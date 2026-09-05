@@ -1625,7 +1625,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.17.1';
+var APP_VERSION = 'v1.18.0';
 
 var db = null;
 var storage = null;
@@ -6041,6 +6041,9 @@ function toast(msg) {
    ARBEITSAUFTRAG – Zustand
    Aufbau nach dem Blatt "Arbeitsauftrag" der BV-Daten.
    ═══════════════════════════════════════ */
+// Firmenlogo (elmbau.de), 200x64 als JPEG eingebettet - html2canvas braucht
+// das Bild lokal, ein externer Link waere im PDF leer und offline tot.
+var AA_LOGO = 'data:image/jpeg;base64,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';
 var AA_ARTEN = ['Kundendienst', 'Restarbeit', 'Mangelbeseitigung'];
 var aaArt = [];              // gewaehlte Auftragsarten
 var aaRows = [];             // [{id, text, erledigt:''|'ja'|'nein'}]
@@ -6228,8 +6231,10 @@ function getAuftragData() {
     bemerkungen: document.getElementById('aa-bemerkungen').value.trim(),
     abnahme1: aaAbnahme.a1,
     abnahme2: aaAbnahme.a2,
-    signatur: aaSigData,
-    signaturKunde: aaSig2Data
+    // Direkt vom Zeichenfeld holen: verlaesst sich nicht darauf, dass das
+    // Ende der Fingerbewegung sauber gemeldet wurde
+    signatur: (aaSigCanvas ? sigAlsBild(aaSigCanvas) : null) || aaSigData,
+    signaturKunde: (aaSig2Canvas ? sigAlsBild(aaSig2Canvas) : null) || aaSig2Data
   };
 }
 
@@ -6244,17 +6249,18 @@ function aaBox(an) {
 function buildAuftragHtml(data) {
   var dateFmt = fmtDate(data.datum);
   var artZeile = AA_ARTEN.map(function(a) {
-    return aaBox(data.art && data.art.indexOf(a) !== -1) + '&nbsp;' + escHtml(a);
-  }).join('&nbsp;&nbsp;&nbsp;&nbsp;');
+    var an = data.art && data.art.indexOf(a) !== -1;
+    return '<span style="' + (an ? 'font-weight:bold;' : '') + '">' + aaBox(an) + '&nbsp;' + escHtml(a) + '</span>';
+  }).join('<span style="display:inline-block;width:10mm"></span>');
 
   var zeilen = (data.rows || []).filter(function(r){ return (r.text || '').trim(); });
-  // Blatt immer auf mindestens 8 Zeilen auffuellen, damit die Optik steht
   var anzeige = zeilen.slice();
   while (anzeige.length < 8) anzeige.push({ text: '', erledigt: '' });
 
-  var arbeiten = anzeige.map(function(r) {
+  var arbeiten = anzeige.map(function(r, i) {
     return '<tr>'
-      + '<td style="height:6.5mm">' + escHtml(r.text || '') + '</td>'
+      + '<td class="nr">' + (i + 1) + '</td>'
+      + '<td style="height:7mm">' + escHtml(r.text || '') + '</td>'
       + '<td class="c">' + (r.erledigt === 'ja' ? 'X' : '') + '</td>'
       + '<td class="c">' + (r.erledigt === 'nein' ? 'X' : '') + '</td>'
       + '</tr>';
@@ -6263,32 +6269,43 @@ function buildAuftragHtml(data) {
   var plzOrt = (data.plz ? data.plz + ' ' : '') + (data.ort || '');
   var telefon = data.tel1 + (data.tel2 ? '  /  ' + data.tel2 : '');
 
-  var sigM = data.signatur
-    ? '<img src="' + data.signatur + '" style="max-height:14mm;max-width:60mm;display:block">'
-    : '<div style="height:14mm"></div>';
-  var sigK = data.signaturKunde
-    ? '<img src="' + data.signaturKunde + '" style="max-height:14mm;max-width:60mm;display:block">'
-    : '<div style="height:14mm"></div>';
+  function sigFeld(bild, beschriftung, zusatz) {
+    return '<div style="flex:1">'
+      + '<div style="height:16mm;display:flex;align-items:flex-end">'
+      +   (bild ? '<img src="' + bild + '" style="max-height:16mm;max-width:100%;display:block">' : '')
+      + '</div>'
+      + '<div style="border-top:1px solid #000;padding-top:2px;font-size:9px">' + beschriftung
+      +   (zusatz ? '<span style="color:#555">&nbsp;&nbsp;' + zusatz + '</span>' : '')
+      + '</div>'
+      + '</div>';
+  }
 
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
     + '<title>Arbeitsauftrag – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
     + '<style>' + checklisteStil()
-    +   '.aa-lbl { background:#f0f0f0; font-weight:bold; width:24mm; }'
-    +   '.aa-box { border:1px solid #000; margin-top:6px; }'
-    +   '.aa-box .t { background:#f0f0f0; border-bottom:1px solid #000; padding:3px 5px; font-weight:bold; }'
-    +   '.aa-box .b { padding:4px 6px; white-space:pre-wrap; }'
+    +   'td, th { border:1px solid #999; }'
+    +   '.aa-lbl { background:#f2f2f2; font-weight:bold; }'
+    +   '.nr { width:7mm; text-align:center; color:#666; font-size:9px; }'
+    +   '.aa-box { border:1px solid #999; margin-top:5px; }'
+    +   '.aa-box .t { background:#f2f2f2; border-bottom:1px solid #999; padding:3px 6px; font-weight:bold; font-size:10px; }'
+    +   '.aa-box .b { padding:5px 7px; white-space:pre-wrap; line-height:1.35; }'
     + '</style></head><body>'
-    + '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:5px">'
-    +   '<div class="hdr">Auftrag - ELEKTRO</div>'
-    +   '<div class="sub">Elm Bau GmbH</div>'
+    // Kopf: Logo links, Titel rechts
+    + '<div style="display:flex;justify-content:space-between;align-items:center;'
+    +      'border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:6px">'
+    +   '<img src="' + AA_LOGO + '" style="height:11mm;display:block">'
+    +   '<div style="text-align:right">'
+    +     '<div style="font-size:19px;font-weight:bold;letter-spacing:0.04em">AUFTRAG ELEKTRO</div>'
+    +     '<div style="font-size:9px;color:#444;margin-top:1px">Elm Bau GmbH &middot; Braunschweiger Straße 22 B &middot; 38154 Königslutter &middot; Tel. 05353 91348-10</div>'
+    +   '</div>'
     + '</div>'
-    + '<div style="border:1px solid #000;padding:3px 6px;margin-bottom:6px;font-size:10.5px">' + artZeile + '</div>'
-    + '<table style="margin-bottom:6px">'
-    + '<colgroup><col style="width:16%"><col style="width:44%"><col style="width:14%"><col style="width:26%"></colgroup>'
-    + '<tr><td class="aa-lbl">Projekt</td><td>' + escHtml(data.bv || '')
-    +     (data.projekt ? ' &nbsp;<b>' + escHtml(data.projekt) + '</b>' : '')
-    +     (data.kostenstelle ? ' &nbsp;<span style="font-size:9px">KST ' + escHtml(data.kostenstelle) + '</span>' : '') + '</td>'
-    +     '<td class="aa-lbl" colspan="2" style="text-align:center;width:auto">Termin</td></tr>'
+    + '<div style="border:1px solid #999;background:#fafafa;padding:4px 7px;margin-bottom:5px;font-size:10.5px">' + artZeile + '</div>'
+    + '<table style="margin-bottom:5px">'
+    + '<colgroup><col style="width:17%"><col style="width:43%"><col style="width:14%"><col style="width:26%"></colgroup>'
+    + '<tr><td class="aa-lbl">Projekt</td><td><b>' + escHtml(data.bv || '') + '</b>'
+    +     (data.projekt ? ' &nbsp;' + escHtml(data.projekt) : '')
+    +     (data.kostenstelle ? ' &nbsp;<span style="font-size:9px;color:#555">KST ' + escHtml(data.kostenstelle) + '</span>' : '') + '</td>'
+    +     '<td class="aa-lbl" colspan="2" style="text-align:center;letter-spacing:0.08em">TERMIN</td></tr>'
     + '<tr><td class="aa-lbl">Straße, Nr.</td><td>' + escHtml(data.strasse) + '</td>'
     +     '<td class="aa-lbl">Datum</td><td>' + escHtml(dateFmt) + '</td></tr>'
     + '<tr><td class="aa-lbl">PLZ, Ort</td><td>' + escHtml(plzOrt) + '</td>'
@@ -6297,38 +6314,32 @@ function buildAuftragHtml(data) {
     +     '<td class="aa-lbl">Fahrzeug</td><td>' + escHtml(data.fahrzeug || '') + '</td></tr>'
     + '</table>'
     + '<table>'
-    + '<colgroup><col style="width:80%"><col style="width:10%"><col style="width:10%"></colgroup>'
-    + '<tr><th rowspan="2" style="text-align:left;padding-left:5px">auszuführende Arbeiten</th>'
+    + '<colgroup><col style="width:7mm"><col><col style="width:12mm"><col style="width:12mm"></colgroup>'
+    + '<tr><th colspan="2" style="text-align:left;padding-left:6px;letter-spacing:0.04em">AUSZUFÜHRENDE ARBEITEN</th>'
     +     '<th colspan="2">erledigt</th></tr>'
-    + '<tr><th>Ja</th><th>nein</th></tr>'
+    + '<tr><th colspan="2" style="border-top:none;padding:0;height:0"></th><th>Ja</th><th>nein</th></tr>'
     + arbeiten
     + '</table>'
     + '<div class="aa-box">'
     +   '<div class="t">'
     +     aaBox(data.rueckDurch) + '&nbsp;durchgeführte Arbeiten'
-    +     '&nbsp;&nbsp;&nbsp;&nbsp;' + aaBox(data.rueckOffen) + '&nbsp;noch durchzuführende Arbeiten'
+    +     '<span style="display:inline-block;width:10mm"></span>' + aaBox(data.rueckOffen) + '&nbsp;noch durchzuführende Arbeiten'
     +   '</div>'
     +   '<div class="b" style="min-height:20mm">' + escHtml(data.rueckText || '') + '</div>'
     + '</div>'
     + '<div class="aa-box">'
     +   '<div class="t">Besonderheiten / Bemerkungen</div>'
-    +   '<div class="b" style="min-height:18mm">' + escHtml(data.bemerkungen || '') + '</div>'
+    +   '<div class="b" style="min-height:16mm">' + escHtml(data.bemerkungen || '') + '</div>'
     + '</div>'
     + '<div class="aa-box">'
     +   '<div class="t">Abnahme / Bestätigung</div>'
     +   '<div class="b">'
     +     '<div>' + aaBox(data.abnahme1) + '&nbsp;Die oben aufgeführten Arbeiten wurden vollständig und ohne Beanstandungen durchgeführt</div>'
     +     '<div style="margin-top:3px">' + aaBox(data.abnahme2) + '&nbsp;Die oben aufgeführten Arbeiten wurden wie zuvor beschrieben durchgeführt</div>'
-    +     '<table style="border:none;margin-top:6mm">'
-    +     '<colgroup><col style="width:50%"><col style="width:50%"></colgroup>'
-    +     '<tr><td style="border:none;padding:0">' + sigM + '</td>'
-    +         '<td style="border:none;padding:0 0 0 8mm">' + sigK + '</td></tr>'
-    +     '<tr><td style="border:none;border-top:1px solid #000;padding:2px 0 0">Name / Unterschrift Monteur'
-    +         (data.monteur ? '  <span style="font-size:9px">(' + escHtml(data.monteur) + ')</span>' : '') + '</td>'
-    +         '<td style="border:none;border-top:1px solid #000;padding:2px 0 0 8mm">Unterschrift Auftraggeber / Bauleiter</td></tr>'
-    +     '<tr><td style="border:none;padding:3px 0 0;font-size:9px">Datum: ' + escHtml(dateFmt) + '</td>'
-    +         '<td style="border:none"></td></tr>'
-    +     '</table>'
+    +     '<div style="display:flex;gap:12mm;margin-top:8mm">'
+    +       sigFeld(data.signatur, 'Unterschrift Monteur', escHtml(data.monteur || ''))
+    +       sigFeld(data.signaturKunde, 'Unterschrift Auftraggeber / Bauherr / Bauleiter', escHtml(dateFmt))
+    +     '</div>'
     +   '</div>'
     + '</div>'
     + '</body></html>';
