@@ -1746,7 +1746,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.22.1';
+var APP_VERSION = 'v1.23.0';
 
 var db = null;
 var storage = null;
@@ -6939,11 +6939,7 @@ function kalGeruest() {
     + '</div>'
     + (isChef ? '<select class="kal-person" id="kalPerson" onchange="kalPersonWechsel(this.value)"></select>' : '')
     + '<div class="kal-grid" id="kalGrid"></div>'
-    + '<div class="kal-legende">'
-    +   '<span><i class="kal-p kal-p-ok"></i>Rapport da</span>'
-    +   '<span><i class="kal-p kal-p-teil"></i>unvollständig</span>'
-    +   '<span><i class="kal-p kal-p-fehlt"></i>Rapport fehlt</span>'
-    + '</div>'
+    + '<div class="kal-legende" id="kalLegende"></div>'
     + '<div id="kalLuecken" class="kal-luecken"></div>';
 }
 
@@ -7013,13 +7009,11 @@ function kalLaden() {
       var tag = d.datum || '';
       if (!tag) return;
       if (isChef && (tag < von || tag > bis)) return;
-      var namen = [];
-      if (d.ersteller) namen.push(d.ersteller);
-      if (d.daten && d.daten.workers) {
-        d.daten.workers.forEach(function(w){ if (w && w.name) namen.push(w.name); });
-      }
-      if (d.meta && d.meta.monteur) namen.push(d.meta.monteur);
-      liste.push({ tag: tag, typ: d.type || 'kontrolle', baustelle: d.baustelle || '', namen: namen });
+      // Jeder schreibt seinen eigenen Rapport -- deshalb zaehlt allein, wer
+      // den Bericht eingereicht hat. Fahrer und mitaufgefuehrte Kollegen
+      // gelten ausdruecklich nicht als abgedeckt.
+      liste.push({ tag: tag, typ: d.type || 'kontrolle', baustelle: d.baustelle || '',
+                   ersteller: d.ersteller || '' });
     });
     kalCache[schluessel] = liste;
     kalZeichnen();
@@ -7042,7 +7036,7 @@ function kalZeichnen() {
 
   // Nach Person filtern (Chef) bzw. bei Monteuren steckt der Filter schon in der Abfrage
   if (kalPerson) {
-    liste = liste.filter(function(e){ return e.namen.indexOf(kalPerson) !== -1; });
+    liste = liste.filter(function(e){ return e.ersteller === kalPerson; });
   }
 
   // Pro Tag: welche Berichtsarten, und wer hat einen Rapport abgedeckt
@@ -7051,7 +7045,7 @@ function kalZeichnen() {
     var t = tage[e.tag] || (tage[e.tag] = { typen: {}, rapportNamen: {}, anzahl: 0 });
     t.typen[e.typ] = true;
     t.anzahl++;
-    if (e.typ === 'rapport') e.namen.forEach(function(n){ t.rapportNamen[n] = true; });
+    if (e.typ === 'rapport' && e.ersteller) t.rapportNamen[e.ersteller] = true;
   });
 
   // Erwartete Mannschaft: alle, oder nur die ausgewaehlte Person
@@ -7110,6 +7104,16 @@ function kalZeichnen() {
   }
   grid.innerHTML = html;
 
+  var leg = document.getElementById('kalLegende');
+  if (leg) {
+    leg.innerHTML = (erwartet.length > 1)
+      ? '<span><i class="kal-p kal-p-ok"></i>alle Rapporte da</span>'
+      + '<span><i class="kal-p kal-p-teil"></i>einzelne fehlen</span>'
+      + '<span><i class="kal-p kal-p-fehlt"></i>niemand hat eingereicht</span>'
+      : '<span><i class="kal-p kal-p-ok"></i>Rapport geschrieben</span>'
+      + '<span><i class="kal-p kal-p-fehlt"></i>Rapport fehlt</span>';
+  }
+
   var lk = document.getElementById('kalLuecken');
   if (lk) {
     if (!luecken.length) {
@@ -7130,12 +7134,14 @@ function kalZeichnen() {
 function kalTagInfo(iso) {
   var liste = (kalCache[isChef ? kalMonatsSchluessel(kalMonat) : '_eigene'] || []).filter(function(e) {
     if (e.tag !== iso) return false;
-    if (kalPerson && e.namen.indexOf(kalPerson) === -1) return false;
+    if (kalPerson && e.ersteller !== kalPerson) return false;
     return true;
   });
   if (!liste.length) { toast(fmtDate(iso) + ': keine Berichte'); return; }
   var text = liste.map(function(e) {
-    return (HISTORY_TYPE_LABELS[e.typ] || e.typ) + (e.baustelle ? ' – ' + e.baustelle : '');
+    return (HISTORY_TYPE_LABELS[e.typ] || e.typ)
+      + (e.ersteller ? ' – ' + e.ersteller : '')
+      + (e.baustelle ? ' (' + e.baustelle + ')' : '');
   }).join('\n');
   alert(fmtDate(iso) + '\n\n' + text);
 }
