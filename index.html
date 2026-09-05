@@ -899,22 +899,13 @@ body {
         <input type="time" id="tr-pause2-bis" value="12:30" onchange="calcArbeitszeit()">
       </div>
     </div>
-    <div class="row" style="align-items:center;margin-top:8px">
-      <div class="field" style="flex:0 0 auto">
-        <label class="toggle-wrap" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-muted)">
-          <input type="checkbox" id="tr-az-auto" checked onchange="calcArbeitszeit()" style="width:18px;height:18px;accent-color:var(--accent)">
-          Auto-Berechnung
-        </label>
-      </div>
-    </div>
+
   </div>
 
   <div class="section">
     <div class="section-label">Personal &amp; Stunden</div>
     <div id="workerList"></div>
-    <button class="btn btn-secondary" onclick="addWorker()" style="margin-top:8px">
-      + Mitarbeiter hinzufügen
-    </button>
+
     <div class="summary-row" id="tr-stunden-summe" hidden>
       <span class="summary-label">Summe Stunden</span>
       <span class="summary-value" id="tr-summe-val">0</span>
@@ -3273,9 +3264,7 @@ function buildReportHtml(data) {
    ═══════════════════════════════════════ */
 function calcArbeitszeit() {
   var display = document.getElementById('tr-az-display');
-  var auto = document.getElementById('tr-az-auto');
   if (!display) return;
-  if (!auto || !auto.checked) { display.textContent = 'Manuell'; display.style.color = 'var(--text-muted)'; return; }
 
   var beginn = document.getElementById('tr-beginn').value;
   var ende = document.getElementById('tr-ende').value;
