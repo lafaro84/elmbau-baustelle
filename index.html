@@ -1429,7 +1429,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.9.0';
+var APP_VERSION = 'v1.9.1';
 
 var db = null;
 var storage = null;
@@ -1535,6 +1535,9 @@ function appBoot() {
 }
 
 function showLoginScreen() {
+  // Sicherheitsnetz: solange niemand angemeldet ist, gibt es keine Chef-Rechte
+  isChef = false;
+  currentUser = null;
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-login').style.display = '';
   document.getElementById('app-main').style.display = 'none';
@@ -1589,7 +1592,11 @@ function doLogin() {
     var d = doc.data();
     if (d.pin !== pin) { errEl.textContent = 'Falsche PIN'; return; }
     currentUser = { id: doc.id, name: d.name, rolle: d.rolle || 'mitarbeiter', pin: d.pin };
-    isChef = (d.rolle === 'chef');
+    // Chef-Rechte gibt es ausschliesslich ueber die Anmeldung mit einem
+    // Firebase-Konto, das in der Sammlung 'chefs' freigeschaltet ist.
+    // Ein Feld in der Mitarbeiter-Sammlung darf das nicht koennen -- sonst
+    // waere eine vierstellige PIN der Schluessel zum ganzen Chef-Bereich.
+    isChef = false;
     afterLogin();
   }).catch(function(err) {
     errEl.textContent = 'Fehler: ' + err.message;
