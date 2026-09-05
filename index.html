@@ -1487,7 +1487,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.11.0';
+var APP_VERSION = 'v1.11.1';
 
 var db = null;
 var storage = null;
@@ -3241,9 +3241,25 @@ function closeLB() {
 // wird sie hier auf eine drucktaugliche Breite gerechnet.
 var SIG_MAX_BREITE = 400;
 
+// Prueft, ob ueberhaupt etwas gezeichnet wurde. Ein blosses Antippen des
+// Feldes loest sonst das Speichern eines vollstaendig durchsichtigen Bildes
+// aus - rund 1,8 KB fuer nichts, plus ein unsichtbares Bild im Ausdruck.
+function sigHatInhalt(canvas) {
+  try {
+    var d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    for (var i = 3; i < d.length; i += 4) {
+      if (d[i] !== 0) return true;   // ein Punkt ist nicht durchsichtig
+    }
+    return false;
+  } catch(e) {
+    return true;   // im Zweifel speichern
+  }
+}
+
 function sigAlsBild(canvas) {
   try {
     if (!canvas || !canvas.width) return null;
+    if (!sigHatInhalt(canvas)) return null;
     if (canvas.width <= SIG_MAX_BREITE) return canvas.toDataURL('image/png');
     var h = Math.round(canvas.height * SIG_MAX_BREITE / canvas.width);
     var klein = document.createElement('canvas');
