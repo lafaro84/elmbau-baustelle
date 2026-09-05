@@ -1448,6 +1448,7 @@ body {
     <div id="pnDatenArea"></div>
     <div style="padding:12px 20px 0;display:flex;gap:8px">
       <button class="btn-sm" onclick="pnAdd('daten')">+ Datendose</button>
+      <button class="btn-sm" onclick="pnAddDoppel()">+ Doppeldose</button>
       <button class="btn-sm" onclick="pnAlle('daten')">Alle gepr&uuml;ft</button>
     </div>
   </div>
@@ -1690,7 +1691,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.19.1';
+var APP_VERSION = 'v1.20.0';
 
 var db = null;
 var storage = null;
@@ -6524,11 +6525,19 @@ var pnDaten = [], pnSat = [], pnSeq = 0;
 var pnSigData = null;
 var pnSpeichertGerade = false;
 
-function pnNeu(mitDb) {
+// pos: '' = einfache Dose, 'links'/'rechts' = eine Seite einer Doppeldose.
+// paar: id der Partnerzeile, damit der Raum nur einmal getippt werden muss.
+function pnNeu(mitDb, pos) {
   pnSeq++;
-  var z = { id: pnSeq, ort: '', ok: false };
+  var z = { id: pnSeq, ort: '', ok: false, pos: pos || '', paar: 0 };
   if (mitDb) z.db = '';
   return z;
+}
+var PN_POS_FOLGE = ['', 'links', 'rechts'];
+function pnPosKurz(pos) {
+  if (pos === 'links') return 'L';
+  if (pos === 'rechts') return 'R';
+  return '–';
 }
 function initPnRows() {
   pnSeq = 0; pnDaten = []; pnSat = [];
@@ -6547,10 +6556,10 @@ function renderPn() {
     el.innerHTML = liste.map(function(z, i) {
       return '<div class="cl-item" style="flex-wrap:wrap;gap:6px">'
         + '<span style="flex:0 0 62px;font-size:12px;color:var(--text-muted)">' + name.charAt(0) + (i + 1) + '</span>'
-        + '<input class="cl-bem" style="flex:1;min-width:110px" placeholder="Ort / Raum" value="' + escHtml(z.ort) + '" oninput="pnSetOrt(\'' + art + '\',' + z.id + ',this.value)">'
+        + '<input class="cl-bem" id="pn-ort-' + art + '-' + z.id + '" style="flex:1;min-width:110px" placeholder="Ort / Raum" value="' + escHtml(z.ort) + '" oninput="pnSetOrt(\'' + art + '\',' + z.id + ',this.value)">'
         + (art === 'sat'
             ? '<input class="cl-bem" style="width:62px" inputmode="decimal" placeholder="dB" value="' + escHtml(z.db || '') + '" oninput="pnSetDb(' + z.id + ',this.value)">'
-            : '')
+            : '<button class="cl-btn' + (z.pos ? ' yes' : '') + '" style="width:34px" onclick="pnPosWeiter(\'' + art + '\',' + z.id + ')" title="Doppeldose: linke oder rechte Seite">' + pnPosKurz(z.pos) + '</button>')
         + '<button class="cl-btn' + (z.ok ? ' yes' : '') + '" style="width:42px" onclick="pnToggle(\'' + art + '\',' + z.id + ')" title="Geprüft und intakt">' + (z.ok ? '&#10003;' : 'i.O.') + '</button>'
         + (liste.length > 1 ? '<button class="cl-btn" style="width:32px" onclick="pnDel(\'' + art + '\',' + z.id + ')" title="Zeile entfernen">&times;</button>' : '')
         + '</div>';
@@ -6563,10 +6572,52 @@ function pnFinde(art, id) {
   for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
   return null;
 }
-function pnSetOrt(art, id, val) { var z = pnFinde(art, id); if (z) z.ort = val; }
+function pnSetOrt(art, id, val) {
+  var z = pnFinde(art, id);
+  if (!z) return;
+  var alt = z.ort;
+  z.ort = val;
+  // Bei einer Doppeldose den Raum mitziehen, solange die Partnerzeile nicht
+  // von Hand abgeaendert wurde
+  if (z.paar) {
+    var p = pnFinde(art, z.paar);
+    if (p && (!p.ort || p.ort === alt)) {
+      p.ort = val;
+      var feld = document.getElementById('pn-ort-' + art + '-' + p.id);
+      if (feld) feld.value = val;
+    }
+  }
+}
+
+function pnPosWeiter(art, id) {
+  var z = pnFinde(art, id);
+  if (!z) return;
+  var i = PN_POS_FOLGE.indexOf(z.pos || '');
+  z.pos = PN_POS_FOLGE[(i + 1) % PN_POS_FOLGE.length];
+  renderPn();
+}
+
+// Legt zwei verbundene Zeilen an: derselbe Raum, links und rechts
+function pnAddDoppel() {
+  if (pnDaten.length + 2 > PN_MAX) { toast('Mehr als ' + PN_MAX + ' Dosen sind nicht vorgesehen'); return; }
+  var l = pnNeu(false, 'links');
+  var r = pnNeu(false, 'rechts');
+  l.paar = r.id; r.paar = l.id;
+  pnDaten.push(l); pnDaten.push(r);
+  renderPn();
+  setTimeout(function() {
+    var feld = document.getElementById('pn-ort-daten-' + l.id);
+    if (feld) { try { feld.focus(); } catch(e) {} }
+  }, 30);
+}
 function pnSetDb(id, val) { var z = pnFinde('sat', id); if (z) z.db = val; }
 function pnToggle(art, id) { var z = pnFinde(art, id); if (z) { z.ok = !z.ok; renderPn(); } }
 function pnDel(art, id) {
+  var weg = pnFinde(art, id);
+  if (weg && weg.paar) {
+    var p = pnFinde(art, weg.paar);
+    if (p) p.paar = 0;
+  }
   if (art === 'sat') pnSat = pnSat.filter(function(z){ return z.id !== id; });
   else pnDaten = pnDaten.filter(function(z){ return z.id !== id; });
   if (!pnListe(art).length) pnListe(art).push(pnNeu(art === 'sat'));
@@ -6645,7 +6696,7 @@ function getNetzwerkData() {
     projekt: document.getElementById('pn-projekt').value.trim(),
     monteur: document.getElementById('pn-monteur').value,
     datum: document.getElementById('pn-datum').value,
-    daten: pnDaten.map(function(z){ return { ort: z.ort, ok: z.ok }; }),
+    daten: pnDaten.map(function(z){ return { ort: z.ort, ok: z.ok, pos: z.pos || '' }; }),
     sat: pnSat.map(function(z){ return { ort: z.ort, ok: z.ok, db: z.db || '' }; }),
     bemerkungen: document.getElementById('pn-bemerkungen').value.trim(),
     signatur: (pnSigCanvas ? sigAlsBild(pnSigCanvas) : null) || pnSigData
@@ -6662,7 +6713,8 @@ function buildNetzwerkHtml(data) {
     var rows = zeilen.map(function(z, i) {
       return '<tr>'
         + '<td class="pn-nr">' + kurz + (i + 1) + '</td>'
-        + '<td style="height:6.4mm">' + escHtml(z.ort || '') + '</td>'
+        + '<td style="height:6.4mm">' + escHtml(z.ort || '')
+        +   (z.ort && z.pos ? ' <span style="color:#555">Dose ' + escHtml(z.pos) + '</span>' : '') + '</td>'
         + (mitDb ? '<td class="c">' + escHtml(z.db || '') + '</td>' : '')
         + '<td class="c">' + aaBox(!!z.ok) + '</td>'
         + '</tr>';
