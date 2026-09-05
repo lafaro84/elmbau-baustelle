@@ -408,6 +408,7 @@ body {
 }
 .history-dot.kontrolle { background: var(--accent); }
 .history-dot.rapport { background: var(--info); }
+.history-dot.auftrag { background: #38BDF8; }
 .history-dot.rohmontage { background: var(--success); }
 .history-dot.fertigmontage { background: var(--danger); }
 .history-dot.kabelliste { background: #A78BFA; }
@@ -422,6 +423,7 @@ body {
 }
 .history-type.kontrolle { background: var(--accent-light); color: var(--accent); }
 .history-type.rapport { background: var(--info-light); color: var(--info); }
+.history-type.auftrag { background: #10344A; color: #38BDF8; }
 .history-type.rohmontage { background: var(--success-light); color: var(--success); }
 .history-type.fertigmontage { background: var(--danger-light); color: var(--danger); }
 .history-type.kabelliste { background: #2D1F5E; color: #A78BFA; }
@@ -814,6 +816,7 @@ body {
 <div class="module-nav">
   <button class="module-btn active" onclick="switchModule('kontrolle',this)">Kontrolle</button>
   <button class="module-btn" onclick="switchModule('rapport',this)">Rapport</button>
+  <button class="module-btn" onclick="switchModule('auftrag',this)">Auftrag</button>
   <button class="module-btn" onclick="switchModule('rohmontage',this)">Rohmontage</button>
   <button class="module-btn" onclick="switchModule('fertigmontage',this)">Fertigm.</button>
   <button class="module-btn" onclick="switchModule('kabelliste',this)">Kabelliste</button>
@@ -1037,6 +1040,107 @@ body {
     <button class="btn btn-danger-outline" onclick="resetRapport()">
       Formular zurücksetzen
     </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: ARBEITSAUFTRAG
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-auftrag">
+
+  <div class="section">
+    <div class="section-label">Auftragsart</div>
+    <div class="chip-group">
+      <button type="button" class="chip-toggle" onclick="aaArtToggle('Kundendienst',this)">Kundendienst</button>
+      <button type="button" class="chip-toggle" onclick="aaArtToggle('Restarbeit',this)">Restarbeit</button>
+      <button type="button" class="chip-toggle" onclick="aaArtToggle('Mangelbeseitigung',this)">Mangelbeseitigung</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Projekt</div>
+    <div class="field">
+      <label for="aa-bv">Bauvorhaben</label>
+      <select id="aa-bv" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+    </div>
+    <div class="row">
+      <div class="field"><label for="aa-projekt">Projekt-Nr.</label><input type="text" id="aa-projekt" placeholder="EL 00-000"></div>
+      <div class="field"><label for="aa-kostenstelle">Kostenstelle</label><input type="text" id="aa-kostenstelle" placeholder="Kostenstelle"></div>
+    </div>
+    <div class="field"><label for="aa-strasse">Stra&szlig;e, Nr.</label><input type="text" id="aa-strasse" placeholder="Stra&szlig;e und Hausnummer"></div>
+    <div class="row">
+      <div class="field" style="flex:0 0 100px"><label for="aa-plz">PLZ</label><input type="text" id="aa-plz" inputmode="numeric" placeholder="38154"></div>
+      <div class="field"><label for="aa-ort">Ort</label><input type="text" id="aa-ort" placeholder="Ort"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="aa-tel1">Telefon</label><input type="tel" id="aa-tel1" placeholder="Ansprechpartner"></div>
+      <div class="field"><label for="aa-tel2">Telefon 2</label><input type="tel" id="aa-tel2" placeholder="optional"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Termin</div>
+    <div class="row">
+      <div class="field"><label for="aa-datum">Datum</label><input type="date" id="aa-datum"></div>
+      <div class="field"><label for="aa-uhrzeit">Uhrzeit</label><input type="time" id="aa-uhrzeit"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="aa-fahrzeug">Fahrzeug</label><input type="text" id="aa-fahrzeug" placeholder="Kennzeichen"></div>
+      <div class="field"><label for="aa-monteur">Monteur</label><select id="aa-monteur"><option value="">&mdash; Ausw&auml;hlen &mdash;</option></select></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Auszuf&uuml;hrende Arbeiten</div>
+    <div id="aaArbeitenArea"></div>
+    <div style="padding:12px 20px 0"><button class="btn-sm" onclick="aaAddZeile()">+ Position</button></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">R&uuml;ckmeldung</div>
+    <div class="chip-group">
+      <button type="button" class="chip-toggle" onclick="aaRueckToggle('durchgefuehrt',this)">durchgef&uuml;hrte Arbeiten</button>
+      <button type="button" class="chip-toggle" onclick="aaRueckToggle('offen',this)">noch durchzuf&uuml;hrende Arbeiten</button>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <textarea id="aa-rueck" placeholder="Beschreibung..."></textarea>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Besonderheiten / Bemerkungen</div>
+    <div class="field"><textarea id="aa-bemerkungen" placeholder="Besonderheiten..."></textarea></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Abnahme / Best&auml;tigung</div>
+    <div class="chip-group" style="flex-direction:column;align-items:stretch">
+      <button type="button" class="chip-toggle" style="text-align:left" onclick="aaAbnahmeToggle(1,this)">Vollst&auml;ndig und ohne Beanstandungen durchgef&uuml;hrt</button>
+      <button type="button" class="chip-toggle" style="text-align:left" onclick="aaAbnahmeToggle(2,this)">Wie vor beschrieben durchgef&uuml;hrt</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Unterschrift Monteur</div>
+    <div class="sig-wrap" id="aaSigWrap">
+      <canvas id="aaSigCanvas" height="160"></canvas>
+      <div class="sig-hint" id="aaSigHint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions"><button class="btn-sm" onclick="clearAaSig()">L&ouml;schen</button></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Unterschrift Auftraggeber</div>
+    <div class="sig-wrap" id="aaSig2Wrap">
+      <canvas id="aaSig2Canvas" height="160"></canvas>
+      <div class="sig-hint" id="aaSig2Hint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions"><button class="btn-sm" onclick="clearAaSig2()">L&ouml;schen</button></div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" id="aa-submit" onclick="createAuftrag()">Arbeitsauftrag erstellen</button>
+    <button class="btn btn-danger-outline" onclick="resetAuftrag()">Formular zur&uuml;cksetzen</button>
   </div>
 </div>
 
@@ -1323,6 +1427,7 @@ body {
     <button class="filter-tab active" onclick="filterHistory('all',this)">Alle</button>
     <button class="filter-tab" onclick="filterHistory('kontrolle',this)">Kontrolle</button>
     <button class="filter-tab" onclick="filterHistory('rapport',this)">Rapport</button>
+    <button class="filter-tab" onclick="filterHistory('auftrag',this)">Auftrag</button>
     <button class="filter-tab" onclick="filterHistory('rohmontage',this)">Rohmont.</button>
     <button class="filter-tab" onclick="filterHistory('fertigmontage',this)">Fertigm.</button>
     <button class="filter-tab" onclick="filterHistory('kabelliste',this)">Kabelliste</button>
@@ -1462,6 +1567,7 @@ body {
         <option value="">Alle Typen</option>
         <option value="kontrolle">Kontrolle</option>
         <option value="rapport">Tagesrapport</option>
+        <option value="auftrag">Arbeitsauftrag</option>
         <option value="rohmontage">Rohmontage</option>
         <option value="fertigmontage">Fertigmontage</option>
         <option value="kabelliste">Kabelliste</option>
@@ -1487,6 +1593,7 @@ body {
         <option value="">Alle Typen</option>
         <option value="kontrolle">Kontrolle</option>
         <option value="rapport">Tagesrapport</option>
+        <option value="auftrag">Arbeitsauftrag</option>
         <option value="rohmontage">Rohmontage</option>
         <option value="fertigmontage">Fertigmontage</option>
         <option value="kabelliste">Kabelliste</option>
@@ -1518,7 +1625,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.16.0';
+var APP_VERSION = 'v1.17.0';
 
 var db = null;
 var storage = null;
@@ -1886,7 +1993,7 @@ function loadMasterData() {
 }
 
 function populatePersonalDropdowns() {
-  var selIds = ['tr-fahrer','rm-monteur','fm-monteur','kl-monteur','sc-monteur'];
+  var selIds = ['tr-fahrer','aa-monteur','rm-monteur','fm-monteur','kl-monteur','sc-monteur'];
   selIds.forEach(function(sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
@@ -1903,7 +2010,7 @@ function populatePersonalDropdowns() {
 }
 
 function populateBaustellenDropdowns() {
-  var selectIds = ['f-site','tr-baustelle','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
+  var selectIds = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
   selectIds.forEach(function(sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
@@ -1927,7 +2034,7 @@ function populateBaustellenDropdowns() {
    zuletzt verwendete zuerst, und das Anlegen erst, wenn die Suche nichts
    findet, samt Warnung vor aehnlichen Namen.
    ═══════════════════════════════════════ */
-var BV_FELDER = ['f-site','tr-baustelle','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
+var BV_FELDER = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
 var BV_ZULETZT_KEY = 'elmbau_bv_zuletzt';
 var BV_ZULETZT_MAX = 5;
 var bvOverlayEl = null;
@@ -2178,6 +2285,21 @@ function autofillFromBaustelle(sel) {
     // Tagesrapport: fill Kostenstelle + Projekt-Nr.
     document.getElementById('tr-kostenstelle').value = found ? (found.kostenstelle || '') : '';
     document.getElementById('tr-projekt').value = found ? (found.projektNr || '') : '';
+  } else if (selId === 'aa-bv') {
+    // Arbeitsauftrag: Projekt-Nr., Kostenstelle und Anschrift uebernehmen.
+    // Die Adresse steht in den Stammdaten als "Strasse, PLZ Ort" -- daraus
+    // werden Strasse, PLZ und Ort getrennt, ohne bereits Getipptes zu loeschen.
+    var aap = document.getElementById('aa-projekt');
+    var aak = document.getElementById('aa-kostenstelle');
+    if (aap) aap.value = found ? (found.projektNr || '') : '';
+    if (aak) aak.value = found ? (found.kostenstelle || '') : '';
+    var teile = String(found ? (found.adresse || '') : '').split(',');
+    var strasse = (teile[0] || '').trim();
+    var rest = teile.slice(1).join(',').trim();
+    var m = rest.match(/^(\d{4,5})\s+(.*)$/);
+    document.getElementById('aa-strasse').value = strasse;
+    document.getElementById('aa-plz').value = m ? m[1] : '';
+    document.getElementById('aa-ort').value = m ? m[2] : rest;
   } else if (selId === 'kl-bv') {
     // Kabelliste: fill el-Nr.
     var elnr = document.getElementById('kl-elnr');
@@ -2891,8 +3013,8 @@ function dashLoadReports() {
       return;
     }
 
-    var typeLabels = { kontrolle:'Kontrolle', rapport:'Tagesrapport', rohmontage:'Rohmontage', fertigmontage:'Fertigmontage', kabelliste:'Kabelliste', schalter:'Schalter' };
-    var typeColors = { kontrolle:'#009959', rapport:'#60A5FA', rohmontage:'#F59E0B', fertigmontage:'#EC4899', kabelliste:'#A78BFA', schalter:'#F472B6' };
+    var typeLabels = { kontrolle:'Kontrolle', rapport:'Tagesrapport', auftrag:'Arbeitsauftrag', rohmontage:'Rohmontage', fertigmontage:'Fertigmontage', kabelliste:'Kabelliste', schalter:'Schalter' };
+    var typeColors = { kontrolle:'#009959', rapport:'#60A5FA', auftrag:'#38BDF8', rohmontage:'#F59E0B', fertigmontage:'#EC4899', kabelliste:'#A78BFA', schalter:'#F472B6' };
 
     listEl.innerHTML = reports.map(function(r) {
       var typeLabel = typeLabels[r.type] || r.type;
@@ -3143,6 +3265,7 @@ function berichtHtml(d) {
   try {
     if (d.type === 'rapport') return buildRapportHtml(daten);
     if (d.type === 'kontrolle') return buildReportHtml(daten);
+    if (d.type === 'auftrag') return buildAuftragHtml(daten);
     if (d.type === 'rohmontage') return buildRohmontageHtml(daten);
     if (d.type === 'fertigmontage') return buildFertigmontageHtml(daten);
     if (d.type === 'kabelliste') return buildKabellisteHtml(daten);
@@ -3645,6 +3768,7 @@ function switchModule(name, btn) {
   var sub = document.getElementById('headerSubtitle');
   if (name === 'kontrolle') sub.textContent = 'Mängeldokumentation';
   else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(function(){ loadPauseMemory(); ladeEntwurf(); calcArbeitszeit(); initTrSig2(); }, 50); }
+  else if (name === 'auftrag') sub.textContent = 'Arbeitsauftrag';
   else if (name === 'rohmontage') sub.textContent = 'Checkliste Rohmontage';
   else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
@@ -4609,8 +4733,8 @@ function buildRapportHtml(data) {
     +   '<div style="font-size:18px;font-weight:bold;margin-top:4mm">' + escHtml(data.baustelle || '') + '</div>'
     +   (data.ort ? '<div style="font-size:13px;margin-top:1mm">' + escHtml(data.ort) + '</div>' : '')
     +   '<div style="margin-top:4mm;font-size:14px">'
-    +     'Kostenstelle: <b style="color:#c00;font-size:16px">' + escHtml(data.kostenstelle || '') + '</b>'
-    +     '<span style="margin-left:16mm">Projekt Nr.: <b style="color:#c00;font-size:16px">' + escHtml(data.projekt || '') + '</b></span>'
+    +     'Kostenstelle: <b style="font-size:16px">' + escHtml(data.kostenstelle || '') + '</b>'
+    +     '<span style="margin-left:16mm">Projekt Nr.: <b style="font-size:16px">' + escHtml(data.projekt || '') + '</b></span>'
     +   '</div>'
     + '</td>'
     + '<td style="font-size:11px;padding:2px 4px">'
@@ -5411,6 +5535,7 @@ function filterHistory(type, btn) {
 var HISTORY_TYPE_LABELS = {
   kontrolle: 'Kontrolle',
   rapport: 'Tagesrapport',
+  auftrag: 'Arbeitsauftrag',
   rohmontage: 'Rohmontage',
   fertigmontage: 'Fertigmontage',
   kabelliste: 'Kabelliste',
@@ -5535,6 +5660,8 @@ function renderLocalHistory(el) {
       meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.inspector || '—') + ' &middot; ' + (h.mangelCount || 0) + ' Mängel';
     } else if (hType === 'rapport') {
       meta = fmtDate(h.date) + ' &middot; ' + (h.workerCount || 0) + ' MA &middot; ' + (h.sumStd || 0) + ' Std.';
+    } else if (hType === 'auftrag') {
+      meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.jaCount || 0) + ' erledigt / ' + (h.neinCount || 0) + ' offen';
     } else if (hType === 'rohmontage' || hType === 'fertigmontage') {
       meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.jaCount || 0) + ' Ja / ' + (h.neinCount || 0) + ' Nein';
     } else if (hType === 'kabelliste') {
@@ -5563,6 +5690,7 @@ function renderLocalHistory(el) {
 var HISTORY_FILE_PREFIXES = {
   kontrolle: 'Kontrolle_',
   rapport: 'Tagesrapport_',
+  auftrag: 'Arbeitsauftrag_',
   rohmontage: 'Rohmontage_',
   fertigmontage: 'Fertigmontage_',
   kabelliste: 'Kabelliste_',
@@ -5908,6 +6036,389 @@ function toast(msg) {
   t._tid = setTimeout(function(){ t.classList.remove('show'); }, 3000);
 }
 
+
+/* ═══════════════════════════════════════
+   ARBEITSAUFTRAG – Zustand
+   Aufbau nach dem Blatt "Arbeitsauftrag" der BV-Daten.
+   ═══════════════════════════════════════ */
+var AA_ARTEN = ['Kundendienst', 'Restarbeit', 'Mangelbeseitigung'];
+var aaArt = [];              // gewaehlte Auftragsarten
+var aaRows = [];             // [{id, text, erledigt:''|'ja'|'nein'}]
+var aaSeq = 0;
+var aaRueck = { durchgefuehrt: false, offen: false };
+var aaAbnahme = { a1: false, a2: false };
+var aaSpeichertGerade = false;
+
+function aaNeueZeile(text) {
+  aaSeq++;
+  return { id: aaSeq, text: text || '', erledigt: '' };
+}
+
+function initAaRows() {
+  aaSeq = 0;
+  aaRows = [];
+  for (var i = 0; i < 6; i++) aaRows.push(aaNeueZeile(''));
+}
+initAaRows();
+
+function renderAaArbeiten() {
+  var el = document.getElementById('aaArbeitenArea');
+  if (!el) return;
+  var html = '';
+  aaRows.forEach(function(r, i) {
+    html += '<div class="cl-item" style="flex-wrap:wrap;gap:6px">'
+      + '<span style="width:18px;font-size:12px;color:var(--text-muted)">' + (i + 1) + '.</span>'
+      + '<input class="cl-bem" style="flex:1;min-width:120px" placeholder="Arbeit / Position" value="' + escHtml(r.text) + '" oninput="setAaText(' + r.id + ',this.value)">'
+      + '<div class="cl-btns">'
+      +   '<button class="cl-btn' + (r.erledigt === 'ja' ? ' yes' : '') + '" onclick="setAaErledigt(' + r.id + ',\'ja\')">Ja</button>'
+      +   '<button class="cl-btn' + (r.erledigt === 'nein' ? ' no' : '') + '" onclick="setAaErledigt(' + r.id + ',\'nein\')">Nein</button>'
+      + '</div>'
+      + (aaRows.length > 1 ? '<button class="cl-btn" style="width:32px" onclick="aaDelZeile(' + r.id + ')" title="Zeile entfernen">&times;</button>' : '')
+      + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function aaFinde(id) {
+  for (var i = 0; i < aaRows.length; i++) if (aaRows[i].id === id) return aaRows[i];
+  return null;
+}
+function setAaText(id, val) { var r = aaFinde(id); if (r) r.text = val; }
+function setAaErledigt(id, val) {
+  var r = aaFinde(id);
+  if (!r) return;
+  r.erledigt = (r.erledigt === val) ? '' : val;
+  renderAaArbeiten();
+}
+function aaAddZeile() {
+  if (aaRows.length >= 20) { toast('Mehr als 20 Positionen passen nicht auf das Blatt'); return; }
+  aaRows.push(aaNeueZeile(''));
+  renderAaArbeiten();
+}
+function aaDelZeile(id) {
+  aaRows = aaRows.filter(function(r){ return r.id !== id; });
+  if (!aaRows.length) aaRows.push(aaNeueZeile(''));
+  renderAaArbeiten();
+}
+
+function aaArtToggle(name, btn) {
+  var i = aaArt.indexOf(name);
+  if (i === -1) aaArt.push(name); else aaArt.splice(i, 1);
+  btn.classList.toggle('active');
+}
+function aaRueckToggle(key, btn) {
+  aaRueck[key] = !aaRueck[key];
+  btn.classList.toggle('active');
+}
+function aaAbnahmeToggle(nr, btn) {
+  var key = nr === 1 ? 'a1' : 'a2';
+  aaAbnahme[key] = !aaAbnahme[key];
+  btn.classList.toggle('active');
+}
+
+/* ═══════════════════════════════════════
+   SIGNATURE – Arbeitsauftrag (Monteur + Auftraggeber)
+   ═══════════════════════════════════════ */
+var aaSigCanvas = document.getElementById('aaSigCanvas');
+var aaSigCtx = aaSigCanvas ? aaSigCanvas.getContext('2d') : null;
+var aaSigDrawing = false, aaSigLX, aaSigLY, aaSigData = null;
+var aaSig2Canvas = document.getElementById('aaSig2Canvas');
+var aaSig2Ctx = aaSig2Canvas ? aaSig2Canvas.getContext('2d') : null;
+var aaSig2Drawing = false, aaSig2LX, aaSig2LY, aaSig2Data = null;
+
+function aaSigSetup(canvas, ctx) {
+  if (!canvas || !ctx) return;
+  var r = canvas.parentElement.getBoundingClientRect();
+  if (r.width < 10) return;
+  canvas.width = r.width;
+  canvas.height = 160;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+function initAaSig() { aaSigSetup(aaSigCanvas, aaSigCtx); aaSigSetup(aaSig2Canvas, aaSig2Ctx); }
+
+if (aaSigCanvas) {
+  aaSigCanvas.addEventListener('mousedown', function(e){ aaSigStart(e); });
+  aaSigCanvas.addEventListener('mousemove', function(e){ aaSigMove(e); });
+  aaSigCanvas.addEventListener('mouseup', aaSigEnd);
+  aaSigCanvas.addEventListener('touchstart', function(e){ aaSigStart(e); }, {passive:false});
+  aaSigCanvas.addEventListener('touchmove', function(e){ aaSigMove(e); }, {passive:false});
+  aaSigCanvas.addEventListener('touchend', aaSigEnd);
+}
+function aaSigStart(e) {
+  e.preventDefault(); aaSigDrawing = true;
+  var p = sigPos(e, aaSigCanvas); aaSigLX = p[0]; aaSigLY = p[1];
+  document.getElementById('aaSigHint').style.opacity = '0';
+}
+function aaSigMove(e) {
+  if (!aaSigDrawing) return;
+  e.preventDefault();
+  var p = sigPos(e, aaSigCanvas);
+  aaSigCtx.beginPath(); aaSigCtx.moveTo(aaSigLX, aaSigLY); aaSigCtx.lineTo(p[0], p[1]); aaSigCtx.stroke();
+  aaSigLX = p[0]; aaSigLY = p[1];
+}
+function aaSigEnd() {
+  if (!aaSigDrawing) return;
+  aaSigDrawing = false;
+  aaSigData = sigAlsBild(aaSigCanvas);
+}
+function clearAaSig() {
+  if (!aaSigCtx) return;
+  aaSigCtx.clearRect(0, 0, aaSigCanvas.width, aaSigCanvas.height);
+  aaSigData = null;
+  document.getElementById('aaSigHint').style.opacity = '1';
+}
+
+if (aaSig2Canvas) {
+  aaSig2Canvas.addEventListener('mousedown', function(e){ aaSig2Start(e); });
+  aaSig2Canvas.addEventListener('mousemove', function(e){ aaSig2Move(e); });
+  aaSig2Canvas.addEventListener('mouseup', aaSig2End);
+  aaSig2Canvas.addEventListener('touchstart', function(e){ aaSig2Start(e); }, {passive:false});
+  aaSig2Canvas.addEventListener('touchmove', function(e){ aaSig2Move(e); }, {passive:false});
+  aaSig2Canvas.addEventListener('touchend', aaSig2End);
+}
+function aaSig2Start(e) {
+  e.preventDefault(); aaSig2Drawing = true;
+  var p = sigPos(e, aaSig2Canvas); aaSig2LX = p[0]; aaSig2LY = p[1];
+  document.getElementById('aaSig2Hint').style.opacity = '0';
+}
+function aaSig2Move(e) {
+  if (!aaSig2Drawing) return;
+  e.preventDefault();
+  var p = sigPos(e, aaSig2Canvas);
+  aaSig2Ctx.beginPath(); aaSig2Ctx.moveTo(aaSig2LX, aaSig2LY); aaSig2Ctx.lineTo(p[0], p[1]); aaSig2Ctx.stroke();
+  aaSig2LX = p[0]; aaSig2LY = p[1];
+}
+function aaSig2End() {
+  if (!aaSig2Drawing) return;
+  aaSig2Drawing = false;
+  aaSig2Data = sigAlsBild(aaSig2Canvas);
+}
+function clearAaSig2() {
+  if (!aaSig2Ctx) return;
+  aaSig2Ctx.clearRect(0, 0, aaSig2Canvas.width, aaSig2Canvas.height);
+  aaSig2Data = null;
+  document.getElementById('aaSig2Hint').style.opacity = '1';
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Arbeitsauftrag
+   ═══════════════════════════════════════ */
+function getAuftragData() {
+  return {
+    art: aaArt.slice(),
+    bv: document.getElementById('aa-bv').value.trim(),
+    projekt: document.getElementById('aa-projekt').value.trim(),
+    kostenstelle: document.getElementById('aa-kostenstelle').value.trim(),
+    strasse: document.getElementById('aa-strasse').value.trim(),
+    plz: document.getElementById('aa-plz').value.trim(),
+    ort: document.getElementById('aa-ort').value.trim(),
+    tel1: document.getElementById('aa-tel1').value.trim(),
+    tel2: document.getElementById('aa-tel2').value.trim(),
+    datum: document.getElementById('aa-datum').value,
+    uhrzeit: document.getElementById('aa-uhrzeit').value,
+    fahrzeug: document.getElementById('aa-fahrzeug').value.trim(),
+    monteur: document.getElementById('aa-monteur').value,
+    rows: aaRows.map(function(r){ return { text: r.text, erledigt: r.erledigt }; }),
+    rueckDurch: aaRueck.durchgefuehrt,
+    rueckOffen: aaRueck.offen,
+    rueckText: document.getElementById('aa-rueck').value.trim(),
+    bemerkungen: document.getElementById('aa-bemerkungen').value.trim(),
+    abnahme1: aaAbnahme.a1,
+    abnahme2: aaAbnahme.a2,
+    signatur: aaSigData,
+    signaturKunde: aaSig2Data
+  };
+}
+
+// Kaestchen als echte Rahmen zeichnen - Unicode-Haken werden von html2canvas
+// je nach Schrift nicht zuverlaessig dargestellt.
+function aaBox(an) {
+  return '<span style="display:inline-block;width:9px;height:9px;line-height:9px;'
+    + 'border:1px solid #000;text-align:center;font-size:8px;font-weight:bold;'
+    + 'vertical-align:-1px">' + (an ? 'X' : '&nbsp;') + '</span>';
+}
+
+function buildAuftragHtml(data) {
+  var dateFmt = fmtDate(data.datum);
+  var artZeile = AA_ARTEN.map(function(a) {
+    return aaBox(data.art && data.art.indexOf(a) !== -1) + '&nbsp;' + escHtml(a);
+  }).join('&nbsp;&nbsp;&nbsp;&nbsp;');
+
+  var zeilen = (data.rows || []).filter(function(r){ return (r.text || '').trim(); });
+  // Blatt immer auf mindestens 8 Zeilen auffuellen, damit die Optik steht
+  var anzeige = zeilen.slice();
+  while (anzeige.length < 8) anzeige.push({ text: '', erledigt: '' });
+
+  var arbeiten = anzeige.map(function(r) {
+    return '<tr>'
+      + '<td style="height:6.5mm">' + escHtml(r.text || '') + '</td>'
+      + '<td class="c">' + (r.erledigt === 'ja' ? 'X' : '') + '</td>'
+      + '<td class="c">' + (r.erledigt === 'nein' ? 'X' : '') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var plzOrt = (data.plz ? data.plz + ' ' : '') + (data.ort || '');
+  var telefon = data.tel1 + (data.tel2 ? '  /  ' + data.tel2 : '');
+
+  var sigM = data.signatur
+    ? '<img src="' + data.signatur + '" style="max-height:14mm;max-width:60mm;display:block">'
+    : '<div style="height:14mm"></div>';
+  var sigK = data.signaturKunde
+    ? '<img src="' + data.signaturKunde + '" style="max-height:14mm;max-width:60mm;display:block">'
+    : '<div style="height:14mm"></div>';
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Arbeitsauftrag – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
+    + '<style>' + checklisteStil()
+    +   '.aa-lbl { background:#f0f0f0; font-weight:bold; width:24mm; }'
+    +   '.aa-box { border:1px solid #000; margin-top:6px; }'
+    +   '.aa-box .t { background:#f0f0f0; border-bottom:1px solid #000; padding:3px 5px; font-weight:bold; }'
+    +   '.aa-box .b { padding:4px 6px; white-space:pre-wrap; }'
+    + '</style></head><body>'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:5px">'
+    +   '<div class="hdr">Auftrag - ELEKTRO</div>'
+    +   '<div class="sub">Elm Bau GmbH</div>'
+    + '</div>'
+    + '<div style="border:1px solid #000;padding:3px 6px;margin-bottom:6px;font-size:10.5px">' + artZeile + '</div>'
+    + '<table style="margin-bottom:6px">'
+    + '<colgroup><col style="width:16%"><col style="width:44%"><col style="width:14%"><col style="width:26%"></colgroup>'
+    + '<tr><td class="aa-lbl">Projekt</td><td>' + escHtml(data.bv || '')
+    +     (data.projekt ? ' &nbsp;<b>' + escHtml(data.projekt) + '</b>' : '')
+    +     (data.kostenstelle ? ' &nbsp;<span style="font-size:9px">KST ' + escHtml(data.kostenstelle) + '</span>' : '') + '</td>'
+    +     '<td class="aa-lbl" colspan="2" style="text-align:center;width:auto">Termin</td></tr>'
+    + '<tr><td class="aa-lbl">Straße, Nr.</td><td>' + escHtml(data.strasse) + '</td>'
+    +     '<td class="aa-lbl">Datum</td><td>' + escHtml(dateFmt) + '</td></tr>'
+    + '<tr><td class="aa-lbl">PLZ, Ort</td><td>' + escHtml(plzOrt) + '</td>'
+    +     '<td class="aa-lbl">Uhrzeit</td><td>' + escHtml(data.uhrzeit || '') + '</td></tr>'
+    + '<tr><td class="aa-lbl">Telefon</td><td>' + escHtml(telefon) + '</td>'
+    +     '<td class="aa-lbl">Fahrzeug</td><td>' + escHtml(data.fahrzeug || '') + '</td></tr>'
+    + '</table>'
+    + '<table>'
+    + '<colgroup><col style="width:80%"><col style="width:10%"><col style="width:10%"></colgroup>'
+    + '<tr><th rowspan="2" style="text-align:left;padding-left:5px">auszuführende Arbeiten</th>'
+    +     '<th colspan="2">erledigt</th></tr>'
+    + '<tr><th>Ja</th><th>nein</th></tr>'
+    + arbeiten
+    + '</table>'
+    + '<div class="aa-box">'
+    +   '<div class="t">'
+    +     aaBox(data.rueckDurch) + '&nbsp;durchgeführte Arbeiten'
+    +     '&nbsp;&nbsp;&nbsp;&nbsp;' + aaBox(data.rueckOffen) + '&nbsp;noch durchzuführende Arbeiten'
+    +   '</div>'
+    +   '<div class="b" style="min-height:20mm">' + escHtml(data.rueckText || '') + '</div>'
+    + '</div>'
+    + '<div class="aa-box">'
+    +   '<div class="t">Besonderheiten / Bemerkungen</div>'
+    +   '<div class="b" style="min-height:18mm">' + escHtml(data.bemerkungen || '') + '</div>'
+    + '</div>'
+    + '<div class="aa-box">'
+    +   '<div class="t">Abnahme / Bestätigung</div>'
+    +   '<div class="b">'
+    +     '<div>' + aaBox(data.abnahme1) + '&nbsp;Die oben aufgeführten Arbeiten wurden vollständig und ohne Beanstandungen durchgeführt</div>'
+    +     '<div style="margin-top:3px">' + aaBox(data.abnahme2) + '&nbsp;Die oben aufgeführten Arbeiten wurden wie vor beschrieben durchgeführt</div>'
+    +     '<table style="border:none;margin-top:6mm">'
+    +     '<colgroup><col style="width:50%"><col style="width:50%"></colgroup>'
+    +     '<tr><td style="border:none;padding:0">' + sigM + '</td>'
+    +         '<td style="border:none;padding:0 0 0 8mm">' + sigK + '</td></tr>'
+    +     '<tr><td style="border:none;border-top:1px solid #000;padding:2px 0 0">Name / Unterschrift Monteur'
+    +         (data.monteur ? '  <span style="font-size:9px">(' + escHtml(data.monteur) + ')</span>' : '') + '</td>'
+    +         '<td style="border:none;border-top:1px solid #000;padding:2px 0 0 8mm">Unterschrift Auftraggeber / Bauleiter</td></tr>'
+    +     '<tr><td style="border:none;padding:3px 0 0;font-size:9px">Datum: ' + escHtml(dateFmt) + '</td>'
+    +         '<td style="border:none"></td></tr>'
+    +     '</table>'
+    +   '</div>'
+    + '</div>'
+    + '</body></html>';
+}
+
+function pruefeAuftrag(d) {
+  if (!d.bv) return { id: 'aa-bv-btn', text: 'Bitte Bauvorhaben wählen' };
+  if (!d.datum) return { id: 'aa-datum', text: 'Bitte Datum eingeben' };
+  if (!d.monteur) return { id: 'aa-monteur', text: 'Bitte Monteur wählen' };
+  var hat = false;
+  d.rows.forEach(function(r){ if ((r.text || '').trim()) hat = true; });
+  if (!hat) return { id: 'aaArbeitenArea', text: 'Bitte mindestens eine auszuführende Arbeit eintragen' };
+  return null;
+}
+
+function createAuftrag() {
+  if (aaSpeichertGerade) return;
+  var data = getAuftragData();
+
+  var luecke = pruefeAuftrag(data);
+  if (luecke) {
+    toast(luecke.text);
+    var ziel = document.getElementById(luecke.id);
+    if (ziel) {
+      ziel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var alt = ziel.style.boxShadow;
+      ziel.style.transition = 'box-shadow .2s';
+      ziel.style.boxShadow = '0 0 0 3px var(--danger)';
+      setTimeout(function(){ ziel.style.boxShadow = alt || ''; }, 1600);
+    }
+    return;
+  }
+
+  var label = data.bv || data.projekt || fmtDate(data.datum);
+  var offen = 0, fertig = 0;
+  data.rows.forEach(function(r) {
+    if (!(r.text || '').trim()) return;
+    if (r.erledigt === 'ja') fertig++;
+    else if (r.erledigt === 'nein') offen++;
+  });
+
+  aaSpeichertGerade = true;
+  var btn = document.getElementById('aa-submit');
+  var btnText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Wird eingereicht…'; }
+
+  saveToHistory({ type: 'auftrag', site: label, date: data.datum, monteur: data.monteur,
+                  jaCount: fertig, neinCount: offen, daten: data });
+
+  var meta = { baustelle: label, datum: data.datum, monteur: data.monteur, jaCount: fertig, neinCount: offen };
+  mitZeitlimit(saveReportToFirestore('auftrag', meta, data), 5000).then(function(ergebnis) {
+    aaSpeichertGerade = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = btnText; }
+    if (ergebnis === 'fehler') { toast('Konnte nicht eingereicht werden – bitte erneut versuchen'); return; }
+
+    document.getElementById('statusBadge').textContent = 'Erstellt';
+    document.getElementById('statusBadge').className = 'status-badge saved';
+    toast(ergebnis === 'gespeichert' ? 'Arbeitsauftrag eingereicht' : 'Eingereicht – wird bei Netz übertragen');
+
+    var ziel = isChef ? 'dashboard' : 'history';
+    var navBtn = document.getElementById(isChef ? 'nav-dashboard' : 'nav-history');
+    switchModule(ziel, navBtn);
+  });
+}
+
+function resetAuftrag() {
+  if (!confirm('Arbeitsauftrag zurücksetzen?')) return;
+  aaArt = [];
+  aaRueck = { durchgefuehrt: false, offen: false };
+  aaAbnahme = { a1: false, a2: false };
+  document.querySelectorAll('#mod-auftrag .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+  ['aa-bv','aa-projekt','aa-kostenstelle','aa-strasse','aa-plz','aa-ort','aa-tel1','aa-tel2',
+   'aa-uhrzeit','aa-fahrzeug','aa-monteur','aa-rueck','aa-bemerkungen'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('aa-datum').valueAsDate = new Date();
+  initAaRows();
+  renderAaArbeiten();
+  clearAaSig();
+  clearAaSig2();
+  document.getElementById('statusBadge').textContent = '';
+  document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
+  toast('Arbeitsauftrag zurückgesetzt');
+}
+
+renderAaArbeiten();
+document.getElementById('aa-datum').valueAsDate = new Date();
+
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
    ═══════════════════════════════════════ */
@@ -5916,6 +6427,9 @@ switchModule = function(name, btn) {
   origSwitchModule(name, btn);
   if (name === 'rapport') {
     setTimeout(initTrSig, 50);
+  }
+  if (name === 'auftrag') {
+    setTimeout(initAaSig, 50);
   }
   if (name === 'rohmontage') {
     setTimeout(initRmSig, 50);
