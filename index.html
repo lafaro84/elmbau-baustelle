@@ -1423,7 +1423,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.2.1';
+var APP_VERSION = 'v1.3.0';
 
 var db = null;
 var storage = null;
@@ -3466,9 +3466,17 @@ function buildRapportHtml(data) {
     + '.nbt { border-top: none; }'
     + '.nbb { border-bottom: none; }'
     + 'th { background: #eee; font-size: 7px; padding: 2px 2px; }'
-    + '.drow td { height: 14px; font-size: 8px; }'
+    + '.drow td { height: 9.7mm; font-size: 10px; }'
+    + '.data-tbl th { height: 9.1mm; }'
     + '.hdr-tbl td { font-size: 8px; }'
     + '.ftr-tbl td { font-size: 8px; }'
+    // Kopf 48mm + Daten 116mm + Fuss 30mm = 194mm Nutzhoehe
+    + '.hr1 { height: 11mm; }'
+    + '.hr2 { height: 11mm; }'
+    + '.hr3 { height: 12mm; }'
+    + '.hr4 { height: 14mm; }'
+    + '.fr1 { height: 16mm; }'
+    + '.fr2 { height: 14mm; }'
     + '</style></head>'
     + '<body>'
 
@@ -3478,7 +3486,7 @@ function buildRapportHtml(data) {
     + '</colgroup>'
 
     // Row 1: Company | Title | Entfernung
-    + '<tr>'
+    + '<tr class="hr1">'
     + '<td rowspan="2" style="font-weight:bold;font-size:10px;vertical-align:top;padding:3px">'
     +   'Elm Bau GmbH<br><span style="font-size:7px;font-weight:normal">Braunschweiger Str.22b<br>38154 Kgl.</span>'
     + '</td>'
@@ -3493,14 +3501,14 @@ function buildRapportHtml(data) {
     + '</tr>'
 
     // Row 2: (cont) | (cont) | Fahrzeug
-    + '<tr>'
+    + '<tr class="hr2">'
     + '<td style="font-size:7px;padding:2px 4px">'
     +   'Fahrzeug: <b style="font-size:9px">' + escHtml(data.fahrzeug || '') + '</b>'
     + '</td>'
     + '</tr>'
 
     // Row 3: Address2 + Kostenstelle | Projekt | Fahrer/Hinfahrt
-    + '<tr>'
+    + '<tr class="hr3">'
     + '<td rowspan="2" style="font-size:7px;padding:2px 3px;vertical-align:top">'
     +   '<span style="font-size:6px">Am Mart 17 / 01561 Lampertswalde</span><br>'
     +   'Kostenstelle: <b style="color:#c00;font-size:9px">' + escHtml(data.kostenstelle || '') + '</b>'
@@ -3516,7 +3524,7 @@ function buildRapportHtml(data) {
     + '</tr>'
 
     // Row 4: leeres Unterschriftenfeld fuer den Chef (wird per Hand ausgefuellt)
-    + '<tr>'
+    + '<tr class="hr4">'
     + '<td style="padding:2px 4px;vertical-align:bottom;height:34px">'
     +   '<div style="height:20px"></div>'
     +   '<div style="font-size:6px;border-top:1px solid #000;padding-top:1px">Datum / Unterschrift Vorgesetzter</div>'
@@ -3558,7 +3566,7 @@ function buildRapportHtml(data) {
     + '</colgroup>'
 
     // Row 1: Arbeitszeit | Kürzel | Bemerkungen + Unterschrift
-    + '<tr>'
+    + '<tr class="fr1">'
     + '<td style="vertical-align:top;padding:3px 4px">'
     +   '<b>Arbeitszeitbeginn (Uhrzeit):</b> ' + escHtml(data.beginn || '') + '<br>'
     +   '<b>Arbeitszeitende (Uhrzeit):</b> ' + escHtml(data.ende || '') + '<br>'
@@ -3583,7 +3591,7 @@ function buildRapportHtml(data) {
     + '</tr>'
 
     // Row 2: Pause 1 | Pause 2 | (cont Bemerkungen)
-    + '<tr>'
+    + '<tr class="fr2">'
     + '<td style="padding:3px 4px">'
     +   '<b>Pause 1</b><br>'
     +   'Beginn: ' + escHtml(data.pause1von || '') + '<br>'
@@ -4043,42 +4051,54 @@ function exportPdf(html, fileName) {
   var landscape = html.indexOf('A4 landscape') !== -1 || html.indexOf('297mm 210mm') !== -1;
   var pageW = landscape ? 297 : 210;
   var pageH = landscape ? 210 : 297;
-  // Querformat-Rapport: body ist 281mm breit bei 8mm Rand.
-  // Hochformat-Berichte: body 190mm + 2x10mm Padding = 210mm.
+  // Querformat-Rapport: body ist exakt 281x194mm bei 8mm Rand -> genau eine Seite.
+  // Hochformat-Berichte: body 190mm + 2x10mm Padding = 210mm, Hoehe variabel.
   var offX = landscape ? 8 : 0;
   var offY = landscape ? 8 : 0;
   var contentW = pageW - 2 * offX;
+  var contentH = pageH - 2 * offY;
   var pxPerMm = 96 / 25.4;
   var wpx = Math.round(contentW * pxPerMm);
+  var hpx = Math.round(contentH * pxPerMm);
 
   toast('PDF wird erstellt\u2026');
 
   var ifr = document.createElement('iframe');
-  ifr.style.cssText = 'position:fixed;left:-10000px;top:0;border:0;width:' + wpx + 'px;height:' + Math.round(pageH * pxPerMm) + 'px';
+  ifr.style.cssText = 'position:fixed;left:-10000px;top:0;border:0;width:' + wpx + 'px;height:' + hpx + 'px';
   document.body.appendChild(ifr);
   var idoc = ifr.contentDocument || ifr.contentWindow.document;
   idoc.open(); idoc.write(html); idoc.close();
 
   setTimeout(function() {
-    html2canvas(idoc.body, {
+    var opts = {
       scale: 2,
       backgroundColor: '#ffffff',
       width: wpx,
       windowWidth: wpx,
       useCORS: true
-    }).then(function(canvas) {
+    };
+    // Querformat hat feste Hoehe -> exakt diesen Bereich aufnehmen
+    if (landscape) { opts.height = hpx; opts.windowHeight = hpx; }
+
+    html2canvas(idoc.body, opts).then(function(canvas) {
       var PDF = window.jspdf.jsPDF;
       var pdf = new PDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
       var img = canvas.toDataURL('image/jpeg', 0.92);
-      var totalH = canvas.height * contentW / canvas.width;
-      var usableH = pageH - 2 * offY;
-      var pos = 0;
-      pdf.addImage(img, 'JPEG', offX, offY, contentW, totalH);
-      while (pos + usableH < totalH - 0.5) {
-        pos += usableH;
-        pdf.addPage();
-        pdf.addImage(img, 'JPEG', offX, offY - pos, contentW, totalH);
+
+      if (landscape) {
+        // Seite exakt fuellen, kein Seitenumbruch
+        pdf.addImage(img, 'JPEG', offX, offY, contentW, contentH);
+      } else {
+        var totalH = canvas.height * contentW / canvas.width;
+        var pos = 0;
+        pdf.addImage(img, 'JPEG', offX, offY, contentW, totalH);
+        while (pos + contentH < totalH - 0.5) {
+          pos += contentH;
+          pdf.addPage();
+          pdf.addImage(img, 'JPEG', offX, offY - pos, contentW, totalH);
+        }
       }
+
       pdf.save(fileName.replace(/\.html$/i, '') + '.pdf');
       document.body.removeChild(ifr);
       toast('PDF heruntergeladen');
