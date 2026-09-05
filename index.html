@@ -196,6 +196,52 @@ body {
 .row { display: flex; gap: 12px; }
 .row > .field { flex: 1; min-width: 0; }
 
+/* ── Kalender (Berichte / Dashboard) ── */
+.kal-kopf { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.kal-titel { flex:1; text-align:center; font-size:15px; font-weight:600; }
+.kal-nav { width:36px; height:32px; border-radius:var(--radius-sm); border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font-size:16px; cursor:pointer; font-family:var(--font); }
+.kal-person { width:100%; margin-bottom:10px; padding:10px 12px; border:1px solid var(--border);
+  border-radius:var(--radius-sm); background:var(--surface); color:var(--text); font-family:var(--font); font-size:14px; }
+.kal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.kal-wt { text-align:center; font-size:11px; font-weight:600; color:var(--text-muted); padding-bottom:2px; }
+.kal-tag { position:relative; min-height:46px; border-radius:var(--radius-sm); border:1px solid var(--border);
+  background:var(--surface); padding:3px 4px; cursor:pointer; overflow:hidden; }
+.kal-tag.kal-aus { border:none; background:none; cursor:default; }
+.kal-nr { font-size:12px; font-weight:600; color:var(--text); }
+.kal-zahl { position:absolute; top:3px; right:4px; font-size:9px; font-weight:700; color:var(--text-muted); }
+.kal-dots { position:absolute; left:4px; right:4px; bottom:4px; display:flex; flex-wrap:wrap; gap:2px; }
+.kal-dot { width:6px; height:6px; border-radius:50%; display:block; }
+.kal-dot.rapport { background:var(--info); }
+.kal-dot.kontrolle { background:var(--accent); }
+.kal-dot.auftrag { background:#38BDF8; }
+.kal-dot.rohmontage { background:var(--success); }
+.kal-dot.fertigmontage { background:var(--danger); }
+.kal-dot.kabelliste { background:#A78BFA; }
+.kal-dot.schalter { background:#F472B6; }
+.kal-dot.netzwerk { background:#FBBF24; }
+.kal-we { background:var(--surface-alt); }
+.kal-we .kal-nr { color:var(--text-muted); }
+.kal-zukunft { opacity:.45; }
+.kal-heute { outline:2px solid var(--accent); outline-offset:-2px; }
+.kal-ok { border-color:var(--success); }
+.kal-teil { border-color:#FBBF24; }
+.kal-fehlt { border-color:var(--danger); background:rgba(231,76,60,.10); }
+.kal-legende { display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; font-size:11px; color:var(--text-muted); }
+.kal-legende span { display:flex; align-items:center; gap:5px; }
+.kal-p { width:10px; height:10px; border-radius:3px; border:1px solid var(--border); display:block; }
+.kal-p-ok { border-color:var(--success); }
+.kal-p-teil { border-color:#FBBF24; }
+.kal-p-fehlt { border-color:var(--danger); background:rgba(231,76,60,.18); }
+.kal-info { padding:10px 0; font-size:13px; color:var(--text-muted); }
+.kal-gut { color:var(--success); }
+.kal-luecken { margin-top:12px; }
+.kal-lk-titel { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+  color:var(--text-muted); margin-bottom:6px; }
+.kal-lk-zeile { display:flex; justify-content:space-between; gap:10px; font-size:13px;
+  padding:6px 0; border-bottom:1px solid var(--border); }
+.kal-lk-zeile span { color:var(--text-muted); text-align:right; min-width:0; }
+
 /* ── Toggle Chips ── */
 .chip-group {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -1486,6 +1532,10 @@ body {
      MODULE: BERICHTE (History)
      ═══════════════════════════════════════ -->
 <div class="module-panel" id="mod-history">
+  <div class="section">
+    <div class="section-label">Kalender</div>
+    <div id="kalBerichte"></div>
+  </div>
   <div class="filter-tabs" id="historyFilters">
     <button class="filter-tab active" onclick="filterHistory('all',this)">Alle</button>
     <button class="filter-tab" onclick="filterHistory('kontrolle',this)">Kontrolle</button>
@@ -1619,6 +1669,11 @@ body {
       <div class="dash-stat"><div class="dash-stat-val" id="dash-count-total">0</div><div class="dash-stat-label">Gesamt</div></div>
     </div>
   </div>
+
+  <div class="section">
+    <div class="section-label">Kalender &ndash; eingereichte Berichte</div>
+    <div id="kalDash"></div>
+  </div>
   <div class="section">
     <div class="section-label">Sammel-Export als PDF</div>
     <div class="row">
@@ -1691,7 +1746,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.21.0';
+var APP_VERSION = 'v1.22.1';
 
 var db = null;
 var storage = null;
@@ -3359,6 +3414,8 @@ function berichtDateiname(d) {
    ═══════════════════════════════════════ */
 function saveReportToFirestore(type, meta, vollDaten) {
   if (!db || !currentUser) return Promise.reject(new Error('keine Verbindung'));
+  // Der Kalender liest gecacht -- nach einem neuen Bericht muss er neu laden
+  kalCache = {};
   var entry = {
     type: type,
     baustelle: meta.baustelle || meta.site || '',
@@ -3844,9 +3901,9 @@ function switchModule(name, btn) {
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
   else if (name === 'schalter') sub.textContent = 'Schalteraufmaß';
   else if (name === 'netzwerk') sub.textContent = 'Prüfprotokoll Netzwerk/SAT';
-  else if (name === 'history') { sub.textContent = 'Berichte'; historyLimit = 20; renderHistory(); }
+  else if (name === 'history') { sub.textContent = 'Berichte'; historyLimit = 20; kalMount('kalBerichte'); renderHistory(); }
   else if (name === 'stammdaten') { sub.textContent = 'Stammdaten verwalten'; sdSwitchTab('mitarbeiter', document.querySelector('.sd-tab')); }
-  else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dashLimit = 20; dxSetzeVorgaben(); dashLoadReports(); }
+  else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dashLimit = 20; dxSetzeVorgaben(); kalMount('kalDash'); dashLoadReports(); }
 }
 
 /* ═══════════════════════════════════════
@@ -6846,6 +6903,242 @@ function resetNetzwerk() {
 
 renderPn();
 document.getElementById('pn-datum').valueAsDate = new Date();
+
+
+/* ═══════════════════════════════════════
+   KALENDER – wann wurde was eingereicht
+   Zweck: auf einen Blick sehen, an welchen Werktagen ein Tagesrapport fehlt.
+   Der Chef sieht das ganze Team, der Monteur nur sich selbst.
+   ═══════════════════════════════════════ */
+var kalMonat = null;        // erster Tag des angezeigten Monats
+var kalPerson = '';         // Chef-Filter: leer = alle
+var kalZielId = null;       // in welchem Reiter der Kalender gerade haengt
+var kalCache = {};          // 'YYYY-MM' -> Berichte des Monats (spart Lesevorgaenge)
+var kalLaedt = false;
+
+var KAL_WOCHENTAGE = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+var KAL_MONATE = ['Januar','Februar','März','April','Mai','Juni',
+                  'Juli','August','September','Oktober','November','Dezember'];
+
+function kalIso(d) {
+  var m = d.getMonth() + 1, t = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (t < 10 ? '0' : '') + t;
+}
+function kalMonatsSchluessel(d) {
+  var m = d.getMonth() + 1;
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m;
+}
+// Montag = 0 ... Sonntag = 6
+function kalSpalte(d) { return (d.getDay() + 6) % 7; }
+
+function kalGeruest() {
+  return '<div class="kal-kopf">'
+    +   '<button class="kal-nav" onclick="kalBlaettern(-1)">&#8249;</button>'
+    +   '<div class="kal-titel" id="kalTitel">&nbsp;</div>'
+    +   '<button class="kal-nav" onclick="kalBlaettern(1)">&#8250;</button>'
+    + '</div>'
+    + (isChef ? '<select class="kal-person" id="kalPerson" onchange="kalPersonWechsel(this.value)"></select>' : '')
+    + '<div class="kal-grid" id="kalGrid"></div>'
+    + '<div class="kal-legende">'
+    +   '<span><i class="kal-p kal-p-ok"></i>Rapport da</span>'
+    +   '<span><i class="kal-p kal-p-teil"></i>unvollständig</span>'
+    +   '<span><i class="kal-p kal-p-fehlt"></i>Rapport fehlt</span>'
+    + '</div>'
+    + '<div id="kalLuecken" class="kal-luecken"></div>';
+}
+
+// Haengt den Kalender in den angegebenen Container und leert den anderen,
+// damit die IDs im Dokument eindeutig bleiben.
+function kalMount(zielId) {
+  ['kalBerichte','kalDash'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (id === zielId) { if (!el.innerHTML) el.innerHTML = kalGeruest(); }
+    else el.innerHTML = '';
+  });
+  kalZielId = zielId;
+  if (!kalMonat) { var h = new Date(); kalMonat = new Date(h.getFullYear(), h.getMonth(), 1); }
+  kalPersonFuellen();
+  kalLaden();
+}
+
+function kalPersonFuellen() {
+  var sel = document.getElementById('kalPerson');
+  if (!sel) return;
+  var alt = kalPerson;
+  sel.innerHTML = '<option value="">Alle Mitarbeiter</option>';
+  (PERSONAL.alle || []).forEach(function(n) {
+    var o = document.createElement('option');
+    o.value = n; o.textContent = n;
+    sel.appendChild(o);
+  });
+  sel.value = alt;
+}
+function kalPersonWechsel(v) { kalPerson = v; kalZeichnen(); }
+
+function kalBlaettern(schritt) {
+  kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth() + schritt, 1);
+  kalLaden();
+}
+
+function kalLaden() {
+  var titel = document.getElementById('kalTitel');
+  if (titel) titel.textContent = KAL_MONATE[kalMonat.getMonth()] + ' ' + kalMonat.getFullYear();
+
+  // Der Chef holt monatsweise (Bereichsabfrage), der Monteur einmal alles --
+  // das spart Lesevorgaenge beim Blaettern.
+  var schluessel = isChef ? kalMonatsSchluessel(kalMonat) : '_eigene';
+  if (kalCache[schluessel]) { kalZeichnen(); return; }
+
+  var grid = document.getElementById('kalGrid');
+  if (grid) grid.innerHTML = '<div class="kal-info">Lade&hellip;</div>';
+  if (!db || !currentUser) { kalCache[schluessel] = []; kalZeichnen(); return; }
+  if (kalLaedt) return;
+  kalLaedt = true;
+
+  var von = kalIso(new Date(kalMonat.getFullYear(), kalMonat.getMonth(), 1));
+  var bis = kalIso(new Date(kalMonat.getFullYear(), kalMonat.getMonth() + 1, 0));
+
+  // Chef: Bereichsabfrage auf einem Feld -- braucht keinen zusammengesetzten Index.
+  // Monteur: nur die eigenen Berichte, der Monat wird hier gefiltert.
+  var abfrage = isChef
+    ? db.collection('berichte').where('datum', '>=', von).where('datum', '<=', bis)
+    : db.collection('berichte').where('erstellerId', '==', currentUser.id);
+
+  abfrage.get().then(function(snap) {
+    kalLaedt = false;
+    var liste = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var tag = d.datum || '';
+      if (!tag) return;
+      if (isChef && (tag < von || tag > bis)) return;
+      var namen = [];
+      if (d.ersteller) namen.push(d.ersteller);
+      if (d.daten && d.daten.workers) {
+        d.daten.workers.forEach(function(w){ if (w && w.name) namen.push(w.name); });
+      }
+      if (d.meta && d.meta.monteur) namen.push(d.meta.monteur);
+      liste.push({ tag: tag, typ: d.type || 'kontrolle', baustelle: d.baustelle || '', namen: namen });
+    });
+    kalCache[schluessel] = liste;
+    kalZeichnen();
+  }).catch(function(err) {
+    kalLaedt = false;
+    console.error('Kalender:', err);
+    var g = document.getElementById('kalGrid');
+    if (g) g.innerHTML = '<div class="kal-info">Kalender konnte nicht geladen werden.</div>';
+  });
+}
+
+function kalZeichnen() {
+  var grid = document.getElementById('kalGrid');
+  if (!grid) return;
+  var liste = kalCache[isChef ? kalMonatsSchluessel(kalMonat) : '_eigene'] || [];
+  if (!isChef) {
+    var praefix = kalMonatsSchluessel(kalMonat);
+    liste = liste.filter(function(e){ return e.tag.indexOf(praefix) === 0; });
+  }
+
+  // Nach Person filtern (Chef) bzw. bei Monteuren steckt der Filter schon in der Abfrage
+  if (kalPerson) {
+    liste = liste.filter(function(e){ return e.namen.indexOf(kalPerson) !== -1; });
+  }
+
+  // Pro Tag: welche Berichtsarten, und wer hat einen Rapport abgedeckt
+  var tage = {};
+  liste.forEach(function(e) {
+    var t = tage[e.tag] || (tage[e.tag] = { typen: {}, rapportNamen: {}, anzahl: 0 });
+    t.typen[e.typ] = true;
+    t.anzahl++;
+    if (e.typ === 'rapport') e.namen.forEach(function(n){ t.rapportNamen[n] = true; });
+  });
+
+  // Erwartete Mannschaft: alle, oder nur die ausgewaehlte Person
+  var erwartet = kalPerson ? [kalPerson]
+               : (isChef ? (PERSONAL.alle || []).slice() : (currentUser ? [currentUser.name] : []));
+
+  var heute = kalIso(new Date());
+  var jahr = kalMonat.getFullYear(), monat = kalMonat.getMonth();
+  var ersterTag = new Date(jahr, monat, 1);
+  var tageImMonat = new Date(jahr, monat + 1, 0).getDate();
+  var vorlauf = kalSpalte(ersterTag);
+
+  var html = KAL_WOCHENTAGE.map(function(w){ return '<div class="kal-wt">' + w + '</div>'; }).join('');
+  for (var i = 0; i < vorlauf; i++) html += '<div class="kal-tag kal-aus"></div>';
+
+  var luecken = [];
+  for (var t = 1; t <= tageImMonat; t++) {
+    var d = new Date(jahr, monat, t);
+    var iso = kalIso(d);
+    var we = kalSpalte(d) >= 5;
+    var zukunft = iso > heute;
+    var eintrag = tage[iso];
+    var klassen = ['kal-tag'];
+    if (we) klassen.push('kal-we');
+    if (zukunft) klassen.push('kal-zukunft');
+    if (iso === heute) klassen.push('kal-heute');
+
+    var fehlend = [];
+    if (!we && !zukunft) {
+      erwartet.forEach(function(n) {
+        if (!eintrag || !eintrag.rapportNamen[n]) fehlend.push(n);
+      });
+      if (fehlend.length === erwartet.length && erwartet.length) klassen.push('kal-fehlt');
+      else if (fehlend.length) klassen.push('kal-teil');
+      else klassen.push('kal-ok');
+      if (fehlend.length) luecken.push({ iso: iso, tag: t, wt: KAL_WOCHENTAGE[kalSpalte(d)], namen: fehlend });
+    }
+
+    var punkte = '';
+    if (eintrag) {
+      var reihenfolge = ['rapport','auftrag','kontrolle','rohmontage','fertigmontage','kabelliste','schalter','netzwerk'];
+      reihenfolge.forEach(function(typ) {
+        if (eintrag.typen[typ]) punkte += '<i class="kal-dot ' + typ + '"></i>';
+      });
+    }
+    var zaehler = '';
+    if (!we && !zukunft && erwartet.length > 1) {
+      zaehler = '<span class="kal-zahl">' + (erwartet.length - fehlend.length) + '/' + erwartet.length + '</span>';
+    }
+
+    html += '<div class="' + klassen.join(' ') + '" onclick="kalTagInfo(\'' + iso + '\')">'
+      + '<span class="kal-nr">' + t + '</span>'
+      + zaehler
+      + '<span class="kal-dots">' + punkte + '</span>'
+      + '</div>';
+  }
+  grid.innerHTML = html;
+
+  var lk = document.getElementById('kalLuecken');
+  if (lk) {
+    if (!luecken.length) {
+      lk.innerHTML = '<div class="kal-info kal-gut">Keine fehlenden Tagesrapporte in diesem Monat.</div>';
+    } else {
+      lk.innerHTML = '<div class="kal-lk-titel">Fehlende Tagesrapporte (' + luecken.length + ' Tage)</div>'
+        + luecken.map(function(l) {
+            var wer = (erwartet.length > 1)
+              ? l.namen.join(', ')
+              : 'kein Rapport';
+            return '<div class="kal-lk-zeile"><b>' + l.wt + ' ' + fmtDate(l.iso) + '</b>'
+              + '<span>' + escHtml(wer) + '</span></div>';
+          }).join('');
+    }
+  }
+}
+
+function kalTagInfo(iso) {
+  var liste = (kalCache[isChef ? kalMonatsSchluessel(kalMonat) : '_eigene'] || []).filter(function(e) {
+    if (e.tag !== iso) return false;
+    if (kalPerson && e.namen.indexOf(kalPerson) === -1) return false;
+    return true;
+  });
+  if (!liste.length) { toast(fmtDate(iso) + ': keine Berichte'); return; }
+  var text = liste.map(function(e) {
+    return (HISTORY_TYPE_LABELS[e.typ] || e.typ) + (e.baustelle ? ' – ' + e.baustelle : '');
+  }).join('\n');
+  alert(fmtDate(iso) + '\n\n' + text);
+}
 
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
