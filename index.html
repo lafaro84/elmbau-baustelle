@@ -242,6 +242,20 @@ body {
   padding:6px 0; border-bottom:1px solid var(--border); }
 .kal-lk-zeile span { color:var(--text-muted); text-align:right; min-width:0; }
 
+/* ── Update-Hinweis ── */
+.upd-banner {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--accent); color: #fff; font-size: 14px; font-weight: 600;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.4);
+}
+.upd-banner button {
+  flex-shrink: 0; padding: 8px 16px; border: none; border-radius: 20px;
+  background: #fff; color: var(--accent); font-family: var(--font);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+
 /* ── Toggle Chips ── */
 .chip-group {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -1746,7 +1760,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.23.0';
+var APP_VERSION = 'v1.24.1';
 
 var db = null;
 var storage = null;
@@ -7146,6 +7160,82 @@ function kalTagInfo(iso) {
   alert(fmtDate(iso) + '\n\n' + text);
 }
 
+
+/* ═══════════════════════════════════════
+   UPDATE-PRUEFUNG
+   Handys halten die einmal geladene Seite hartnaeckig im Zwischenspeicher.
+   Deshalb liegt neben der App eine winzige version.json. Steht dort eine
+   andere Version als in dieser Datei, laedt die App sich selbst unter einer
+   neuen Adresse (?v=...) neu -- ein Zwischenspeicher greift dabei nicht,
+   weil die Adresse noch nie abgerufen wurde.
+   ═══════════════════════════════════════ */
+var UPD_DATEI = 'version.json';
+var UPD_MARKER = 'elmbau_update_versuch';   // gegen Endlosschleifen
+var UPD_INTERVALL = 30 * 60 * 1000;         // alle 30 Minuten nachsehen
+var updBannerDa = false;
+
+function updBasisUrl() {
+  return location.origin + location.pathname;
+}
+
+function updNeuLaden(version) {
+  try { localStorage.setItem(UPD_MARKER, version); } catch(e) {}
+  location.replace(updBasisUrl() + '?v=' + encodeURIComponent(version));
+}
+
+function updBanner(version) {
+  if (updBannerDa) return;
+  updBannerDa = true;
+  var d = document.createElement('div');
+  d.className = 'upd-banner';
+  d.innerHTML = '<span>Neue Version ' + escHtml(version) + ' verf&uuml;gbar</span>'
+    + '<button onclick="updJetzt(\'' + escHtml(version) + '\')">Jetzt laden</button>';
+  document.body.appendChild(d);
+}
+// Von Hand ausgeloest: zusaetzlich ein Zeitstempel, damit die Adresse auch
+// dann neu ist, wenn wir schon auf ?v=<version> stehen.
+function updJetzt(version) {
+  try { localStorage.setItem(UPD_MARKER, version); } catch(e) {}
+  location.replace(updBasisUrl() + '?v=' + encodeURIComponent(version) + '&t=' + Date.now());
+}
+
+// beimStart = true: es ist noch nichts eingegeben, wir laden ohne Nachfrage neu.
+// Spaeter im Betrieb nur ein Hinweis, damit niemand mitten in einem Rapport
+// die Seite unter den Fingern verliert.
+function updPruefen(beimStart) {
+  if (!location.protocol || location.protocol === 'file:') return;
+  var url = UPD_DATEI + '?t=' + Date.now();
+  var anfrage = (typeof fetch === 'function')
+    ? fetch(url, { cache: 'no-store' }).then(function(r){ return r.ok ? r.json() : null; })
+    : Promise.reject(new Error('kein fetch'));
+
+  anfrage.then(function(j) {
+    if (!j || !j.version) return;
+    if (j.version === APP_VERSION) {
+      // Wir sind aktuell -- Marker aufraeumen
+      try { localStorage.removeItem(UPD_MARKER); } catch(e) {}
+      return;
+    }
+    var schonVersucht = '';
+    try { schonVersucht = localStorage.getItem(UPD_MARKER) || ''; } catch(e) {}
+    if (beimStart && schonVersucht !== j.version) {
+      updNeuLaden(j.version);
+      return;
+    }
+    // Entweder mitten im Betrieb, oder das Neuladen hat die alte Fassung
+    // gebracht (GitHub Pages braucht ein paar Minuten) -- dann nur anbieten.
+    updBanner(j.version);
+  }).catch(function(){ /* offline oder Datei fehlt: nicht stoeren */ });
+}
+
+function updStarten() {
+  updPruefen(true);
+  setInterval(function(){ updPruefen(false); }, UPD_INTERVALL);
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) updPruefen(false);
+  });
+}
+
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
    ═══════════════════════════════════════ */
@@ -7191,6 +7281,7 @@ bvPickerInit();
    APP BOOT – Firebase init
    ═══════════════════════════════════════ */
 appBoot();
+updStarten();
 </script>
 </body>
 </html>
