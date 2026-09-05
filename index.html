@@ -859,7 +859,7 @@ body {
   </div>
 
   <div class="section">
-    <div class="section-label">Unterschrift Prüfer</div>
+    <div class="section-label">Unterschrift Kunde</div>
     <div class="sig-wrap" id="sigWrap">
       <canvas id="sigCanvas" height="160"></canvas>
       <div class="sig-hint" id="sigHint">Mit dem Finger unterschreiben</div>
@@ -1116,7 +1116,7 @@ body {
     <div class="section-label">Abnahme / Best&auml;tigung</div>
     <div class="chip-group" style="flex-direction:column;align-items:stretch">
       <button type="button" class="chip-toggle" style="text-align:left" onclick="aaAbnahmeToggle(1,this)">Vollst&auml;ndig und ohne Beanstandungen durchgef&uuml;hrt</button>
-      <button type="button" class="chip-toggle" style="text-align:left" onclick="aaAbnahmeToggle(2,this)">Wie vor beschrieben durchgef&uuml;hrt</button>
+      <button type="button" class="chip-toggle" style="text-align:left" onclick="aaAbnahmeToggle(2,this)">Wie zuvor beschrieben durchgef&uuml;hrt</button>
     </div>
   </div>
 
@@ -1625,7 +1625,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.17.0';
+var APP_VERSION = 'v1.17.1';
 
 var db = null;
 var storage = null;
@@ -4518,9 +4518,9 @@ function buildReportHtml(data) {
 
   var sigBlock = '';
   if (data.signature) {
-    sigBlock = '<h2 style="font-size:16px;text-transform:uppercase;letter-spacing:0.06em;color:#6b6860;margin:32px 0 16px;border-bottom:1px solid #e5e4e0;padding-bottom:8px">Unterschrift Prüfer</h2>'
+    sigBlock = '<h2 style="font-size:16px;text-transform:uppercase;letter-spacing:0.06em;color:#6b6860;margin:32px 0 16px;border-bottom:1px solid #e5e4e0;padding-bottom:8px">Unterschrift Kunde</h2>'
       + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:300px;height:auto;border-bottom:1px solid #1a1917"></div>'
-      + '<div style="font-size:13px;color:#6b6860;margin-top:4px">' + escHtml(data.inspector || '—') + ', ' + dateFmt + '</div>';
+      + '<div style="font-size:13px;color:#6b6860;margin-top:4px">' + dateFmt + '</div>';
   }
 
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
@@ -6057,7 +6057,7 @@ function aaNeueZeile(text) {
 function initAaRows() {
   aaSeq = 0;
   aaRows = [];
-  for (var i = 0; i < 6; i++) aaRows.push(aaNeueZeile(''));
+  for (var i = 0; i < 3; i++) aaRows.push(aaNeueZeile(''));
 }
 initAaRows();
 
@@ -6318,7 +6318,7 @@ function buildAuftragHtml(data) {
     +   '<div class="t">Abnahme / Bestätigung</div>'
     +   '<div class="b">'
     +     '<div>' + aaBox(data.abnahme1) + '&nbsp;Die oben aufgeführten Arbeiten wurden vollständig und ohne Beanstandungen durchgeführt</div>'
-    +     '<div style="margin-top:3px">' + aaBox(data.abnahme2) + '&nbsp;Die oben aufgeführten Arbeiten wurden wie vor beschrieben durchgeführt</div>'
+    +     '<div style="margin-top:3px">' + aaBox(data.abnahme2) + '&nbsp;Die oben aufgeführten Arbeiten wurden wie zuvor beschrieben durchgeführt</div>'
     +     '<table style="border:none;margin-top:6mm">'
     +     '<colgroup><col style="width:50%"><col style="width:50%"></colgroup>'
     +     '<tr><td style="border:none;padding:0">' + sigM + '</td>'
