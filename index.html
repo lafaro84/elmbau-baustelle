@@ -953,7 +953,7 @@ body {
   </div>
 
   <div class="section">
-    <div class="section-label">Unterschrift Vorgesetzter</div>
+    <div class="section-label">Unterschrift Mitarbeiter</div>
     <div class="sig-wrap" id="trSigWrap">
       <canvas id="trSigCanvas" height="160"></canvas>
       <div class="sig-hint" id="trSigHint">Mit dem Finger unterschreiben</div>
@@ -1295,6 +1295,12 @@ body {
             <select id="sd-ma-tr-rolle"><option value="Facharbeiter">Facharbeiter</option><option value="Lehrling">Lehrling</option><option value="Probearbeit">Probearbeit</option></select>
           </div>
           <div class="field"><label>PIN (4-6 Stellen)</label><input type="text" id="sd-ma-pin" inputmode="numeric" maxlength="6" placeholder="z.B. 1234"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Fahrzeug</label>
+            <select id="sd-ma-fahrzeug"><option value="">— Keins —</option></select>
+          </div>
+          <div class="field"></div>
         </div>
         <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveMitarbeiter()">Speichern</button></div>
         <input type="hidden" id="sd-ma-id">
@@ -1653,6 +1659,7 @@ function loadMasterData() {
     PERSONAL.azubi = [];
     PERSONAL.alle = [];
     PERSONAL.rollen = {};
+    PERSONAL.fahrzeuge = {};
     snap.forEach(function(doc) {
       var d = doc.data();
       if (d.aktiv === false) return;
@@ -1660,6 +1667,7 @@ function loadMasterData() {
       else if (d.rolle === 'azubi') PERSONAL.azubi.push(d.name);
       PERSONAL.alle.push(d.name);
       PERSONAL.rollen[d.name] = d.tagesrapportRolle || 'Facharbeiter';
+      PERSONAL.fahrzeuge[d.name] = d.fahrzeug || '';
     });
     PERSONAL.alle.sort();
     PERSONAL.elektriker.sort();
@@ -1685,6 +1693,12 @@ function loadMasterData() {
     });
     FAHRZEUGE.sort(function(a, b) { return (a.kennzeichen || '').localeCompare(b.kennzeichen || ''); });
     populateFahrzeugDropdowns();
+    populateSdMaFahrzeug();
+    // Auto-fill fahrzeug for logged-in user
+    if (currentUser && PERSONAL.fahrzeuge && PERSONAL.fahrzeuge[currentUser.name]) {
+      var fzSel = document.getElementById('tr-fahrzeug');
+      if (fzSel && !fzSel.value) fzSel.value = PERSONAL.fahrzeuge[currentUser.name];
+    }
     checkTuevWarnungen();
   }).catch(function(err) {
     console.error('Load Fahrzeuge error:', err);
@@ -1883,7 +1897,8 @@ function sdSaveMitarbeiter() {
   if (!name) { toast('Name eingeben'); return; }
   if (!pin || pin.length < 4) { toast('PIN muss mindestens 4 Stellen haben'); return; }
 
-  var data = { name: name, rolle: rolle, tagesrapportRolle: trRolle, pin: pin, aktiv: true };
+  var fzg = document.getElementById("sd-ma-fahrzeug").value;
+  var data = { name: name, rolle: rolle, tagesrapportRolle: trRolle, fahrzeug: fzg, pin: pin, aktiv: true };
   var promise;
   if (editId) {
     promise = db.collection('mitarbeiter').doc(editId).update(data);
@@ -1897,6 +1912,7 @@ function sdSaveMitarbeiter() {
     document.getElementById('sd-ma-id').value = '';
     document.getElementById('sd-ma-rolle').value = 'elektriker';
     document.getElementById('sd-ma-tr-rolle').value = 'Facharbeiter';
+    document.getElementById('sd-ma-fahrzeug').value = '';
     sdLoadMitarbeiter();
     loadMasterData();
   }).catch(function(err) { toast('Fehler: ' + err.message); });
@@ -1909,6 +1925,7 @@ function sdEditMitarbeiter(id) {
     document.getElementById('sd-ma-name').value = d.name || '';
     document.getElementById('sd-ma-rolle').value = d.rolle || 'elektriker';
     document.getElementById('sd-ma-tr-rolle').value = d.tagesrapportRolle || 'Facharbeiter';
+    document.getElementById('sd-ma-fahrzeug').value = d.fahrzeug || '';
     document.getElementById('sd-ma-pin').value = d.pin || '';
     document.getElementById('sd-ma-id').value = id;
     document.getElementById('sd-ma-name').focus();
@@ -2024,6 +2041,20 @@ function sdDeleteFahrzeug(id) {
 
 function populateFahrzeugDropdowns() {
   var sel = document.getElementById('tr-fahrzeug');
+  if (!sel) return;
+  var val = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  FAHRZEUGE.forEach(function(fz) {
+    var o = document.createElement('option');
+    o.value = fz.kennzeichen;
+    o.textContent = fz.kennzeichen;
+    sel.appendChild(o);
+  });
+  if (val) sel.value = val;
+}
+
+function populateSdMaFahrzeug() {
+  var sel = document.getElementById('sd-ma-fahrzeug');
   if (!sel) return;
   var val = sel.value;
   while (sel.options.length > 1) sel.remove(1);
@@ -3427,7 +3458,7 @@ function buildRapportHtml(data) {
     + '<td class="c"><span class="chk">' + katSonstig + '</span></td>'
     + '<td class="c sub">Sonstiges</td>'
     + '<td colspan="2"><b>' + escHtml(data.projekt || '') + '</b></td>'
-    + '<td class="sm" style="border-bottom:2px solid #000">Datum / Unterschrift<br>Vorgesetzter</td>'
+    + '<td class="sm" style="border-bottom:2px solid #000">Datum / Unterschrift<br>Mitarbeiter</td>'
     + '</tr>'
     + '<tr>'
     + '<td class="sub">Bauvorhaben:</td>'
