@@ -1487,7 +1487,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.11.1';
+var APP_VERSION = 'v1.12.0';
 
 var db = null;
 var storage = null;
@@ -2796,39 +2796,42 @@ addWorker();
 /* ═══════════════════════════════════════
    STATE – Rohmontage
    ═══════════════════════════════════════ */
+// Positionen und Wortlaut wie im Blatt "Rohmontage" der BV-Daten.
+// typ 'text' sind die beiden Meterriss-Zeilen, die keine Ja/Nein-Frage
+// sind, sondern zwei Eintragungen (Ort und Sitzhoehe).
 var RM_CATEGORIES = [
   { name: 'Meterriss', items: [
-    'Meterriss vorhanden und schlüssig',
-    'Ort EG / Sitz über Boden',
-    'Ort OG / Sitz über Boden',
-    'Schalter/Steckdosen gem. Meterriss'
+    { t: 'Meterriss vorhanden und schlüssig' },
+    { t: 'Ort EG:', typ: 'text', zusatz: 'Sitz:', einheit: 'm über Boden' },
+    { t: 'Ort OG:', typ: 'text', zusatz: 'Sitz:', einheit: 'm über Boden' },
+    { t: 'Schalter/Steckdosen gem. Meterriss' }
   ]},
   { name: 'Pläne', items: [
-    'Küchenpläne vorhanden',
-    'Badpläne vorhanden',
-    'Heizungspläne vorhanden',
-    'Änderungen/Ergänzungen eingetragen'
+    { t: 'Küchenpläne vorhanden' },
+    { t: 'Badpläne vorhanden' },
+    { t: 'Heizungspläne vorhanden' },
+    { t: 'Änderungen/Ergänzungen eingetragen' }
   ]},
   { name: 'Schlitzen / Stemmen / Fräsen', items: [
-    'Schlitztiefenbegrenzung beachtet',
-    'Schalterdosen fachgerecht gesetzt',
-    'Schalterdosen Kabeleinführungen geschlossen'
+    { t: 'Schlitztiefenbegrenzung beachtet' },
+    { t: 'Schalterdosen fachgerecht gesetzt und senkrecht / waagerecht ausgerichtet' },
+    { t: 'Schalterdosen (Kabeleinführungen) nach Installation geschlossen' }
   ]},
   { name: 'Installation Leitungen Rohre', items: [
-    'Leitungen in Schlitzen fixiert',
-    'Leitungen auf Boden in Schutzrohr',
-    'Durchdringungen Dampfbremse mit Kabelmanschetten',
-    'Durchdringungen nach Außen abgedichtet',
-    'Leitungen in Leichtbauwänden fixiert',
-    'Leitungen beschriftet',
-    'Schalterdosen vorverdrahtet'
+    { t: 'Leitungen in Schlitzen fachgerecht befestigt (fixiert)' },
+    { t: 'Leitungen auf den Boden in Schutzrohr verlegt' },
+    { t: 'Durchdringungen der Dampfbremse "einzeln" mit Kabelmanschetten' },
+    { t: 'Durchdringungen nach Außen mit Dickbeschichtung abgedichtet' },
+    { t: 'Leitungen in Leichtbauwänden fixiert' },
+    { t: 'Leitungen beschriftet' },
+    { t: 'Schalterdosen vorverdrahtet' }
   ]},
   { name: 'Listen und Fotos', items: [
-    'Materialentnahme/rückgabe abgegeben',
-    'Kabelliste vollständig ausgefüllt',
-    'Schalteraufmaß vollständig erstellt',
-    'Fotos Installation in Leichtbauwänden',
-    'Fotos Außenanschlüsse'
+    { t: 'Materialentnahme/rückgabe abgegeben' },
+    { t: 'Kabelliste vollständig ausgefüllt' },
+    { t: 'Schalteraufmaß vollständig erstellt' },
+    { t: 'Fotos - Installation in Leichtbauwänden' },
+    { t: 'Fotos - Außenanschlüsse' }
   ]}
 ];
 
@@ -2842,8 +2845,13 @@ function initRmItems() {
   rmItems = [];
   var idx = 0;
   RM_CATEGORIES.forEach(function(cat) {
-    cat.items.forEach(function(label) {
-      rmItems.push({ id: idx, cat: cat.name, label: label, val: '', bem: '' });
+    cat.items.forEach(function(it) {
+      rmItems.push({
+        id: idx, cat: cat.name, label: it.t,
+        typ: it.typ || 'jn',
+        zusatz: it.zusatz || '', einheit: it.einheit || '',
+        val: '', bem: '', ort: '', sitz: ''
+      });
       idx++;
     });
   });
@@ -2858,6 +2866,17 @@ function renderRmChecklist() {
     if (item.cat !== lastCat) {
       lastCat = item.cat;
       html += '<div class="cl-category">' + escHtml(item.cat) + '</div>';
+    }
+    if (item.typ === 'text') {
+      // Meterriss-Zeilen: Ort und Sitzhöhe eintragen statt Ja/Nein
+      html += '<div class="cl-item" style="flex-wrap:wrap;gap:6px">'
+        + '<span class="cl-label" style="flex:0 0 100%;font-weight:600">' + escHtml(item.label) + '</span>'
+        + '<input class="cl-bem" style="flex:1;min-width:110px" placeholder="Ort" value="' + escHtml(item.ort) + '" oninput="setRmFeld(' + item.id + ',\'ort\',this.value)">'
+        + '<span style="font-size:13px;color:var(--text-muted)">' + escHtml(item.zusatz) + '</span>'
+        + '<input class="cl-bem" style="width:70px" placeholder="0,00" value="' + escHtml(item.sitz) + '" oninput="setRmFeld(' + item.id + ',\'sitz\',this.value)">'
+        + '<span style="font-size:13px;color:var(--text-muted)">' + escHtml(item.einheit) + '</span>'
+        + '</div>';
+      return;
     }
     html += '<div class="cl-item">'
       + '<span class="cl-label">' + escHtml(item.label) + '</span>'
@@ -2883,53 +2902,58 @@ function setRmBem(id, val) {
   if (rmItems[id]) rmItems[id].bem = val;
 }
 
+function setRmFeld(id, feld, val) {
+  if (rmItems[id]) rmItems[id][feld] = val;
+}
+
 /* ═══════════════════════════════════════
    STATE – Fertigmontage
    ═══════════════════════════════════════ */
+// Positionen und Wortlaut wie im Blatt "Fertigmontage" der BV-Daten
 var FM_CATEGORIES = [
   { name: 'Zählerschrank', items: [
-    'Leitungen gemäß Plan aufgelegt',
-    'Abweichungen vom Plan',
-    'Beschriftung vollständig'
+    { t: 'Leitungen gemäß Plan aufgelegt' },
+    { t: 'Abweichungen vom Plan' },
+    { t: 'Beschriftung vollständig' }
   ]},
   { name: 'Potentialausgleich', items: [
-    'Potentialausgleich hergestellt',
-    'PA-Schiene beschriftet',
-    'PA-Bock für Antenne eingebaut'
+    { t: 'Potentialausgleich hergestellt' },
+    { t: 'PA-Schiene beschriftet' },
+    { t: 'PA-Bock/Böcke für Antenne eingebaut' }
   ]},
   { name: 'Heizung HKV', items: [
-    'Heizung angeschlossen',
-    'Außenfühler montiert',
-    'Inbetriebnahme / Estrichprogramm',
-    'Stellventile angeschlossen',
-    'Zuordnung RTH - Heizkreise geprüft'
+    { t: 'Heizung angeschlossen' },
+    { t: 'Außenfühler montiert' },
+    { t: 'Inbetrieb genommen / Estrichprogramm', bem: 'Beginn Tag ' },
+    { t: 'Stellventile angeschlossen + aufgesetzt' },
+    { t: 'Zuordnung RTH - Heizkreise geprüft' }
   ]},
   { name: 'Schaltermontage', items: [
-    'Schalter und Steckdosen montiert',
-    'Lot- und waagerecht überprüft',
-    'Kücheninstallation fertig',
-    'Bad/WC Installation fertig',
-    'Außensteckdosen montiert'
+    { t: 'Schalter und Steckdosen montiert' },
+    { t: 'Lot- und waagerechte Montage überprüft' },
+    { t: 'Kücheninstallation fertig' },
+    { t: 'Bad/WC Installation fertig' },
+    { t: 'Außensteckdosen montiert' }
   ]},
   { name: 'Sonstiges', items: [
-    'Klingeltaster und Gong montiert + geprüft',
-    'Rauchmelder montiert'
+    { t: 'Klingeltaster und Gong montiert + geprüft' },
+    { t: 'Rauchmelder montiert' }
   ]},
   { name: 'Antenne', items: [
-    'Antennen-Leitungen beschriftet',
-    'Antennen-Anschlüsse geprüft/gemessen'
+    { t: 'Antennen - Leitungen beschriftet' },
+    { t: 'Antennen - Anschlüsse geprüft/gemessen' }
   ]},
   { name: 'CAT', items: [
-    'CAT-Leitungen beschriftet',
-    'CAT-Anschlüsse geprüft/gemessen'
+    { t: 'CAT - Leitungen beschriftet' },
+    { t: 'CAT - Anschlüsse geprüft/gemessen' }
   ]},
   { name: 'Restarbeiten', items: [
-    'Restarbeiten notwendig',
-    'Restarbeiten aufgenommen'
+    { t: 'Restarbeiten notwendig' },
+    { t: 'Restarbeiten aufgenommen' }
   ]},
   { name: 'Prüfprotokoll', items: [
-    'Protokoll erstellt und unterschrieben',
-    'Zählernummern und Stände eingetragen'
+    { t: 'Protokoll erstellt und unterschrieben' },
+    { t: 'Zählernummern und Stände eingetragen' }
   ]}
 ];
 
@@ -2944,8 +2968,8 @@ function initFmItems() {
   fmItems = [];
   var idx = 0;
   FM_CATEGORIES.forEach(function(cat) {
-    cat.items.forEach(function(label) {
-      fmItems.push({ id: idx, cat: cat.name, label: label, val: '', bem: '' });
+    cat.items.forEach(function(it) {
+      fmItems.push({ id: idx, cat: cat.name, label: it.t, val: '', bem: it.bem || '' });
       idx++;
     });
   });
@@ -3038,15 +3062,45 @@ renderKlTable();
 /* ═══════════════════════════════════════
    STATE – Schalter
    ═══════════════════════════════════════ */
+// 37 Positionen wie im Blatt "Schalter" der BV-Daten
 var SC_LABELS = [
-  'Universalschalter','Taster','Universalwippen','Serienschalter','Serienwippen',
-  'Kontrollausschalter','2-poliger Ausschalter mit Kontrollampe','Wippe mit Kontroll. Weiß',
-  'Jalousieschalter','Jalousiewippe','Steckdosen','Steckdosen Klappdeckel/Kindersicherung',
-  'Antennendose SAT','Zentralstück Antenne 3-Loch','Bewegungsmelder Innen','Bewegungsmelder Außen',
-  'Zentralstück Antenne 2-Loch','CAT-Dose 1-fach','Zentralstück CAT 1-fach','CAT-Dose 2-fach',
-  'Zentralstück CAT 2-fach','Rahmen 1-fach','Rahmen 2-fach','Rahmen 3-fach','Rahmen 4-fach/5-fach',
-  'Patchfeld','Steckdosen IP44','Rahmen IP44 1-fach','Rahmen IP44 2-fach',
-  'Steckdose Feuchtraum Ap 1-fach','Schalter-Steckdosen-Kombi FR AP','Herdanschlussdose','Spots Innen/Außen'
+  'Universalschalter',
+  'Taster',
+  'Universalwippen',
+  'Serienschalter',
+  'Serienwippen',
+  'Kontrollausschalter',
+  '2-poliger Ausschalter mit Kontrollampe',
+  'Wippe mit Kontroll. Weiß',
+  'Jalousieschalter',
+  'Jalousiewippe',
+  'Steckdosen',
+  'Steckdosen Klappdeckel / Kindersicherung',
+  'Antennendose SAT',
+  'Zentralstück Antenne 3-Loch',
+  'Bewegungsmelder Innen',
+  'Bewegungsmelder Außen (Gesims/Wand)',
+  'Zentralstück Antenne 2-Loch',
+  'CAT-Dose 1-fach',
+  'Zentralstück CAT 1-fach',
+  'CAT-Dose 2-fach',
+  'Zentralstück CAT 2-fach',
+  'Rahmen 1-fach',
+  'Rahmen 2-fach',
+  'Rahmen 3-fach',
+  'Rahmen 4-fach / 5-fach',
+  'Patchfeld',
+  'Steckdosen IP44',
+  'Rahmen IP44, 1-fach',
+  'Rahmen IP44, 2-fach',
+  'Steckdose Feuchtraum Ap 1-fach',
+  'Schalter - Steckdosen-Kombi. FR AP',
+  'Herdanschlussdose',
+  'Spots Innen / Außen',
+  'Gong + Klingeltaster',
+  'Rauchmelder',
+  'Abzweigdose Erdkabel groß / klein',
+  'free@home Jalousie / Licht'
 ];
 
 var scItems = [];
@@ -4166,6 +4220,90 @@ function buildRapportHtml(data) {
 
 
 /* ═══════════════════════════════════════
+   CHECKLISTEN-AUSDRUCK (Rohmontage / Fertigmontage)
+   ═══════════════════════════════════════ */
+// Aufbau wie in den BV-Daten: Kategorie steht links in einer eigenen
+// Spalte und ist ueber ihre Zeilen zusammengefasst.
+function checklisteZeilen(items) {
+  // nach Kategorie gruppieren, Reihenfolge beibehalten
+  var gruppen = [];
+  var letzte = null;
+  items.forEach(function(it) {
+    if (!letzte || letzte.name !== it.cat) {
+      letzte = { name: it.cat, zeilen: [] };
+      gruppen.push(letzte);
+    }
+    letzte.zeilen.push(it);
+  });
+
+  var html = '';
+  gruppen.forEach(function(g) {
+    g.zeilen.forEach(function(it, i) {
+      html += '<tr>';
+      if (i === 0) {
+        html += '<td rowspan="' + g.zeilen.length + '" class="kat">' + escHtml(g.name) + '</td>';
+      }
+      if (it.typ === 'text') {
+        // Ort- und Sitzhoehe-Zeile: keine Ja/Nein-Spalten
+        html += '<td>' + escHtml(it.label) + ' <b>' + escHtml(it.ort || '') + '</b></td>'
+             +  '<td colspan="3">' + escHtml(it.zusatz || '') + ' <b>' + escHtml(it.sitz || '') + '</b> ' + escHtml(it.einheit || '') + '</td>';
+      } else {
+        html += '<td>' + escHtml(it.label) + '</td>'
+             +  '<td class="c">' + (it.val === 'ja' ? 'X' : '') + '</td>'
+             +  '<td class="c">' + (it.val === 'nein' ? 'X' : '') + '</td>'
+             +  '<td class="bem">' + escHtml(it.bem || '') + '</td>';
+      }
+      html += '</tr>';
+    });
+  });
+  return html;
+}
+
+function checklisteStil() {
+  return '@page { size: A4 portrait; margin: 10mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0; width: 190mm; }'
+    + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
+    + 'td, th { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }'
+    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 10px; }'
+    + '.c { text-align: center; font-weight: bold; font-size: 12px; }'
+    + '.kat { font-weight: bold; font-size: 9.5px; vertical-align: middle; background: #f7f7f7; }'
+    + '.bem { font-size: 9px; }'
+    + '.hdr { font-size: 15px; font-weight: bold; }'
+    + '.sub { font-size: 11px; }'
+    + '.lbl { background: #f0f0f0; font-weight: bold; }';
+}
+
+function checklisteKopf(titel, untertitel, bv, projekt, monteur, datum) {
+  return '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px">'
+    +   '<div class="hdr">' + escHtml(titel) + '</div>'
+    +   '<div class="sub">' + escHtml(untertitel || '') + '</div>'
+    + '</div>'
+    + '<table style="margin-bottom:8px">'
+    + '<colgroup><col style="width:14%"><col style="width:43%"><col style="width:16%"><col style="width:27%"></colgroup>'
+    + '<tr><td class="lbl">BV</td><td>' + escHtml(bv || '') + '</td>'
+    +     '<td class="lbl">Projekt</td><td>' + escHtml(projekt || '') + '</td></tr>'
+    + '<tr><td class="lbl">Monteur</td><td>' + escHtml(monteur || '') + '</td>'
+    +     '<td class="lbl">Datum</td><td>' + escHtml(datum || '') + '</td></tr>'
+    + '</table>';
+}
+
+function checklisteFuss(bemerkungen, signatur, monteur, datum) {
+  var unterschrift = signatur
+    ? '<img src="' + signatur + '" style="max-height:16mm;max-width:60mm;display:block">'
+    : '<div style="height:16mm"></div>';
+  return '<div style="margin-top:10px;border:1px solid #000">'
+    +   '<div style="background:#f0f0f0;border-bottom:1px solid #000;padding:3px 5px;font-weight:bold;font-size:10px">Sonstiges / Besonderheiten / Bemerkungen</div>'
+    +   '<div style="min-height:22mm;padding:4px 6px;font-size:10px;white-space:pre-wrap">' + escHtml(bemerkungen || '') + '</div>'
+    + '</div>'
+    + '<div style="margin-top:12mm;width:75mm">'
+    +   unterschrift
+    +   '<div style="border-top:1px solid #000;padding-top:2px;font-size:10px">Unterschrift'
+    +     (monteur ? ' &nbsp;&nbsp;<span style="font-size:9px">' + escHtml(monteur) + ', ' + escHtml(datum || '') + '</span>' : '')
+    +   '</div>'
+    + '</div>';
+}
+
+/* ═══════════════════════════════════════
    REPORT GENERATION – Rohmontage
    ═══════════════════════════════════════ */
 function getRohmontageData() {
@@ -4182,58 +4320,17 @@ function getRohmontageData() {
 
 function buildRohmontageHtml(data) {
   var dateFmt = fmtDate(data.datum);
-
-  var itemRows = '';
-  var lastCat = '';
-  data.items.forEach(function(item) {
-    if (item.cat !== lastCat) {
-      lastCat = item.cat;
-      itemRows += '<tr><td colspan="5" style="background:#f0f0f0;font-weight:bold;font-size:10px;padding:4px 6px;text-transform:uppercase;letter-spacing:0.04em">' + escHtml(item.cat) + '</td></tr>';
-    }
-    itemRows += '<tr>'
-      + '<td style="font-size:9px;padding:3px 6px">' + escHtml(item.label) + '</td>'
-      + '<td class="c" style="width:30px">' + (item.val === 'ja' ? 'X' : '') + '</td>'
-      + '<td class="c" style="width:30px">' + (item.val === 'nein' ? 'X' : '') + '</td>'
-      + '<td style="font-size:8px;padding:3px 6px">' + escHtml(item.bem) + '</td>'
-      + '</tr>';
-  });
-
-  var sigBlock = '';
-  if (data.signature) {
-    sigBlock = '<div style="margin-top:20px;display:flex;justify-content:flex-end">'
-      + '<div><img src="' + data.signature + '" style="max-height:50px;max-width:200px;border-bottom:1px solid #000">'
-      + '<div style="font-size:8px;text-align:center;margin-top:2px">' + escHtml(data.monteur || '') + ', ' + dateFmt + '</div></div></div>';
-  }
-
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
     + '<title>Rohmontage – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
-    + '<style>'
-    + '@page { size: A4 portrait; margin: 10mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
-    + '@media print { body { padding: 0; width: auto; } }'
-    + 'table { border-collapse: collapse; width: 100%; }'
-    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
-    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
-    + '.c { text-align: center; }'
-    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; }'
-    + '.sub { font-size: 11px; text-align: center; margin-bottom: 8px; }'
-    + '</style></head>'
-    + '<body>'
-    + '<div class="hdr">Checkliste - Rohbau</div>'
-    + '<div class="sub">Checkliste Elektro-Rohmontage</div>'
-    + '<table style="margin-bottom:8px">'
-    + '<tr><td style="width:20%;font-weight:bold">BV:</td><td style="width:30%">' + escHtml(data.bv) + '</td>'
-    + '<td style="width:20%;font-weight:bold">Monteur:</td><td style="width:30%">' + escHtml(data.monteur) + '</td></tr>'
-    + '<tr><td style="font-weight:bold">Projekt:</td><td>' + escHtml(data.projekt) + '</td>'
-    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
-    + '</table>'
+    + '<style>' + checklisteStil() + '</style></head><body>'
+    + checklisteKopf('Checkliste - Rohbau', 'Checkliste Elektro-Rohmontage',
+                     data.bv, data.projekt, data.monteur, dateFmt)
     + '<table>'
-    + '<tr><th style="width:auto">Beschreibung</th><th style="width:30px">Ja</th><th style="width:30px">Nein</th><th style="width:25%">Bemerkungen</th></tr>'
-    + itemRows
+    + '<colgroup><col style="width:14%"><col style="width:39%"><col style="width:7%"><col style="width:9%"><col style="width:31%"></colgroup>'
+    + '<tr><th>Prüfen</th><th>Beschreibung</th><th>Ja</th><th>Nein</th><th>Bemerkungen</th></tr>'
+    + checklisteZeilen(data.items)
     + '</table>'
-    + (data.bemerkungen ? '<div style="margin-top:10px;border:1px solid #000;padding:6px"><b>Sonstiges / Bemerkungen:</b><br>' + escHtml(data.bemerkungen).replace(/\n/g,'<br>') + '</div>' : '')
-    + sigBlock
-    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + checklisteFuss(data.bemerkungen, data.signature, data.monteur, dateFmt)
     + '</body></html>';
 }
 
@@ -4255,63 +4352,28 @@ function getFertigmontageData() {
 
 function buildFertigmontageHtml(data) {
   var dateFmt = fmtDate(data.datum);
-
-  var itemRows = '';
-  var lastCat = '';
-  data.items.forEach(function(item) {
-    if (item.cat !== lastCat) {
-      lastCat = item.cat;
-      itemRows += '<tr><td colspan="5" style="background:#f0f0f0;font-weight:bold;font-size:10px;padding:4px 6px;text-transform:uppercase;letter-spacing:0.04em">' + escHtml(item.cat) + '</td></tr>';
-    }
-    itemRows += '<tr>'
-      + '<td style="font-size:9px;padding:3px 6px">' + escHtml(item.label) + '</td>'
-      + '<td class="c" style="width:30px">' + (item.val === 'ja' ? 'X' : '') + '</td>'
-      + '<td class="c" style="width:30px">' + (item.val === 'nein' ? 'X' : '') + '</td>'
-      + '<td style="font-size:8px;padding:3px 6px">' + escHtml(item.bem) + '</td>'
-      + '</tr>';
-  });
-
-  var begonnenText = '';
-  if (data.begonnen === true) begonnenText = 'Ja';
-  else if (data.begonnen === false) begonnenText = 'Nein';
-
-  var sigBlock = '';
-  if (data.signature) {
-    sigBlock = '<div style="margin-top:20px;display:flex;justify-content:flex-end">'
-      + '<div><img src="' + data.signature + '" style="max-height:50px;max-width:200px;border-bottom:1px solid #000">'
-      + '<div style="font-size:8px;text-align:center;margin-top:2px">' + escHtml(data.monteur || '') + ', ' + dateFmt + '</div></div></div>';
-  }
+  var begonnen = '';
+  if (data.begonnen === true) begonnen = 'ja';
+  else if (data.begonnen === false) begonnen = 'nein';
 
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
     + '<title>Fertigmontage – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
-    + '<style>'
-    + '@page { size: A4 portrait; margin: 10mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
-    + '@media print { body { padding: 0; width: auto; } }'
-    + 'table { border-collapse: collapse; width: 100%; }'
-    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
-    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
-    + '.c { text-align: center; }'
-    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; }'
-    + '.sub { font-size: 11px; text-align: center; margin-bottom: 8px; }'
-    + '</style></head>'
-    + '<body>'
-    + '<div class="hdr">Checkliste - Elektro-Fertigmontage</div>'
-    + '<div class="sub">&nbsp;</div>'
-    + '<table style="margin-bottom:8px">'
-    + '<tr><td style="width:20%;font-weight:bold">BV:</td><td style="width:30%">' + escHtml(data.bv) + '</td>'
-    + '<td style="width:20%;font-weight:bold">Monteur:</td><td style="width:30%">' + escHtml(data.monteur) + '</td></tr>'
-    + '<tr><td style="font-weight:bold">Projekt:</td><td>' + escHtml(data.projekt) + '</td>'
-    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
-    + '</table>'
+    + '<style>' + checklisteStil() + '</style></head><body>'
+    + checklisteKopf('Checkliste - Elektro-Fertigmontage', '',
+                     data.bv, data.projekt, data.monteur, dateFmt)
     + '<table>'
-    + '<tr><th style="width:auto">Beschreibung</th><th style="width:30px">Ja</th><th style="width:30px">Nein</th><th style="width:25%">Bemerkungen</th></tr>'
-    + itemRows
+    + '<colgroup><col style="width:14%"><col style="width:43%"><col style="width:7%"><col style="width:9%"><col style="width:27%"></colgroup>'
+    + '<tr><th>Prüfen</th><th>Beschreibung</th><th>Ja</th><th>Nein</th><th>Bemerkungen</th></tr>'
+    + checklisteZeilen(data.items)
     + '</table>'
-    + (begonnenText ? '<div style="margin-top:8px;font-size:10px"><b>Fertigmontage war durch Kollegen bereits begonnen:</b> ' + begonnenText + '</div>' : '')
-    + (data.bemerkungen ? '<div style="margin-top:10px;border:1px solid #000;padding:6px"><b>Sonstiges / Bemerkungen:</b><br>' + escHtml(data.bemerkungen).replace(/\n/g,'<br>') + '</div>' : '')
-    + sigBlock
-    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + '<table style="margin-top:8px">'
+    + '<colgroup><col style="width:57%"><col style="width:7%"><col style="width:9%"><col style="width:27%"></colgroup>'
+    + '<tr><td style="font-weight:bold">Fertigmontage war durch Kollegen bereits begonnen</td>'
+    +     '<td class="c">' + (begonnen === 'ja' ? 'X' : '') + '</td>'
+    +     '<td class="c">' + (begonnen === 'nein' ? 'X' : '') + '</td>'
+    +     '<td class="bem"></td></tr>'
+    + '</table>'
+    + checklisteFuss(data.bemerkungen, data.signature, data.monteur, dateFmt)
     + '</body></html>';
 }
 
@@ -4336,43 +4398,52 @@ function buildKabellisteHtml(data) {
   var tRows = '';
   data.rows.forEach(function(row) {
     tRows += '<tr>'
-      + '<td class="c" style="width:35px">' + row.nr + '</td>'
+      + '<td class="c">' + row.nr + '</td>'
       + '<td>' + escHtml(row.stromkreis) + '</td>'
-      + '<td>' + escHtml(row.art) + '</td>'
-      + '<td>' + escHtml(row.leiter) + '</td>'
-      + '<td>' + escHtml(row.sicherung) + '</td>'
+      + '<td class="c">' + escHtml(row.art) + '</td>'
+      + '<td class="c">' + escHtml(row.leiter) + '</td>'
+      + '<td class="c">' + escHtml(row.sicherung) + '</td>'
       + '</tr>';
   });
+
+  var links = data.tuer === 'links' ? 'X' : '';
+  var rechts = data.tuer === 'rechts' ? 'X' : '';
 
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
     + '<title>Kabelliste – ' + escHtml(data.bv || data.elnr || dateFmt) + '</title>'
     + '<style>'
     + '@page { size: A4 portrait; margin: 10mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
-    + '@media print { body { padding: 0; width: auto; } }'
-    + 'table { border-collapse: collapse; width: 100%; }'
-    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
-    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0; width: 190mm; }'
+    + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
+    + 'td, th { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }'
+    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 10px; }'
     + '.c { text-align: center; }'
-    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 8px; }'
-    + '</style></head>'
-    + '<body>'
-    + '<div class="hdr">Kabelliste LWWP</div>'
+    + '.lbl { background: #f0f0f0; font-weight: bold; }'
+    + '</style></head><body>'
+    + '<div style="font-size:15px;font-weight:bold;margin-bottom:6px">Kabelliste</div>'
     + '<table style="margin-bottom:8px">'
-    + '<tr><td style="width:15%;font-weight:bold">BV:</td><td style="width:35%">' + escHtml(data.bv) + '</td>'
-    + '<td style="width:15%;font-weight:bold">Name:</td><td style="width:35%">' + escHtml(data.monteur) + '</td></tr>'
-    + '<tr><td style="font-weight:bold">el-Nr.:</td><td>' + escHtml(data.elnr) + '</td>'
-    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
+    + '<colgroup><col style="width:10%"><col style="width:52%"><col style="width:12%"><col style="width:26%"></colgroup>'
+    + '<tr><td class="lbl">BV</td><td>' + escHtml(data.bv) + '</td>'
+    +     '<td class="lbl">el-Nr.</td><td>' + escHtml(data.elnr) + '</td></tr>'
+    + '<tr><td class="lbl">Name</td><td>' + escHtml(data.monteur) + '</td>'
+    +     '<td class="lbl">Datum</td><td>' + dateFmt + '</td></tr>'
     + '</table>'
     + '<table>'
-    + '<tr><th style="width:35px">lfd. Nr.</th><th>Stromkreis</th><th>Kabel Art</th><th>Leiter/qmm</th><th>Sicherung</th></tr>'
+    + '<colgroup><col style="width:8%"><col style="width:56%"><col style="width:9%"><col style="width:14%"><col style="width:13%"></colgroup>'
+    // zweizeiliger Kopf wie in der Vorlage: "Kabel / Leitung" spannt Art und Leiter
+    + '<tr><th rowspan="2">lfd.<br>Nr.</th><th rowspan="2">Stromkreis</th>'
+    +     '<th colspan="2">Kabel / Leitung</th><th rowspan="2">Sicherung</th></tr>'
+    + '<tr><th>Art</th><th>Leiter/qmm</th></tr>'
     + tRows
     + '</table>'
     + '<table style="margin-top:8px">'
-    + '<tr><td style="width:15%;font-weight:bold">EVU:</td><td style="width:35%">' + escHtml(data.evu) + '</td>'
-    + '<td style="width:25%;font-weight:bold">Türanschlag:</td><td style="width:25%">' + escHtml(data.tuer) + ' <span style="font-size:8px;color:#666">(von Oben gesehen)</span></td></tr>'
+    + '<colgroup><col style="width:8%"><col style="width:56%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>'
+    + '<tr><td colspan="2" style="border:none"></td>'
+    +     '<td colspan="3" class="c" style="border:none;font-size:9px">von Oben gesehen</td></tr>'
+    + '<tr><td class="lbl" colspan="2">EVU = ' + escHtml(data.evu) + '</td>'
+    +     '<td class="c">Tür links</td><td class="c" style="font-weight:bold;font-size:12px">' + links + '</td>'
+    +     '<td class="c">Tür rechts <b style="font-size:12px">' + rechts + '</b></td></tr>'
     + '</table>'
-    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
     + '</body></html>';
 }
 
@@ -4392,16 +4463,18 @@ function getSchalterData() {
 
 function buildSchalterHtml(data) {
   var dateFmt = fmtDate(data.datum);
+  var balance = (data.fabrikat === 'Balance SI') ? 'X' : '';
+  var andere = (data.fabrikat && data.fabrikat !== 'Balance SI') ? 'X' : '';
 
   var tRows = '';
   data.items.forEach(function(item) {
     var tally = '';
     for (var t = 0; t < item.count; t++) { tally += '|'; if ((t + 1) % 5 === 0) tally += ' '; }
     tRows += '<tr>'
-      + '<td class="c" style="width:35px">' + item.nr + '</td>'
+      + '<td class="c">' + item.nr + '</td>'
       + '<td>' + escHtml(item.label) + '</td>'
-      + '<td style="font-family:monospace;font-size:9px;letter-spacing:1px">' + tally + '</td>'
-      + '<td class="c" style="width:45px">' + (item.count > 0 ? item.count : '') + '</td>'
+      + '<td class="strich">' + tally + '</td>'
+      + '<td class="c" style="font-weight:bold">' + (item.count > 0 ? item.count : '') + '</td>'
       + '</tr>';
   });
 
@@ -4409,29 +4482,31 @@ function buildSchalterHtml(data) {
     + '<title>Schalteraufmaß – ' + escHtml(data.bv || data.elnr || dateFmt) + '</title>'
     + '<style>'
     + '@page { size: A4 portrait; margin: 10mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
-    + '@media print { body { padding: 0; width: auto; } }'
-    + 'table { border-collapse: collapse; width: 100%; }'
-    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
-    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0; width: 190mm; }'
+    + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
+    + 'td, th { border: 1px solid #000; padding: 2px 5px; vertical-align: middle; }'
+    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 10px; }'
     + '.c { text-align: center; }'
-    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 4px; }'
-    + '.sub { font-size: 11px; text-align: center; margin-bottom: 8px; }'
-    + '</style></head>'
-    + '<body>'
-    + '<div class="hdr">Schalteraufmaß</div>'
-    + '<div class="sub">Fabrikat: Busch Jäger / ' + escHtml(data.fabrikat) + '</div>'
+    + '.lbl { background: #f0f0f0; font-weight: bold; }'
+    + '.strich { font-family: monospace; font-size: 10px; letter-spacing: 1.5px; }'
+    + '</style></head><body>'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px">'
+    +   '<div style="font-size:15px;font-weight:bold">Schalteraufmaß</div>'
+    +   '<div style="font-size:10px">Busch Jäger: &nbsp; Balance SI [<b>' + balance + '</b>] &nbsp; andere [<b>' + andere + '</b>]'
+    +     (andere ? ' &nbsp;<b>' + escHtml(data.fabrikat) + '</b>' : '') + '</div>'
+    + '</div>'
     + '<table style="margin-bottom:8px">'
-    + '<tr><td style="width:15%;font-weight:bold">BV:</td><td style="width:35%">' + escHtml(data.bv) + '</td>'
-    + '<td style="width:15%;font-weight:bold">Monteur:</td><td style="width:35%">' + escHtml(data.monteur) + '</td></tr>'
-    + '<tr><td style="font-weight:bold">el-Nr.:</td><td>' + escHtml(data.elnr) + '</td>'
-    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
+    + '<colgroup><col style="width:10%"><col style="width:52%"><col style="width:12%"><col style="width:26%"></colgroup>'
+    + '<tr><td class="lbl">BV</td><td>' + escHtml(data.bv) + '</td>'
+    +     '<td class="lbl">el-Nr.</td><td>' + escHtml(data.elnr) + '</td></tr>'
+    + '<tr><td class="lbl">Monteur</td><td>' + escHtml(data.monteur) + '</td>'
+    +     '<td class="lbl">Datum</td><td>' + dateFmt + '</td></tr>'
     + '</table>'
     + '<table>'
-    + '<tr><th style="width:35px">lfd. Nr.</th><th>Bezeichnung</th><th>Strichliste</th><th style="width:45px">Stück</th></tr>'
+    + '<colgroup><col style="width:8%"><col style="width:44%"><col style="width:36%"><col style="width:12%"></colgroup>'
+    + '<tr><th>lfd.<br>Nr.</th><th>Bezeichnung</th><th>Strichliste</th><th>Stück</th></tr>'
     + tRows
     + '</table>'
-    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
     + '</body></html>';
 }
 
