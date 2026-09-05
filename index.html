@@ -1487,7 +1487,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.12.0';
+var APP_VERSION = 'v1.13.0';
 
 var db = null;
 var storage = null;
@@ -1940,12 +1940,71 @@ function autofillFromBaustelle(sel) {
     var elnr = document.getElementById('kl-elnr');
     if (elnr && found) elnr.value = found.projektNr || '';
     else if (elnr) elnr.value = '';
+    uebernehmeKabelVorgabe(found);
   } else if (selId === 'sc-bv') {
     // Schalter: fill el-Nr.
     var elnr2 = document.getElementById('sc-elnr');
     if (elnr2 && found) elnr2.value = found.projektNr || '';
     else if (elnr2) elnr2.value = '';
+    uebernehmeSchalterVorgabe(found);
   }
+}
+
+// Hat der Monteur schon Eintragungen gemacht, wird vor dem Ueberschreiben gefragt
+function klHatEingaben() {
+  for (var i = 0; i < klRows.length; i++) {
+    var d = KL_DEFAULTS[i] || { stromkreis:'', art:'', leiter:'', sicherung:'' };
+    var r = klRows[i];
+    if ((r.stromkreis || '') !== (d.stromkreis || '')) return true;
+    if ((r.art || '') !== (d.art || '')) return true;
+    if ((r.leiter || '') !== (d.leiter || '')) return true;
+    if ((r.sicherung || '') !== (d.sicherung || '')) return true;
+  }
+  return false;
+}
+
+function uebernehmeKabelVorgabe(bv) {
+  var vorgabe = bv && bv.vorgabeKabel;
+  if (!vorgabe) return;
+  if (klHatEingaben() && !confirm('Für diese Baustelle ist eine Kabelliste vorgegeben. Vorhandene Eintragungen ersetzen?')) return;
+  klRows = [];
+  for (var i = 0; i < 30; i++) {
+    var q = vorgabe[i] || {};
+    klRows.push({ nr: i + 1, stromkreis: q.stromkreis || '', art: q.art || '',
+                  leiter: q.leiter || '', sicherung: q.sicherung || '' });
+  }
+  renderKlTable();
+  toast('Vorgabe der Baustelle übernommen');
+}
+
+function scHatEingaben() {
+  for (var i = 0; i < scItems.length; i++) if (scItems[i].count > 0) return true;
+  return false;
+}
+
+function uebernehmeSchalterVorgabe(bv) {
+  var v = bv && bv.vorgabeSchalter;
+  if (!v) return;
+  if (scHatEingaben() && !confirm('Für diese Baustelle ist eine Schalterliste vorgegeben. Vorhandene Stückzahlen ersetzen?')) return;
+  initScItems(v.zusatz);
+  var mengen = v.mengen || {};
+  scItems.forEach(function(it) {
+    if (mengen[it.label]) it.count = mengen[it.label];
+  });
+  if (v.fabrikat) {
+    scFabrikat = v.fabrikat;
+    var bal = document.getElementById('sc-fab-balance');
+    var and = document.getElementById('sc-fab-andere');
+    var cus = document.getElementById('sc-fab-custom');
+    if (v.fabrikat === 'Balance SI') {
+      bal.classList.add('active'); and.classList.remove('active'); cus.style.display = 'none';
+    } else {
+      bal.classList.remove('active'); and.classList.add('active');
+      cus.style.display = 'block'; cus.value = v.fabrikat;
+    }
+  }
+  renderScTable();
+  toast('Vorgabe der Baustelle übernommen');
 }
 
 function populateKostenstellenDropdowns() {
@@ -2225,9 +2284,14 @@ function sdLoadBaustellen() {
       item.className = 'sd-item';
       item.innerHTML = '<div class="sd-item-info">'
         + '<div class="sd-item-name">' + statusDot + escHtml(d.name) + '</div>'
-        + '<div class="sd-item-meta">KST: ' + escHtml(d.kostenstelle || '—') + ' &middot; PNr: ' + escHtml(d.projektNr || '—') + (d.adresse ? ' &middot; ' + escHtml(d.adresse) : '') + '</div>'
+        + '<div class="sd-item-meta">KST: ' + escHtml(d.kostenstelle || '—') + ' &middot; PNr: ' + escHtml(d.projektNr || '—') + (d.adresse ? ' &middot; ' + escHtml(d.adresse) : '')
+        +   (d.vorgabeKabel ? ' &middot; <span style="color:var(--accent)">Kabel-Vorgabe</span>' : '')
+        +   (d.vorgabeSchalter ? ' &middot; <span style="color:var(--accent)">Schalter-Vorgabe</span>' : '')
+        + '</div>'
         + '</div>'
         + '<div class="sd-item-actions">'
+        + '<button onclick="sdVorgabeKabel(\'' + doc.id + '\')" title="Kabelliste vorgeben">&#128268;</button>'
+        + '<button onclick="sdVorgabeSchalter(\'' + doc.id + '\')" title="Schalterliste vorgeben">&#128204;</button>'
         + '<button onclick="sdEditBaustelle(\'' + doc.id + '\')" title="Bearbeiten">&#9998;</button>'
         + '<button class="sd-del" onclick="sdToggleBaustelle(\'' + doc.id + '\',' + (d.aktiv !== false ? 'false' : 'true') + ')" title="' + (d.aktiv !== false ? 'Deaktivieren' : 'Aktivieren') + '">' + (d.aktiv !== false ? '&#10005;' : '&#10003;') + '</button>'
         + '</div>';
@@ -2274,6 +2338,162 @@ function sdEditBaustelle(id) {
     document.getElementById('sd-bv-id').value = id;
     document.getElementById('sd-bv-name').focus();
   });
+}
+
+/* ═══════════════════════════════════════
+   VORGABEN JE BAUSTELLE (Chef)
+   Kabelliste und Schalteraufmaß koennen pro Baustelle vorbelegt werden.
+   Die Vorgaben liegen am Baustellen-Dokument und werden beim Auswaehlen
+   der Baustelle in den jeweiligen Tab uebernommen.
+   ═══════════════════════════════════════ */
+function vorgabeOverlay(titel, inhaltHtml, aufSpeichern) {
+  var overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+
+  var bar = document.createElement('div');
+  bar.className = 'preview-bar';
+
+  var t = document.createElement('span');
+  t.style.cssText = 'color:var(--text);font-weight:700;font-size:15px;flex:1;min-width:120px';
+  t.textContent = titel;
+
+  var speichern = document.createElement('button');
+  speichern.className = 'btn btn-primary';
+  speichern.textContent = 'Speichern';
+
+  var abbrechen = document.createElement('button');
+  abbrechen.className = 'btn btn-secondary';
+  abbrechen.textContent = 'Abbrechen';
+  abbrechen.onclick = function(){ document.body.removeChild(overlay); };
+
+  bar.appendChild(t); bar.appendChild(speichern); bar.appendChild(abbrechen);
+
+  var body = document.createElement('div');
+  body.className = 'preview-body';
+  body.innerHTML = inhaltHtml;
+
+  overlay.appendChild(bar);
+  overlay.appendChild(body);
+  document.body.appendChild(overlay);
+
+  speichern.onclick = function() {
+    speichern.disabled = true;
+    speichern.textContent = 'Speichere…';
+    aufSpeichern(body, function(ok) {
+      if (ok) { document.body.removeChild(overlay); }
+      else { speichern.disabled = false; speichern.textContent = 'Speichern'; }
+    });
+  };
+  return overlay;
+}
+
+function sdVorgabeKabel(bvId) {
+  if (!db) return;
+  db.collection('baustellen').doc(bvId).get().then(function(doc) {
+    if (!doc.exists) { toast('Baustelle nicht gefunden'); return; }
+    var d = doc.data();
+    var vorgabe = d.vorgabeKabel;
+    // Ohne Vorgabe die Standardliste als Ausgangspunkt zeigen
+    var zeilen = [];
+    for (var i = 0; i < 30; i++) {
+      var q = vorgabe ? (vorgabe[i] || {}) : (KL_DEFAULTS[i] || {});
+      zeilen.push({ stromkreis: q.stromkreis || '', art: q.art || '', leiter: q.leiter || '', sicherung: q.sicherung || '' });
+    }
+
+    var html = '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">'
+      + 'Diese Zeilen sind für <b style="color:var(--text)">' + escHtml(d.name) + '</b> vorbelegt, sobald jemand die Kabelliste für diese Baustelle öffnet. Leer lassen heißt: Zeile bleibt frei.'
+      + '</div>'
+      + '<div style="overflow-x:auto"><table class="kl-table"><thead><tr>'
+      + '<th>Nr.</th><th>Stromkreis</th><th>Art</th><th>Leiter/qmm</th><th>Sicherung</th>'
+      + '</tr></thead><tbody>';
+    zeilen.forEach(function(z, i) {
+      html += '<tr>'
+        + '<td class="kl-nr">' + (i+1) + '</td>'
+        + '<td><input data-f="stromkreis" data-i="' + i + '" value="' + escHtml(z.stromkreis) + '"></td>'
+        + '<td><input data-f="art" data-i="' + i + '" value="' + escHtml(z.art) + '"></td>'
+        + '<td><input data-f="leiter" data-i="' + i + '" value="' + escHtml(z.leiter) + '"></td>'
+        + '<td><input data-f="sicherung" data-i="' + i + '" value="' + escHtml(z.sicherung) + '"></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>'
+      + '<button class="btn btn-danger-outline" style="margin-top:14px" onclick="sdVorgabeLoeschen(\'' + bvId + '\',\'vorgabeKabel\',this)">Vorgabe entfernen</button>';
+
+    vorgabeOverlay('Kabelliste-Vorgabe – ' + d.name, html, function(body, fertig) {
+      var neu = [];
+      for (var i = 0; i < 30; i++) neu.push({ stromkreis:'', art:'', leiter:'', sicherung:'' });
+      var felder = body.querySelectorAll('input[data-f]');
+      for (var k = 0; k < felder.length; k++) {
+        neu[parseInt(felder[k].getAttribute('data-i'), 10)][felder[k].getAttribute('data-f')] = felder[k].value.trim();
+      }
+      db.collection('baustellen').doc(bvId).update({ vorgabeKabel: neu }).then(function() {
+        toast('Kabelliste-Vorgabe gespeichert');
+        sdLoadBaustellen(); loadMasterData(); fertig(true);
+      }).catch(function(err) { toast('Fehler: ' + err.message); fertig(false); });
+    });
+  });
+}
+
+function sdVorgabeSchalter(bvId) {
+  if (!db) return;
+  db.collection('baustellen').doc(bvId).get().then(function(doc) {
+    if (!doc.exists) { toast('Baustelle nicht gefunden'); return; }
+    var d = doc.data();
+    var v = d.vorgabeSchalter || {};
+    var mengen = v.mengen || {};
+    var zusatz = v.zusatz || [];
+
+    var html = '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">'
+      + 'Vorbelegte Stückzahlen für <b style="color:var(--text)">' + escHtml(d.name) + '</b>. Die Monteure können sie vor Ort ändern. Zusätzliche Positionen erscheinen unten in der Liste.'
+      + '</div>'
+      + '<div class="field"><label>Fabrikat</label>'
+      + '<input type="text" id="vsFabrikat" value="' + escHtml(v.fabrikat || 'Balance SI') + '" placeholder="Balance SI"></div>'
+      + '<div class="field"><label>Zusätzliche Positionen (eine je Zeile)</label>'
+      + '<textarea id="vsZusatz" placeholder="z.B. Dimmer 2-fach&#10;Sonderrahmen Glas">' + escHtml(zusatz.join('\n')) + '</textarea></div>'
+      + '<div style="overflow-x:auto"><table class="sc-table"><thead><tr>'
+      + '<th style="width:35px">Nr.</th><th>Bezeichnung</th><th style="width:90px">Stück</th>'
+      + '</tr></thead><tbody>';
+    SC_LABELS.forEach(function(label, i) {
+      html += '<tr><td class="sc-nr">' + (i+1) + '</td>'
+        + '<td class="sc-label">' + escHtml(label) + '</td>'
+        + '<td><input class="cnt-val" type="number" min="0" style="width:80px" data-label="' + escHtml(label) + '" value="' + (mengen[label] || '') + '"></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>'
+      + '<button class="btn btn-danger-outline" style="margin-top:14px" onclick="sdVorgabeLoeschen(\'' + bvId + '\',\'vorgabeSchalter\',this)">Vorgabe entfernen</button>';
+
+    vorgabeOverlay('Schalter-Vorgabe – ' + d.name, html, function(body, fertig) {
+      var mengenNeu = {};
+      var felder = body.querySelectorAll('input[data-label]');
+      for (var k = 0; k < felder.length; k++) {
+        var anz = parseInt(felder[k].value, 10);
+        if (anz > 0) mengenNeu[felder[k].getAttribute('data-label')] = anz;
+      }
+      var zus = body.querySelector('#vsZusatz').value.split('\n')
+        .map(function(s){ return s.trim(); })
+        .filter(function(s){ return s.length > 0; });
+      var neu = {
+        fabrikat: body.querySelector('#vsFabrikat').value.trim() || 'Balance SI',
+        mengen: mengenNeu,
+        zusatz: zus
+      };
+      db.collection('baustellen').doc(bvId).update({ vorgabeSchalter: neu }).then(function() {
+        toast('Schalter-Vorgabe gespeichert');
+        sdLoadBaustellen(); loadMasterData(); fertig(true);
+      }).catch(function(err) { toast('Fehler: ' + err.message); fertig(false); });
+    });
+  });
+}
+
+function sdVorgabeLoeschen(bvId, feld, btn) {
+  if (!confirm('Vorgabe für diese Baustelle wirklich entfernen?')) return;
+  var aend = {};
+  aend[feld] = firebase.firestore.FieldValue.delete();
+  db.collection('baustellen').doc(bvId).update(aend).then(function() {
+    toast('Vorgabe entfernt');
+    var ov = btn.closest('.preview-overlay');
+    if (ov) document.body.removeChild(ov);
+    sdLoadBaustellen(); loadMasterData();
+  }).catch(function(err) { toast('Fehler: ' + err.message); });
 }
 
 function sdToggleBaustelle(id, activate) {
@@ -3108,11 +3328,17 @@ var scFabrikat = 'Balance SI';
 
 document.getElementById('sc-datum').valueAsDate = new Date();
 
-function initScItems() {
+function initScItems(zusatz) {
   scItems = [];
   SC_LABELS.forEach(function(label, i) {
     scItems.push({ nr: i + 1, label: label, count: 0 });
   });
+  // Zusatzpositionen aus der Baustellen-Vorgabe hinten anhaengen
+  if (zusatz && zusatz.length) {
+    zusatz.forEach(function(label) {
+      scItems.push({ nr: scItems.length + 1, label: label, count: 0, zusatz: true });
+    });
+  }
 }
 initScItems();
 
@@ -3122,7 +3348,9 @@ function renderScTable() {
   scItems.forEach(function(item, i) {
     html += '<tr>'
       + '<td class="sc-nr">' + item.nr + '</td>'
-      + '<td class="sc-label">' + escHtml(item.label) + '</td>'
+      + '<td class="sc-label">' + escHtml(item.label)
+      +   (item.zusatz ? ' <span style="font-size:10px;color:var(--accent);font-weight:600">Vorgabe</span>' : '')
+      + '</td>'
       + '<td>'
       + '<div class="cnt-wrap">'
       + '<button class="cnt-btn" onclick="scCount(' + i + ',-1)">-</button>'
@@ -5350,6 +5578,7 @@ function resetSchalter() {
   document.getElementById('sc-fab-custom').value = '';
   initScItems();
   renderScTable();
+  // Baustelle wurde geleert, damit faellt auch die Vorgabe weg
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Schalteraufmaß zurückgesetzt');
