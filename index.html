@@ -868,6 +868,9 @@ body {
         <label for="tr-pause1-bis">Pause 1 bis</label>
         <input type="time" id="tr-pause1-bis" onchange="calcArbeitszeit()">
       </div>
+      <div class="field" style="flex:0 0 auto;align-self:flex-end;padding-bottom:6px">
+        <button type="button" class="btn-sm" onclick="document.getElementById('tr-pause1-von').value='';document.getElementById('tr-pause1-bis').value='';calcArbeitszeit()" style="font-size:12px;padding:6px 10px">&#10005;</button>
+      </div>
     </div>
     <div class="row">
       <div class="field">
@@ -877,6 +880,9 @@ body {
       <div class="field">
         <label for="tr-pause2-bis">Pause 2 bis</label>
         <input type="time" id="tr-pause2-bis" onchange="calcArbeitszeit()">
+      </div>
+      <div class="field" style="flex:0 0 auto;align-self:flex-end;padding-bottom:6px">
+        <button type="button" class="btn-sm" onclick="document.getElementById('tr-pause2-von').value='';document.getElementById('tr-pause2-bis').value='';calcArbeitszeit()" style="font-size:12px;padding:6px 10px">&#10005;</button>
       </div>
     </div>
 
@@ -960,6 +966,20 @@ body {
     </div>
     <div class="sig-actions">
       <button class="btn-sm" onclick="clearTrSig()">Löschen</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div class="section-label" id="trSig2Label" style="margin-bottom:0">Unterschrift Kunde</div>
+      <button type="button" class="btn-sm" onclick="toggleTrSig2Type()" id="trSig2Toggle" style="font-size:11px;padding:4px 10px">Mitarbeiter</button>
+    </div>
+    <div class="sig-wrap" id="trSig2Wrap">
+      <canvas id="trSig2Canvas" height="160"></canvas>
+      <div class="sig-hint" id="trSig2Hint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn-sm" onclick="clearTrSig2()">Löschen</button>
     </div>
   </div>
 
@@ -2755,7 +2775,7 @@ function switchModule(name, btn) {
 
   var sub = document.getElementById('headerSubtitle');
   if (name === 'kontrolle') sub.textContent = 'Mängeldokumentation';
-  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(calcArbeitszeit, 50); }
+  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(function(){ loadPauseMemory(); calcArbeitszeit(); initTrSig2(); }, 50); }
   else if (name === 'rohmontage') sub.textContent = 'Checkliste Rohmontage';
   else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
@@ -2982,6 +3002,95 @@ function clearTrSig() {
   trHasSigned = false; trSigData = null;
   document.getElementById('trSigHint').style.opacity = '1';
 }
+// ── Pause memory (localStorage) ──
+function savePauseMemory() {
+  try {
+    var pm = {
+      p1von: document.getElementById('tr-pause1-von').value,
+      p1bis: document.getElementById('tr-pause1-bis').value,
+      p2von: document.getElementById('tr-pause2-von').value,
+      p2bis: document.getElementById('tr-pause2-bis').value
+    };
+    localStorage.setItem('elmbau_pausen', JSON.stringify(pm));
+  } catch(e) {}
+}
+function loadPauseMemory() {
+  try {
+    var s = localStorage.getItem('elmbau_pausen');
+    if (!s) return;
+    var pm = JSON.parse(s);
+    if (pm.p1von) document.getElementById('tr-pause1-von').value = pm.p1von;
+    if (pm.p1bis) document.getElementById('tr-pause1-bis').value = pm.p1bis;
+    if (pm.p2von) document.getElementById('tr-pause2-von').value = pm.p2von;
+    if (pm.p2bis) document.getElementById('tr-pause2-bis').value = pm.p2bis;
+    calcArbeitszeit();
+  } catch(e) {}
+}
+
+// ── Signature 2 (Kunde/Mitarbeiter toggle) ──
+var trSig2Type = 'Kunde';
+var trSig2Canvas = document.getElementById('trSig2Canvas');
+var trSig2Ctx = trSig2Canvas ? trSig2Canvas.getContext('2d') : null;
+var trSig2Drawing = false, trSig2LX, trSig2LY;
+var trSig2Data = null, trHasSigned2 = false;
+
+function initTrSig2() {
+  if (!trSig2Canvas) return;
+  var r = trSig2Canvas.parentElement.getBoundingClientRect();
+  if (r.width < 10) return;
+  trSig2Canvas.width = r.width;
+  trSig2Canvas.height = 160;
+  trSig2Ctx.strokeStyle = '#000000';
+  trSig2Ctx.lineWidth = 3;
+  trSig2Ctx.lineCap = 'round';
+  trSig2Ctx.lineJoin = 'round';
+}
+if (trSig2Canvas) {
+  trSig2Canvas.addEventListener('mousedown', function(e){ trSig2Start(e); });
+  trSig2Canvas.addEventListener('mousemove', function(e){ trSig2Move(e); });
+  trSig2Canvas.addEventListener('mouseup', trSig2End);
+  trSig2Canvas.addEventListener('touchstart', function(e){ trSig2Start(e); }, {passive:false});
+  trSig2Canvas.addEventListener('touchmove', function(e){ trSig2Move(e); }, {passive:false});
+  trSig2Canvas.addEventListener('touchend', trSig2End);
+}
+function trSig2Start(e) {
+  e.preventDefault(); trSig2Drawing = true;
+  var p = sigPos(e, trSig2Canvas); trSig2LX = p[0]; trSig2LY = p[1];
+  document.getElementById('trSig2Hint').style.opacity = '0';
+  trHasSigned2 = true;
+}
+function trSig2Move(e) {
+  if (!trSig2Drawing) return; e.preventDefault();
+  var p = sigPos(e, trSig2Canvas);
+  trSig2Ctx.beginPath();
+  trSig2Ctx.moveTo(trSig2LX, trSig2LY);
+  trSig2Ctx.lineTo(p[0], p[1]);
+  trSig2Ctx.stroke();
+  trSig2LX = p[0]; trSig2LY = p[1];
+}
+function trSig2End() {
+  trSig2Drawing = false;
+  trSig2Data = trSig2Canvas.toDataURL('image/png');
+}
+function clearTrSig2() {
+  if (!trSig2Ctx) return;
+  trSig2Ctx.clearRect(0, 0, trSig2Canvas.width, trSig2Canvas.height);
+  trHasSigned2 = false; trSig2Data = null;
+  document.getElementById('trSig2Hint').style.opacity = '1';
+}
+function toggleTrSig2Type() {
+  if (trSig2Type === 'Kunde') {
+    trSig2Type = 'Mitarbeiter';
+    document.getElementById('trSig2Label').textContent = 'Unterschrift Mitarbeiter';
+    document.getElementById('trSig2Toggle').textContent = 'Kunde';
+  } else {
+    trSig2Type = 'Kunde';
+    document.getElementById('trSig2Label').textContent = 'Unterschrift Kunde';
+    document.getElementById('trSig2Toggle').textContent = 'Mitarbeiter';
+  }
+  clearTrSig2();
+}
+
 
 /* ═══════════════════════════════════════
    SIGNATURE – Rohmontage
@@ -3313,6 +3422,7 @@ function calcArbeitszeit() {
 
   display.textContent = h + ':' + (m < 10 ? '0' : '') + m + ' Std.';
   display.style.color = 'var(--accent-dark)';
+  savePauseMemory();
 }
 
 function getRapportData() {
@@ -3338,7 +3448,9 @@ function getRapportData() {
     arbeiten: document.getElementById('tr-arbeiten').value.trim(),
     bemerkungen: document.getElementById('tr-bemerkungen').value.trim(),
     arbeitszeit: (document.getElementById('tr-az-display') ? document.getElementById('tr-az-display').textContent : ''),
-    signature: trSigData
+    signature: trSigData,
+    signature2: trSig2Data,
+    signature2Type: trSig2Type
   };
 }
 
@@ -4397,12 +4509,12 @@ function resetRapport() {
   document.getElementById('tr-fahrer').value = '';
   document.getElementById('tr-hinfahrt').value = document.getElementById('tr-beginn').value;
   document.getElementById('tr-rueckfahrt').value = document.getElementById('tr-ende').value;
-  document.getElementById('tr-beginn').value = '07:00';
-  document.getElementById('tr-ende').value = '16:00';
-  document.getElementById('tr-pause1-von').value = '09:30';
-  document.getElementById('tr-pause1-bis').value = '09:45';
-  document.getElementById('tr-pause2-von').value = '12:00';
-  document.getElementById('tr-pause2-bis').value = '12:30';
+  document.getElementById('tr-beginn').value = '06:00';
+  document.getElementById('tr-ende').value = '15:00';
+  document.getElementById('tr-pause1-von').value = '';
+  document.getElementById('tr-pause1-bis').value = '';
+  document.getElementById('tr-pause2-von').value = '';
+  document.getElementById('tr-pause2-bis').value = '';
   document.getElementById('tr-arbeiten').value = '';
   document.getElementById('tr-bemerkungen').value = '';
   trKategorie = 'Elektro';
@@ -4415,6 +4527,10 @@ function resetRapport() {
   addWorker();
   updateStundenSumme();
   clearTrSig();
+  clearTrSig2();
+  trSig2Type = 'Kunde';
+  if (document.getElementById('trSig2Label')) document.getElementById('trSig2Label').textContent = 'Unterschrift Kunde';
+  if (document.getElementById('trSig2Toggle')) document.getElementById('trSig2Toggle').textContent = 'Mitarbeiter';
   document.getElementById('statusBadge').textContent = APP_VERSION;
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Tagesrapport zurückgesetzt');
