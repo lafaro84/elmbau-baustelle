@@ -1421,7 +1421,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.0.0';
+var APP_VERSION = '';
 
 var db = null;
 var storage = null;
@@ -1628,7 +1628,7 @@ function afterLogin() {
 
   // Show user badge and version
   document.getElementById('currentUserBadge').textContent = currentUser.name;
-  document.getElementById('statusBadge').textContent = APP_VERSION;
+  // version display removed
 
   // Show/hide chef modules
   document.getElementById('nav-stammdaten').style.display = isChef ? '' : 'none';
