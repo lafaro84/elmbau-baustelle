@@ -959,21 +959,7 @@ body {
   </div>
 
   <div class="section">
-    <div class="section-label">Unterschrift Mitarbeiter</div>
-    <div class="sig-wrap" id="trSigWrap">
-      <canvas id="trSigCanvas" height="160"></canvas>
-      <div class="sig-hint" id="trSigHint">Mit dem Finger unterschreiben</div>
-    </div>
-    <div class="sig-actions">
-      <button class="btn-sm" onclick="clearTrSig()">Löschen</button>
-    </div>
-  </div>
-
-  <div class="section">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <div class="section-label" id="trSig2Label" style="margin-bottom:0">Unterschrift Kunde</div>
-      <button type="button" class="btn-sm" onclick="toggleTrSig2Type()" id="trSig2Toggle" style="font-size:11px;padding:4px 10px">Mitarbeiter</button>
-    </div>
+    <div class="section-label">Unterschrift Kunde</div>
     <div class="sig-wrap" id="trSig2Wrap">
       <canvas id="trSig2Canvas" height="160"></canvas>
       <div class="sig-hint" id="trSig2Hint">Mit dem Finger unterschreiben</div>
@@ -1717,7 +1703,20 @@ function loadMasterData() {
     // Auto-fill fahrzeug for logged-in user
     if (currentUser && PERSONAL.fahrzeuge && PERSONAL.fahrzeuge[currentUser.name]) {
       var fzSel = document.getElementById('tr-fahrzeug');
-      if (fzSel && !fzSel.value) fzSel.value = PERSONAL.fahrzeuge[currentUser.name];
+      if (fzSel && !fzSel.value) {
+        var userFz = PERSONAL.fahrzeuge[currentUser.name];
+        // Add as option if not present
+        var found = false;
+        for (var oi = 0; oi < fzSel.options.length; oi++) {
+          if (fzSel.options[oi].value === userFz) { found = true; break; }
+        }
+        if (!found && userFz) {
+          var no = document.createElement('option');
+          no.value = userFz; no.textContent = userFz;
+          fzSel.appendChild(no);
+        }
+        fzSel.value = userFz;
+      }
     }
     checkTuevWarnungen();
   }).catch(function(err) {
@@ -3448,9 +3447,7 @@ function getRapportData() {
     arbeiten: document.getElementById('tr-arbeiten').value.trim(),
     bemerkungen: document.getElementById('tr-bemerkungen').value.trim(),
     arbeitszeit: (document.getElementById('tr-az-display') ? document.getElementById('tr-az-display').textContent : ''),
-    signature: trSigData,
-    signature2: trSig2Data,
-    signature2Type: trSig2Type
+    kundeSignature: trSig2Data
   };
 }
 
@@ -3472,30 +3469,45 @@ function buildRapportHtml(data) {
     taetKuerzel = data.taetigkeiten.map(function(t){ return map[t] || t; }).join(', ');
   }
 
+  // Build worker rows (10 rows like the Excel)
   var wRows = '';
   for (var i = 0; i < 10; i++) {
     var w = validW[i];
-    var fachStd = '', probeStd = '', lehrStd = '', ausloese = '', verpfl = '', name = '', arbeiten = '';
+    var fachStd = '', probeStd = '', lehrStd = '', ausloese = '', verpfl = '', wname = '', arbeiten = '';
     if (w) {
-      name = escHtml(w.name);
+      wname = escHtml(w.name);
       if (w.rolle === 'Facharbeiter') fachStd = w.stunden || '';
       if (w.rolle === 'Probearbeit') probeStd = w.stunden || '';
       if (w.rolle === 'Lehrling') lehrStd = w.stunden || '';
-      ausloese = w.ausloese ? 'X' : '';
-      verpfl = w.verpfl ? 'X' : '';
+      ausloese = w.ausloese ? 'x' : '';
+      verpfl = w.verpfl ? 'x' : '';
       if (i === 0 && taetKuerzel) arbeiten = escHtml(taetKuerzel);
     }
-    wRows += '<tr>'
-      + '<td class="c">' + (w ? dateFmt : '') + '</td>'
-      + '<td class="c">' + ausloese + '</td>'
-      + '<td class="c">' + verpfl + '</td>'
-      + '<td>' + name + '</td>'
-      + '<td class="c">' + fachStd + '</td>'
-      + '<td class="c">' + probeStd + '</td>'
-      + '<td class="c">' + lehrStd + '</td>'
-      + '<td class="c">' + arbeiten + '</td>'
-      + '<td class="arb">' + (w && i === 0 ? escHtml(data.arbeiten || '') : '') + '</td>'
-      + '</tr>';
+    // First worker row gets the Arbeiten/Bemerkungen spanning all 10 rows
+    if (i === 0) {
+      wRows += '<tr class="data">'
+        + '<td class="c">' + (w ? dateFmt : '') + '</td>'
+        + '<td class="c">' + ausloese + '</td>'
+        + '<td class="c">' + verpfl + '</td>'
+        + '<td colspan="3">' + wname + '</td>'
+        + '<td colspan="3" class="c">' + fachStd + '</td>'
+        + '<td colspan="3" class="c">' + probeStd + '</td>'
+        + '<td colspan="3" class="c">' + lehrStd + '</td>'
+        + '<td colspan="2" class="c sm">' + arbeiten + '</td>'
+        + '<td colspan="6" rowspan="10" class="arb" style="vertical-align:top;padding:4px 6px;font-size:9px;white-space:pre-wrap">' + escHtml(data.arbeiten || '') + '</td>'
+        + '</tr>';
+    } else {
+      wRows += '<tr class="data">'
+        + '<td class="c">' + (w ? dateFmt : '') + '</td>'
+        + '<td class="c">' + ausloese + '</td>'
+        + '<td class="c">' + verpfl + '</td>'
+        + '<td colspan="3">' + wname + '</td>'
+        + '<td colspan="3" class="c">' + fachStd + '</td>'
+        + '<td colspan="3" class="c">' + probeStd + '</td>'
+        + '<td colspan="3" class="c">' + lehrStd + '</td>'
+        + '<td colspan="2" class="c sm">' + arbeiten + '</td>'
+        + '</tr>';
+    }
   }
 
   var katElektro = data.kategorie === 'Elektro' ? 'X' : '';
@@ -3503,126 +3515,163 @@ function buildRapportHtml(data) {
   var katLager = data.kategorie === 'Lager' ? 'X' : '';
   var katSonstig = data.kategorie === 'Sonstiges' ? 'X' : '';
 
-  var sigImg = '';
-  if (data.signature) {
-    sigImg = '<img src="' + data.signature + '" style="max-height:38px;max-width:140px">';
+  var kundeSigImg = '';
+  if (data.kundeSignature) {
+    kundeSigImg = '<img src="' + data.kundeSignature + '" style="max-height:60px;max-width:200px">';
   }
 
+  // Pause formatting
+  var pause1Str = '';
+  if (data.pause1von) pause1Str = data.pause1von + (data.pause1bis ? ' - ' + data.pause1bis : '');
+  var pause2Str = '';
+  if (data.pause2von) pause2Str = data.pause2von + (data.pause2bis ? ' - ' + data.pause2bis : '');
+
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
-    + '<title>Tagesrapport – ' + escHtml(data.baustelle || data.projekt || dateFmt) + '</title>'
+    + '<title>Tagesrapport - ' + escHtml(data.baustelle || data.projekt || dateFmt) + '</title>'
     + '<style>'
-    + '@page { size: A4 landscape; margin: 8mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #000; background: #fff; margin: 0; padding: 8mm; width: 281mm; }'
-    + '@media print { body { padding: 0; width: auto; } }'
-    + 'table { border-collapse: collapse; }'
-    + '.form { width: 100%; border: 2px solid #000; }'
-    + '.form td, .form th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }'
-    + '.form th { background: #f0f0f0; font-weight: bold; text-align: center; }'
-    + '.hdr { font-size: 14px; font-weight: bold; }'
-    + '.sub { font-size: 10px; }'
-    + '.sm { font-size: 8px; }'
+    + '@page { size: A4 landscape; margin: 6mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #000; background: #fff; margin: 0; padding: 6mm; }'
+    + '@media print { body { padding: 0; } }'
+    + 'table { border-collapse: collapse; width: 100%; }'
+    + 'td, th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }'
     + '.c { text-align: center; }'
     + '.r { text-align: right; }'
     + '.b { font-weight: bold; }'
-    + '.chk { width: 14px; height: 14px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 14px; font-size: 10px; font-weight: bold; vertical-align: middle; }'
-    + '.data td { height: 20px; font-size: 9px; }'
-    + '.data td.arb { font-size: 8px; text-align: left; padding-left: 4px; }'
-    + '.bot td { font-size: 8px; padding: 2px 4px; vertical-align: top; }'
+    + '.sm { font-size: 8px; }'
+    + '.xs { font-size: 7px; }'
+    + '.chk { font-weight: bold; font-size: 11px; }'
+    + '.data td { height: 22px; font-size: 9px; }'
+    + '.data td.arb { font-size: 8px; text-align: left; }'
+    + '.hdr { font-size: 20px; font-weight: bold; }'
+    + '.no-border { border: none !important; }'
     + '</style></head>'
     + '<body>'
-    + '<table class="form" cellspacing="0">'
+    + '<table cellspacing="0">'
+
+    // === ROW 1-2: Header ===
     + '<tr>'
-    + '<td colspan="4" rowspan="2" style="width:28%"><span class="hdr">Elm Bau GmbH</span></td>'
-    + '<td colspan="3" rowspan="2" class="c" style="width:22%"><span class="sub" style="font-weight:bold">Tagesrapport</span><br><span class="sm">Bitte für jeden Tag einen Tagesrapport separat ausfüllen</span></td>'
-    + '<td colspan="2" style="width:50%;text-align:right;font-size:8px">Entfernung zum BV in km (ab 50km): <b>' + escHtml(data.km || '') + '</b></td>'
+    + '<td colspan="3" rowspan="2" style="width:14%;font-weight:bold;font-size:12px">Elm Bau GmbH</td>'
+    + '<td colspan="15" rowspan="4" class="c" style="width:56%">'
+    +   '<span class="hdr">Tagesrapport</span><br>'
+    +   '<span class="sm" style="margin-top:2px;display:inline-block">einen Tagesrapport separat ausfüllen</span><br>'
+    +   '<span style="font-size:14px;font-weight:bold;margin-top:4px;display:inline-block">' + escHtml(data.baustelle || '') + '</span>'
+    + '</td>'
+    + '<td colspan="3" class="sm" style="width:12%">Entfernung zum BV<br>in km (ab 50km):</td>'
+    + '<td colspan="3" class="c b" style="width:18%">' + escHtml(data.km || '') + '</td>'
     + '</tr>'
+
     + '<tr>'
-    + '<td class="c sm" style="width:10%">Fahrzeug:</td>'
-    + '<td style="width:40%"><b>' + escHtml(data.fahrzeug || '') + '</b></td>'
+    + '<td colspan="3" class="sm">Fahrzeug:</td>'
+    + '<td colspan="3" class="c b">' + escHtml(data.fahrzeug || '') + '</td>'
     + '</tr>'
+
+    // === ROW 3-4: Address + Kategorie ===
     + '<tr>'
-    + '<td colspan="4" rowspan="2" style="font-size:8px">Braunschweiger Str.22b &nbsp; 38154 Kgl.</td>'
-    + '<td class="c" style="width:8%"><span class="chk">' + katElektro + '</span></td>'
-    + '<td class="c sub" style="width:7%">Elektro</td>'
-    + '<td class="c" style="width:7%"></td>'
-    + '<td class="sm" style="width:10%">Fahrer</td>'
-    + '<td class="c"><b>' + escHtml(data.fahrer || '') + '</b></td>'
-    + '</tr>'
-    + '<tr>'
-    + '<td class="c"><span class="chk">' + katElmbau + '</span></td>'
-    + '<td class="c sub">Elmbau</td>'
-    + '<td class="c"></td>'
+    + '<td colspan="2" rowspan="2" class="sm" style="font-size:7px">Braunschweiger Str.22b<br>38154 Kgl.</td>'
+    + '<td class="c chk" rowspan="2">' + (data.baustelle ? 'X' : '') + '</td>'
+    + '<td class="sm">Elektro</td>'
+    + '<td class="c chk">' + katElektro + '</td>'
+    + '<td rowspan="2" class="sm"></td>'
+    + '<td class="sm">Fahrer</td>'
+    + '<td colspan="2" class="c b sm">' + escHtml(data.fahrer || '') + '</td>'
     + '<td class="sm">Hinfahrt</td>'
-    + '<td class="c"><b>' + escHtml(data.hinfahrt || '') + '</b></td>'
+    + '<td colspan="2" class="c b">' + escHtml(data.hinfahrt || '') + '</td>'
     + '</tr>'
+
     + '<tr>'
-    + '<td colspan="4" style="font-size:8px">&nbsp;</td>'
-    + '<td class="c"><span class="chk">' + katLager + '</span></td>'
-    + '<td class="c sub">Lager</td>'
-    + '<td class="c"></td>'
+    + '<td class="sm">Elmbau</td>'
+    + '<td class="c chk">' + katElmbau + '</td>'
+    + '<td class="sm"></td>'
+    + '<td colspan="2" class="sm"></td>'
     + '<td class="sm">Rückfahrt</td>'
-    + '<td class="c"><b>' + escHtml(data.rueckfahrt || '') + '</b></td>'
+    + '<td colspan="2" class="c b">' + escHtml(data.rueckfahrt || '') + '</td>'
     + '</tr>'
+
+    // === ROW 5-6: Adresse 2 + Lager/Sonstiges ===
     + '<tr>'
-    + '<td class="sub" style="width:12%">Kostenstelle:</td>'
-    + '<td colspan="2"><b>' + escHtml(data.kostenstelle || '') + '</b></td>'
-    + '<td class="sub r">Projekt Nr.:</td>'
-    + '<td class="c"><span class="chk">' + katSonstig + '</span></td>'
-    + '<td class="c sub">Sonstiges</td>'
-    + '<td colspan="2"><b>' + escHtml(data.projekt || '') + '</b></td>'
-    + '<td class="sm" style="border-bottom:2px solid #000">Datum / Unterschrift<br>Mitarbeiter</td>'
+    + '<td colspan="3" rowspan="2" class="sm" style="font-size:7px">Am Mart 17<br>01561 Lampertswalde</td>'
+    + '<td colspan="15" rowspan="2"></td>'
+    + '<td class="sm">Lager</td>'
+    + '<td class="c chk">' + katLager + '</td>'
+    + '<td colspan="4" rowspan="4" style="vertical-align:top;padding:4px;font-size:8px">'
+    +   '<div style="text-align:center;margin-bottom:2px;font-size:7px;color:#666">Unterschrift Kunde</div>'
+    +   '<div style="text-align:center;min-height:40px">' + kundeSigImg + '</div>'
+    + '</td>'
     + '</tr>'
+
     + '<tr>'
-    + '<td class="sub">Bauvorhaben:</td>'
-    + '<td colspan="7"><b>' + escHtml(data.baustelle || '') + '</b></td>'
-    + '<td class="c">' + sigImg + '</td>'
+    + '<td class="sm">Sonstiges</td>'
+    + '<td class="c chk">' + katSonstig + '</td>'
     + '</tr>'
-    + '<tr style="background:#f0f0f0">'
-    + '<th style="width:10%">Datum</th>'
-    + '<th style="width:5%">Aus-<br>löse</th>'
-    + '<th style="width:5%">Verpfl.<br>Geld</th>'
-    + '<th style="width:16%">Mitarbeiter</th>'
-    + '<th style="width:7%">Fach-<br>arbeiter<br>Std.</th>'
-    + '<th style="width:7%">Probe-<br>arbeit<br>Std.</th>'
-    + '<th style="width:7%">Lehrling<br>Std.</th>'
-    + '<th style="width:7%">ausgef.<br>Arbeiten</th>'
-    + '<th style="width:36%">Ausgeführte Arbeiten / Bemerkungen</th>'
-    + '</tr>'
-    + '<tbody class="data">'
-    + wRows
-    + '</tbody>'
-    + '<tr style="background:#f0f0f0;font-weight:bold">'
-    + '<td colspan="4" class="r sub">Summe Stunden:</td>'
-    + '<td class="c">' + (sumFach ? (sumFach % 1 === 0 ? sumFach : sumFach.toFixed(1)) : '') + '</td>'
-    + '<td class="c">' + (sumProbe ? (sumProbe % 1 === 0 ? sumProbe : sumProbe.toFixed(1)) : '') + '</td>'
-    + '<td class="c">' + (sumLehr ? (sumLehr % 1 === 0 ? sumLehr : sumLehr.toFixed(1)) : '') + '</td>'
+
+    // === ROW 7-8: Kostenstelle + Projekt ===
+    + '<tr>'
+    + '<td class="sm" colspan="2">Kostenstelle:</td>'
+    + '<td class="c b" style="color:#c00">' + escHtml(data.kostenstelle || '') + '</td>'
+    + '<td colspan="9" class="sm r">Projekt Nr.:</td>'
+    + '<td colspan="6" class="c b" style="color:#c00">' + escHtml(data.projekt || '') + '</td>'
     + '<td colspan="2"></td>'
     + '</tr>'
-    + '<tr class="bot">'
-    + '<td colspan="4" style="border-top:2px solid #000">'
-    + '<b>Arbeitszeitbeginn (Uhrzeit):</b> ' + escHtml(data.beginn || '') + '<br>'
-    + '<b>Arbeitszeitende (Uhrzeit):</b> ' + escHtml(data.ende || '') + '<br>'
-    + '<b>Netto-Arbeitszeit:</b> ' + escHtml(data.arbeitszeit || '')
+
+    + '<tr>'
+    + '<td class="sm" colspan="3">Bauvorhaben:</td>'
+    + '<td colspan="15" class="b">' + escHtml(data.baustelle || '') + '</td>'
+    + '<td colspan="2" class="c sm">Datum / Unterschrift<br>Vorgesetzter</td>'
+    + '</tr>'
+
+    // === Header row for data ===
+    + '<tr style="background:#f0f0f0;font-size:8px;font-weight:bold">'
+    + '<th style="width:8%">Datum</th>'
+    + '<th style="width:4%">Auslöse</th>'
+    + '<th style="width:4%">Verpfl.<br>Geld</th>'
+    + '<th colspan="3" style="width:14%">Mitarbeiter</th>'
+    + '<th colspan="3" style="width:9%">Facharbeiter<br>Std.</th>'
+    + '<th colspan="3" style="width:9%">Probearbeit<br>Std.</th>'
+    + '<th colspan="3" style="width:9%">Lehrling<br>Std.</th>'
+    + '<th colspan="2" style="width:7%">ausgef.<br>Arbeiten</th>'
+    + '<th colspan="6" style="width:36%">Ausgeführte Arbeiten / Bemerkungen</th>'
+    + '</tr>'
+
+    // === Data rows ===
+    + wRows
+
+    // === Bottom section ===
+    + '<tr style="border-top:2px solid #000">'
+    + '<td colspan="6" rowspan="2" style="vertical-align:top;padding:4px;font-size:9px">'
+    +   '<b>Arbeitszeitbeginn (Uhrzeit):</b> ' + escHtml(data.beginn || '') + '<br>'
+    +   '<b>Arbeitszeitende (Uhrzeit):</b> ' + escHtml(data.ende || '')
     + '</td>'
-    + '<td colspan="3" style="border-top:2px solid #000">'
-    + '<b>Kürzel für ausgeführte Arbeiten:</b><br>'
-    + 'RB = Rohbau &nbsp; FM = Fertigmontage<br>'
-    + 'KD = Kundendienst &nbsp; GW = Gewährleistung'
+    + '<td colspan="6" rowspan="2" style="vertical-align:top;padding:4px;font-size:9px">'
+    +   '<b>Netto-Arbeitszeit:</b> ' + escHtml(data.arbeitszeit || '')
     + '</td>'
-    + '<td colspan="2" rowspan="2" style="border-top:2px solid #000;vertical-align:top">'
-    + '<b>Besondere Anmerkungen /<br>Urlaubswünsche usw.:</b><br>'
-    + escHtml(data.bemerkungen || '')
+    + '<td colspan="6" rowspan="2" style="vertical-align:top;padding:4px;font-size:8px">'
+    +   '<b><u>Kürzel für ausgeführte Arbeiten:</u></b><br>'
+    +   'RB = Rohbau &nbsp;-&nbsp; FM = Fertigmontage &nbsp;-&nbsp; KD = Kundendienst'
+    + '</td>'
+    + '<td colspan="6" rowspan="4" style="vertical-align:top;padding:4px;font-size:8px">'
+    +   '<b>Besondere Anmerkungen / Urlaubswünsche usw.:</b><br>'
+    +   '<span style="white-space:pre-wrap">' + escHtml(data.bemerkungen || '') + '</span>'
     + '</td>'
     + '</tr>'
-    + '<tr class="bot">'
-    + '<td colspan="2">'
-    + '<b>Pause 1:</b> ' + escHtml(data.pause1von || '') + (data.pause1von && data.pause1bis ? ' – ' + escHtml(data.pause1bis) : '') + '<br>'
-    + '<b>Pause 2:</b> ' + escHtml(data.pause2von || '') + (data.pause2von && data.pause2bis ? ' – ' + escHtml(data.pause2bis) : '')
+    + '<tr></tr>'
+
+    + '<tr>'
+    + '<td colspan="6" style="padding:4px;font-size:9px">'
+    +   '<b>Pause 1</b><br>'
+    +   'Beginn (Uhrzeit): ' + escHtml(data.pause1von || '.....................') + '<br>'
+    +   'Ende (Uhrzeit): ' + escHtml(data.pause1bis || '.....................')
     + '</td>'
-    + '<td colspan="5"></td>'
+    + '<td colspan="6" style="padding:4px;font-size:9px">'
+    +   '<b>Pause 2</b><br>'
+    +   'Beginn (Uhrzeit): ' + escHtml(data.pause2von || '.....................') + '<br>'
+    +   'Ende (Uhrzeit): ' + escHtml(data.pause2bis || '.....................')
+    + '</td>'
+    + '<td colspan="6"></td>'
     + '</tr>'
+    + '<tr><td colspan="18" style="height:4px;border:none"></td></tr>'
+
     + '</table>'
-    + '<div style="margin-top:4px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + '<div style="margin-top:4px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustellenkontrolle ' + APP_VERSION + '</div>'
     + '</body></html>';
 }
 
@@ -4504,7 +4553,7 @@ function resetRapport() {
   document.getElementById('tr-kostenstelle').value = '';
   document.getElementById('tr-projekt').value = '';
   document.getElementById('tr-baustelle').value = '';
-  document.getElementById('tr-fahrzeug').value = '';
+  // fahrzeug bleibt vorausgefuellt
   document.getElementById('tr-km').value = '';
   document.getElementById('tr-fahrer').value = '';
   document.getElementById('tr-hinfahrt').value = document.getElementById('tr-beginn').value;
@@ -4528,9 +4577,6 @@ function resetRapport() {
   updateStundenSumme();
   clearTrSig();
   clearTrSig2();
-  trSig2Type = 'Kunde';
-  if (document.getElementById('trSig2Label')) document.getElementById('trSig2Label').textContent = 'Unterschrift Kunde';
-  if (document.getElementById('trSig2Toggle')) document.getElementById('trSig2Toggle').textContent = 'Mitarbeiter';
   document.getElementById('statusBadge').textContent = APP_VERSION;
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Tagesrapport zurückgesetzt');
