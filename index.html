@@ -2906,7 +2906,7 @@ function initSig() {
 initSig();
 window.addEventListener('resize', function(){
   if (!hasSigned) initSig();
-  if (!trHasSigned) initTrSig();
+  initTrSig(); initTrSig2();
   if (!rmHasSigned) initRmSig();
   if (!fmHasSigned) initFmSig();
 });
@@ -2952,55 +2952,10 @@ function clearSig() {
 }
 
 /* ═══════════════════════════════════════
-   SIGNATURE – Tagesrapport
+   SIGNATURE – Tagesrapport (entfernt)
    ═══════════════════════════════════════ */
-var trSigCanvas = document.getElementById('trSigCanvas');
-var trSigCtx = trSigCanvas.getContext('2d');
-var trSigDrawing = false, trSigLX, trSigLY;
-
-function initTrSig() {
-  var r = trSigCanvas.parentElement.getBoundingClientRect();
-  if (r.width < 10) return;
-  trSigCanvas.width = r.width;
-  trSigCanvas.height = 160;
-  var style = getComputedStyle(document.documentElement);
-  trSigCtx.strokeStyle = '#000000';
-  trSigCtx.lineWidth = 3;
-  trSigCtx.lineCap = 'round';
-  trSigCtx.lineJoin = 'round';
-}
-
-trSigCanvas.addEventListener('mousedown', function(e){ trSigStart(e); });
-trSigCanvas.addEventListener('mousemove', function(e){ trSigMove(e); });
-trSigCanvas.addEventListener('mouseup', trSigEnd);
-trSigCanvas.addEventListener('touchstart', function(e){ trSigStart(e); }, {passive:false});
-trSigCanvas.addEventListener('touchmove', function(e){ trSigMove(e); }, {passive:false});
-trSigCanvas.addEventListener('touchend', trSigEnd);
-
-function trSigStart(e) {
-  e.preventDefault(); trSigDrawing = true;
-  var p = sigPos(e, trSigCanvas); trSigLX = p[0]; trSigLY = p[1];
-  document.getElementById('trSigHint').style.opacity = '0';
-  trHasSigned = true;
-}
-function trSigMove(e) {
-  if (!trSigDrawing) return; e.preventDefault();
-  var p = sigPos(e, trSigCanvas);
-  trSigCtx.beginPath();
-  trSigCtx.moveTo(trSigLX, trSigLY);
-  trSigCtx.lineTo(p[0], p[1]);
-  trSigCtx.stroke();
-  trSigLX = p[0]; trSigLY = p[1];
-}
-function trSigEnd() {
-  trSigDrawing = false;
-  trSigData = trSigCanvas.toDataURL('image/png');
-}
-function clearTrSig() {
-  trSigCtx.clearRect(0, 0, trSigCanvas.width, trSigCanvas.height);
-  trHasSigned = false; trSigData = null;
-  document.getElementById('trSigHint').style.opacity = '1';
-}
+function initTrSig() {}
+function clearTrSig() {}
 // ── Pause memory (localStorage) ──
 function savePauseMemory() {
   try {
