@@ -692,6 +692,36 @@ body {
 }
 #dx-nutzer label:hover { background: var(--surface-alt); border-radius: var(--radius-sm); }
 
+/* ── Baustellen-Auswahl mit Suche ── */
+.bv-btn {
+  width: 100%; font-family: var(--font); font-size: 16px; text-align: left;
+  padding: 12px 34px 12px 14px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; position: relative;
+}
+.bv-btn:after { content: '\25BE'; position: absolute; right: 14px; top: 12px; color: var(--text-faint); }
+.bv-btn.leer { color: var(--text-faint); }
+.bv-suche {
+  width: 100%; font-family: var(--font); font-size: 16px;
+  padding: 12px 14px; background: var(--surface-alt); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none;
+}
+.bv-suche:focus { border-color: var(--accent); }
+.bv-gruppe {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-faint); padding: 16px 4px 6px;
+}
+.bv-eintrag {
+  display: block; width: 100%; text-align: left;
+  font-family: var(--font); font-size: 15px;
+  padding: 13px 14px; margin-bottom: 6px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+}
+.bv-eintrag:hover { border-color: var(--accent); }
+.bv-eintrag .bv-meta { display: block; font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.bv-eintrag.aktiv { border-color: var(--accent); background: var(--accent-light); }
+
 /* ── Chef nav items ── */
 .module-btn.chef-only { border-color: rgba(255,255,255,.35); }
 
@@ -1488,7 +1518,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.15.0';
+var APP_VERSION = 'v1.16.0';
 
 var db = null;
 var storage = null;
@@ -1885,45 +1915,253 @@ function populateBaustellenDropdowns() {
       o.textContent = bv.name;
       sel.appendChild(o);
     });
-    // Add quick-create option (not for dashboard filter)
-    if (sid !== 'dash-filter-site') {
-      var addOpt = document.createElement('option');
-      addOpt.value = '__neu__';
-      addOpt.textContent = '+ Neue Baustelle anlegen...';
-      sel.appendChild(addOpt);
+    if (val) sel.value = val;
+  });
+  bvButtonsAktualisieren();
+}
+
+/* ═══════════════════════════════════════
+   BAUSTELLEN-AUSWAHL MIT SUCHE
+   Bei vielen Baustellen ist eine Auswahlliste auf dem Handy unbrauchbar --
+   die Leute finden nichts und legen lieber eine neue an. Deshalb: Suche,
+   zuletzt verwendete zuerst, und das Anlegen erst, wenn die Suche nichts
+   findet, samt Warnung vor aehnlichen Namen.
+   ═══════════════════════════════════════ */
+var BV_FELDER = ['f-site','tr-baustelle','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
+var BV_ZULETZT_KEY = 'elmbau_bv_zuletzt';
+var BV_ZULETZT_MAX = 5;
+var bvOverlayEl = null;
+
+function bvZuletzt() {
+  try {
+    var a = JSON.parse(localStorage.getItem(BV_ZULETZT_KEY) || '[]');
+    return Object.prototype.toString.call(a) === '[object Array]' ? a : [];
+  } catch(e) { return []; }
+}
+
+function bvMerke(name) {
+  if (!name) return;
+  try {
+    var liste = bvZuletzt().filter(function(x){ return x !== name; });
+    liste.unshift(name);
+    localStorage.setItem(BV_ZULETZT_KEY, JSON.stringify(liste.slice(0, BV_ZULETZT_MAX)));
+  } catch(e) {}
+}
+
+// Umlaute und Sonderzeichen wegraeumen, damit "Baetjer" und "Bätjer " gleich sind
+function bvNormal(s) {
+  return String(s || '').toLowerCase()
+    .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'ss')
+    // Ersatzschreibweisen ebenfalls falten: wer "baetjer" tippt, soll
+    // "Bätjer" finden. Beide Seiten laufen durch dieselbe Funktion,
+    // deshalb bleibt der Vergleich stimmig.
+    .replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u')
+    .replace(/[^a-z0-9]/g,'');
+}
+
+function feuereChange(el) {
+  var ev;
+  try { ev = new Event('change', { bubbles: true }); }
+  catch(e) { ev = document.createEvent('HTMLEvents'); ev.initEvent('change', true, false); }
+  el.dispatchEvent(ev);
+}
+
+// Das select bleibt im Dokument (versteckt), damit aller vorhandene Code
+// weiter ueber .value arbeiten kann. Davor kommt ein Knopf.
+function bvPickerInit() {
+  BV_FELDER.forEach(function(sid) {
+    var sel = document.getElementById(sid);
+    if (!sel || document.getElementById(sid + '-btn')) return;
+    sel.style.display = 'none';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bv-btn leer';
+    btn.id = sid + '-btn';
+    btn.textContent = 'Baustelle wählen…';
+    btn.onclick = function(){ bvPickerOeffnen(sid); };
+    sel.parentNode.insertBefore(btn, sel.nextSibling);
+  });
+  bvButtonsAktualisieren();
+}
+
+function bvButtonsAktualisieren() {
+  BV_FELDER.forEach(function(sid) {
+    var sel = document.getElementById(sid);
+    var btn = document.getElementById(sid + '-btn');
+    if (!sel || !btn) return;
+    if (sel.value) {
+      btn.textContent = sel.value;
+      btn.className = 'bv-btn';
+    } else {
+      btn.textContent = (sid === 'dash-filter-site') ? 'Alle Baustellen' : 'Baustelle wählen…';
+      btn.className = 'bv-btn leer';
     }
-    if (val && val !== '__neu__') sel.value = val;
   });
 }
 
-function handleBaustelleChange(sel) {
-  // Auto-fill Kostenstelle + Projekt-Nr. from Stammdaten
-  autofillFromBaustelle(sel);
-
-  if (sel.value !== '__neu__') return;
-  sel.value = '';
-  var name = prompt('Name der neuen Baustelle:');
-  if (!name || !name.trim()) return;
-  name = name.trim();
-  // Check if already exists
-  for (var i = 0; i < BAUSTELLEN.length; i++) {
-    if (BAUSTELLEN[i].name === name) {
-      sel.value = name;
-      autofillFromBaustelle(sel);
-      toast('Baustelle existiert bereits');
-      return;
-    }
+function bvWaehle(sid, name) {
+  var sel = document.getElementById(sid);
+  if (!sel) return;
+  var da = false;
+  for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === name) { da = true; break; }
+  if (!da && name) {
+    var o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    sel.appendChild(o);
   }
+  sel.value = name;
+  if (name) bvMerke(name);
+  bvButtonsAktualisieren();
+  bvPickerSchliessen();
+  feuereChange(sel);
+}
+
+function bvPickerSchliessen() {
+  if (bvOverlayEl && bvOverlayEl.parentNode) document.body.removeChild(bvOverlayEl);
+  bvOverlayEl = null;
+}
+
+function bvEintragHtml(bv, aktuell) {
+  if (!bv) return '';
+  var meta = [];
+  if (bv.kostenstelle) meta.push('KST ' + bv.kostenstelle);
+  if (bv.projektNr) meta.push(bv.projektNr);
+  if (bv.adresse) meta.push(bv.adresse);
+  return '<button class="bv-eintrag' + (bv.name === aktuell ? ' aktiv' : '') + '" data-name="' + escHtml(bv.name) + '">'
+    + escHtml(bv.name)
+    + (meta.length ? '<span class="bv-meta">' + escHtml(meta.join(' · ')) + '</span>' : '')
+    + '</button>';
+}
+
+function bvPickerOeffnen(sid) {
+  var sel = document.getElementById(sid);
+  if (!sel) return;
+  var istFilter = (sid === 'dash-filter-site');
+
+  var overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+  bvOverlayEl = overlay;
+
+  var bar = document.createElement('div');
+  bar.className = 'preview-bar';
+
+  var suche = document.createElement('input');
+  suche.className = 'bv-suche';
+  suche.type = 'text';
+  suche.placeholder = 'Baustelle suchen…';
+  suche.style.flex = '1';
+  suche.style.minWidth = '140px';
+
+  var zu = document.createElement('button');
+  zu.className = 'btn btn-secondary';
+  zu.style.width = 'auto';
+  zu.textContent = 'Schließen';
+  zu.onclick = bvPickerSchliessen;
+
+  bar.appendChild(suche);
+  bar.appendChild(zu);
+
+  var body = document.createElement('div');
+  body.className = 'preview-body';
+
+  overlay.appendChild(bar);
+  overlay.appendChild(body);
+  document.body.appendChild(overlay);
+
+  function zeichne() {
+    var roh = suche.value.trim();
+    var q = bvNormal(roh);
+    var treffer = BAUSTELLEN.filter(function(bv){ return !q || bvNormal(bv.name).indexOf(q) !== -1; });
+    var html = '';
+
+    if (istFilter && !q) html += '<button class="bv-eintrag" data-name="">Alle Baustellen</button>';
+
+    if (!q) {
+      var letzte = bvZuletzt().filter(function(nm) {
+        return BAUSTELLEN.filter(function(bv){ return bv.name === nm; }).length > 0;
+      });
+      if (letzte.length) {
+        html += '<div class="bv-gruppe">Zuletzt verwendet</div>';
+        letzte.forEach(function(nm) {
+          html += bvEintragHtml(BAUSTELLEN.filter(function(x){ return x.name === nm; })[0], sel.value);
+        });
+      }
+    }
+
+    html += '<div class="bv-gruppe">' + (q ? treffer.length + ' Treffer' : 'Alle Baustellen') + '</div>';
+    if (!treffer.length) {
+      html += '<div style="padding:14px 4px;color:var(--text-muted);font-size:14px">Keine Baustelle gefunden.</div>';
+    } else {
+      treffer.forEach(function(bv){ html += bvEintragHtml(bv, sel.value); });
+    }
+
+    // Anlegen nur anbieten, wenn die Suche nichts findet oder jemand
+    // bewusst einen vollen Namen getippt hat. Sonst steht der Knopf
+    // neben Treffern und lockt zum unnoetigen Neuanlegen.
+    if (!istFilter && roh.length >= 3 && (!treffer.length || roh.length >= 8)) {
+      var exakt = BAUSTELLEN.filter(function(bv){ return bvNormal(bv.name) === q; }).length > 0;
+      if (!exakt) {
+        html += '<div class="bv-gruppe">Nicht dabei?</div>'
+          + '<button class="btn btn-secondary" id="bvNeu">„' + escHtml(roh) + '" als neue Baustelle anlegen</button>'
+          + '<div style="font-size:12px;color:var(--text-muted);margin-top:8px">Bitte vorher prüfen, ob die Baustelle unter einem anderen Namen schon existiert.</div>';
+      }
+    }
+    body.innerHTML = html;
+
+    var knoepfe = body.querySelectorAll('.bv-eintrag');
+    for (var i = 0; i < knoepfe.length; i++) {
+      (function(btn) { btn.onclick = function(){ bvWaehle(sid, btn.getAttribute('data-name')); }; })(knoepfe[i]);
+    }
+    var neu = body.querySelector('#bvNeu');
+    if (neu) neu.onclick = function(){ bvNeuAnlegen(sid, roh); };
+  }
+
+  suche.oninput = zeichne;
+  zeichne();
+  setTimeout(function(){ try { suche.focus(); } catch(e) {} }, 100);
+}
+
+// Vor dem Anlegen auf aehnliche Namen pruefen, damit nicht dieselbe
+// Baustelle mehrfach unter leicht anderer Schreibweise entsteht
+function bvNeuAnlegen(sid, name) {
+  name = (name || '').trim();
+  if (name.length < 3) { toast('Name zu kurz'); return; }
+  var norm = bvNormal(name);
+
+  var gleich = BAUSTELLEN.filter(function(bv){ return bvNormal(bv.name) === norm; })[0];
+  if (gleich) { bvWaehle(sid, gleich.name); toast('Baustelle existiert bereits'); return; }
+
+  var aehnlich = BAUSTELLEN.filter(function(bv) {
+    var bn = bvNormal(bv.name);
+    return bn.indexOf(norm) !== -1 || norm.indexOf(bn) !== -1
+        || (bn.length >= 5 && norm.length >= 5 && bn.substr(0,5) === norm.substr(0,5));
+  }).slice(0, 4);
+
+  var frage;
+  if (aehnlich.length) {
+    frage = 'Es gibt schon ähnliche Baustellen:\n\n'
+      + aehnlich.map(function(bv){ return '  \u2022 ' + bv.name; }).join('\n')
+      + '\n\nTrotzdem „' + name + '" neu anlegen?';
+  } else {
+    frage = 'Neue Baustelle „' + name + '" anlegen?';
+  }
+  if (!confirm(frage)) return;
+
   if (!db) { toast('Keine Datenbankverbindung'); return; }
-  db.collection('baustellen').add({ name: name, kostenstelle: '', projektNr: '', adresse: '', aktiv: true }).then(function(docRef) {
-    BAUSTELLEN.push({ id: docRef.id, name: name, kostenstelle: '', projektNr: '', adresse: '', aktiv: true });
-    BAUSTELLEN.sort(function(a, b) { return a.name.localeCompare(b.name); });
-    populateBaustellenDropdowns();
-    sel.value = name;
-    toast('Baustelle "' + name + '" angelegt');
-  }).catch(function(err) {
-    toast('Fehler: ' + err.message);
-  });
+  db.collection('baustellen').add({ name: name, kostenstelle: '', projektNr: '', adresse: '', aktiv: true })
+    .then(function(ref) {
+      BAUSTELLEN.push({ id: ref.id, name: name, kostenstelle: '', projektNr: '', adresse: '', aktiv: true });
+      BAUSTELLEN.sort(function(a, b){ return a.name.localeCompare(b.name); });
+      populateBaustellenDropdowns();
+      bvWaehle(sid, name);
+      toast('Baustelle „' + name + '" angelegt');
+    }).catch(function(err) { toast('Fehler: ' + err.message); });
+}
+
+function handleBaustelleChange(sel) {
+  // Kostenstelle und Projekt-Nr. aus den Stammdaten uebernehmen.
+  // Neue Baustellen werden ueber die Suche angelegt, siehe bvNeuAnlegen().
+  autofillFromBaustelle(sel);
 }
 
 function autofillFromBaustelle(sel) {
@@ -5533,6 +5771,7 @@ function resetForm() {
   clearSig();
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
   toast('Formular zurückgesetzt');
 }
 
@@ -5575,6 +5814,7 @@ function resetRapportFelder() {
   clearTrSig2();
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
 }
 
 function resetRohmontage() {
@@ -5589,6 +5829,7 @@ function resetRohmontage() {
   clearRmSig();
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
   toast('Rohmontage zurückgesetzt');
 }
 
@@ -5608,6 +5849,7 @@ function resetFertigmontage() {
   begBtns.forEach(function(b){ b.className = 'cl-btn'; });
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
   toast('Fertigmontage zurückgesetzt');
 }
 
@@ -5623,6 +5865,7 @@ function resetKabelliste() {
   renderKlTable();
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
   toast('Kabelliste zurückgesetzt');
 }
 
@@ -5642,6 +5885,7 @@ function resetSchalter() {
   // Baustelle wurde geleert, damit faellt auch die Vorgabe weg
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
   toast('Schalteraufmaß zurückgesetzt');
 }
 
@@ -5696,6 +5940,8 @@ switchModule = function(name, btn) {
     }
   });
 })();
+
+bvPickerInit();
 
 /* ═══════════════════════════════════════
    APP BOOT – Firebase init
