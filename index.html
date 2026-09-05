@@ -413,6 +413,7 @@ body {
 .history-dot.fertigmontage { background: var(--danger); }
 .history-dot.kabelliste { background: #A78BFA; }
 .history-dot.schalter { background: #F472B6; }
+.history-dot.netzwerk { background: #FBBF24; }
 .history-info { flex: 1; min-width: 0; }
 .history-title { font-size: 15px; font-weight: 500; }
 .history-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
@@ -428,6 +429,7 @@ body {
 .history-type.fertigmontage { background: var(--danger-light); color: var(--danger); }
 .history-type.kabelliste { background: #2D1F5E; color: #A78BFA; }
 .history-type.schalter { background: #4A1942; color: #F472B6; }
+.history-type.netzwerk { background: #3D2E05; color: #FBBF24; }
 .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .history-btn {
   width: 32px; height: 32px;
@@ -821,6 +823,7 @@ body {
   <button class="module-btn" onclick="switchModule('fertigmontage',this)">Fertigm.</button>
   <button class="module-btn" onclick="switchModule('kabelliste',this)">Kabelliste</button>
   <button class="module-btn" onclick="switchModule('schalter',this)">Schalter</button>
+  <button class="module-btn" onclick="switchModule('netzwerk',this)">Netzwerk</button>
   <button class="module-btn" id="nav-history" onclick="switchModule('history',this)">Berichte</button>
   <button class="module-btn chef-only" id="nav-stammdaten" onclick="switchModule('stammdaten',this)" style="display:none">Stammdaten</button>
   <button class="module-btn chef-only" id="nav-dashboard" onclick="switchModule('dashboard',this)" style="display:none">Dashboard</button>
@@ -1420,6 +1423,65 @@ body {
 </div>
 
 <!-- ═══════════════════════════════════════
+     MODULE: PRÜFPROTOKOLL NETZWERK / SAT
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-netzwerk">
+
+  <div class="section">
+    <div class="section-label">Projektdaten</div>
+    <div class="field">
+      <label for="pn-bv">Bauvorhaben</label>
+      <select id="pn-bv" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+    </div>
+    <div class="row">
+      <div class="field"><label for="pn-projekt">Projekt-Nr.</label><input type="text" id="pn-projekt" placeholder="EL 00-000"></div>
+      <div class="field"><label for="pn-datum">Datum</label><input type="date" id="pn-datum"></div>
+    </div>
+    <div class="field">
+      <label for="pn-monteur">Monteur</label>
+      <select id="pn-monteur"><option value="">&mdash; Ausw&auml;hlen &mdash;</option></select>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Datendosen</div>
+    <div id="pnDatenArea"></div>
+    <div style="padding:12px 20px 0;display:flex;gap:8px">
+      <button class="btn-sm" onclick="pnAdd('daten')">+ Datendose</button>
+      <button class="btn-sm" onclick="pnAlle('daten')">Alle gepr&uuml;ft</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">SAT-Dosen</div>
+    <div id="pnSatArea"></div>
+    <div style="padding:12px 20px 0;display:flex;gap:8px">
+      <button class="btn-sm" onclick="pnAdd('sat')">+ SAT-Dose</button>
+      <button class="btn-sm" onclick="pnAlle('sat')">Alle gepr&uuml;ft</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Bemerkungen</div>
+    <div class="field"><textarea id="pn-bemerkungen" placeholder="Auff&auml;lligkeiten, Nacharbeiten..."></textarea></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Unterschrift</div>
+    <div class="sig-wrap" id="pnSigWrap">
+      <canvas id="pnSigCanvas" height="160"></canvas>
+      <div class="sig-hint" id="pnSigHint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions"><button class="btn-sm" onclick="clearPnSig()">L&ouml;schen</button></div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" id="pn-submit" onclick="createNetzwerk()">Pr&uuml;fprotokoll erstellen</button>
+    <button class="btn btn-danger-outline" onclick="resetNetzwerk()">Formular zur&uuml;cksetzen</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      MODULE: BERICHTE (History)
      ═══════════════════════════════════════ -->
 <div class="module-panel" id="mod-history">
@@ -1432,6 +1494,7 @@ body {
     <button class="filter-tab" onclick="filterHistory('fertigmontage',this)">Fertigm.</button>
     <button class="filter-tab" onclick="filterHistory('kabelliste',this)">Kabelliste</button>
     <button class="filter-tab" onclick="filterHistory('schalter',this)">Schalter</button>
+    <button class="filter-tab" onclick="filterHistory('netzwerk',this)">Netzwerk</button>
   </div>
   <div id="historyList"></div>
 </div>
@@ -1572,6 +1635,7 @@ body {
         <option value="fertigmontage">Fertigmontage</option>
         <option value="kabelliste">Kabelliste</option>
         <option value="schalter">Schalter</option>
+        <option value="netzwerk">Prüfprotokoll Netzwerk/SAT</option>
       </select>
     </div>
     <div class="field">
@@ -1598,6 +1662,7 @@ body {
         <option value="fertigmontage">Fertigmontage</option>
         <option value="kabelliste">Kabelliste</option>
         <option value="schalter">Schalter</option>
+        <option value="netzwerk">Prüfprotokoll Netzwerk/SAT</option>
       </select>
       <select id="dash-filter-site" onchange="dashLoadReports()">
         <option value="">Alle Baustellen</option>
@@ -1625,7 +1690,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.18.0';
+var APP_VERSION = 'v1.19.0';
 
 var db = null;
 var storage = null;
@@ -1993,7 +2058,7 @@ function loadMasterData() {
 }
 
 function populatePersonalDropdowns() {
-  var selIds = ['tr-fahrer','aa-monteur','rm-monteur','fm-monteur','kl-monteur','sc-monteur'];
+  var selIds = ['tr-fahrer','aa-monteur','rm-monteur','fm-monteur','kl-monteur','sc-monteur','pn-monteur'];
   selIds.forEach(function(sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
@@ -2010,7 +2075,7 @@ function populatePersonalDropdowns() {
 }
 
 function populateBaustellenDropdowns() {
-  var selectIds = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
+  var selectIds = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site'];
   selectIds.forEach(function(sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
@@ -2034,7 +2099,7 @@ function populateBaustellenDropdowns() {
    zuletzt verwendete zuerst, und das Anlegen erst, wenn die Suche nichts
    findet, samt Warnung vor aehnlichen Namen.
    ═══════════════════════════════════════ */
-var BV_FELDER = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
+var BV_FELDER = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site'];
 var BV_ZULETZT_KEY = 'elmbau_bv_zuletzt';
 var BV_ZULETZT_MAX = 5;
 var bvOverlayEl = null;
@@ -2285,6 +2350,9 @@ function autofillFromBaustelle(sel) {
     // Tagesrapport: fill Kostenstelle + Projekt-Nr.
     document.getElementById('tr-kostenstelle').value = found ? (found.kostenstelle || '') : '';
     document.getElementById('tr-projekt').value = found ? (found.projektNr || '') : '';
+  } else if (selId === 'pn-bv') {
+    var pnp = document.getElementById('pn-projekt');
+    if (pnp) pnp.value = found ? (found.projektNr || '') : '';
   } else if (selId === 'aa-bv') {
     // Arbeitsauftrag: Projekt-Nr., Kostenstelle und Anschrift uebernehmen.
     // Die Adresse steht in den Stammdaten als "Strasse, PLZ Ort" -- daraus
@@ -3013,8 +3081,8 @@ function dashLoadReports() {
       return;
     }
 
-    var typeLabels = { kontrolle:'Kontrolle', rapport:'Tagesrapport', auftrag:'Arbeitsauftrag', rohmontage:'Rohmontage', fertigmontage:'Fertigmontage', kabelliste:'Kabelliste', schalter:'Schalter' };
-    var typeColors = { kontrolle:'#009959', rapport:'#60A5FA', auftrag:'#38BDF8', rohmontage:'#F59E0B', fertigmontage:'#EC4899', kabelliste:'#A78BFA', schalter:'#F472B6' };
+    var typeLabels = { kontrolle:'Kontrolle', rapport:'Tagesrapport', auftrag:'Arbeitsauftrag', rohmontage:'Rohmontage', fertigmontage:'Fertigmontage', kabelliste:'Kabelliste', schalter:'Schalter', netzwerk:'Prüfprot. Netzwerk/SAT' };
+    var typeColors = { kontrolle:'#009959', rapport:'#60A5FA', auftrag:'#38BDF8', rohmontage:'#F59E0B', fertigmontage:'#EC4899', kabelliste:'#A78BFA', schalter:'#F472B6', netzwerk:'#FBBF24' };
 
     listEl.innerHTML = reports.map(function(r) {
       var typeLabel = typeLabels[r.type] || r.type;
@@ -3266,6 +3334,7 @@ function berichtHtml(d) {
     if (d.type === 'rapport') return buildRapportHtml(daten);
     if (d.type === 'kontrolle') return buildReportHtml(daten);
     if (d.type === 'auftrag') return buildAuftragHtml(daten);
+    if (d.type === 'netzwerk') return buildNetzwerkHtml(daten);
     if (d.type === 'rohmontage') return buildRohmontageHtml(daten);
     if (d.type === 'fertigmontage') return buildFertigmontageHtml(daten);
     if (d.type === 'kabelliste') return buildKabellisteHtml(daten);
@@ -3773,6 +3842,7 @@ function switchModule(name, btn) {
   else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
   else if (name === 'schalter') sub.textContent = 'Schalteraufmaß';
+  else if (name === 'netzwerk') sub.textContent = 'Prüfprotokoll Netzwerk/SAT';
   else if (name === 'history') { sub.textContent = 'Berichte'; historyLimit = 20; renderHistory(); }
   else if (name === 'stammdaten') { sub.textContent = 'Stammdaten verwalten'; sdSwitchTab('mitarbeiter', document.querySelector('.sd-tab')); }
   else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dashLimit = 20; dxSetzeVorgaben(); dashLoadReports(); }
@@ -5539,7 +5609,8 @@ var HISTORY_TYPE_LABELS = {
   rohmontage: 'Rohmontage',
   fertigmontage: 'Fertigmontage',
   kabelliste: 'Kabelliste',
-  schalter: 'Schalter'
+  schalter: 'Schalter',
+  netzwerk: 'Prüfprotokoll Netzwerk/SAT'
 };
 
 function renderHistory() {
@@ -5660,6 +5731,8 @@ function renderLocalHistory(el) {
       meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.inspector || '—') + ' &middot; ' + (h.mangelCount || 0) + ' Mängel';
     } else if (hType === 'rapport') {
       meta = fmtDate(h.date) + ' &middot; ' + (h.workerCount || 0) + ' MA &middot; ' + (h.sumStd || 0) + ' Std.';
+    } else if (hType === 'netzwerk') {
+      meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.geprueft || 0) + '/' + (h.dosen || 0) + ' Dosen geprüft';
     } else if (hType === 'auftrag') {
       meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.jaCount || 0) + ' erledigt / ' + (h.neinCount || 0) + ' offen';
     } else if (hType === 'rohmontage' || hType === 'fertigmontage') {
@@ -5694,7 +5767,8 @@ var HISTORY_FILE_PREFIXES = {
   rohmontage: 'Rohmontage_',
   fertigmontage: 'Fertigmontage_',
   kabelliste: 'Kabelliste_',
-  schalter: 'Schalter_'
+  schalter: 'Schalter_',
+  netzwerk: 'Pruefprotokoll_Netzwerk_'
 };
 
 function viewHistoryItem(id) {
@@ -6246,6 +6320,18 @@ function aaBox(an) {
     + 'vertical-align:-1px">' + (an ? 'X' : '&nbsp;') + '</span>';
 }
 
+// Briefkopf mit Firmenlogo - wird von allen neuen Ausdrucken genutzt
+function elmbauKopf(titel) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;'
+    +      'border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:6px">'
+    +   '<img src="' + AA_LOGO + '" style="height:11mm;display:block">'
+    +   '<div style="text-align:right">'
+    +     '<div style="font-size:19px;font-weight:bold;letter-spacing:0.04em">' + escHtml(titel) + '</div>'
+    +     '<div style="font-size:9px;color:#444;margin-top:1px">Elm Bau GmbH &middot; Braunschweiger Stra\u00dfe 22 B &middot; 38154 K\u00f6nigslutter &middot; Tel. 05353 91348-10</div>'
+    +   '</div>'
+    + '</div>';
+}
+
 function buildAuftragHtml(data) {
   var dateFmt = fmtDate(data.datum);
   var artZeile = AA_ARTEN.map(function(a) {
@@ -6291,14 +6377,7 @@ function buildAuftragHtml(data) {
     +   '.aa-box .b { padding:5px 7px; white-space:pre-wrap; line-height:1.35; }'
     + '</style></head><body>'
     // Kopf: Logo links, Titel rechts
-    + '<div style="display:flex;justify-content:space-between;align-items:center;'
-    +      'border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:6px">'
-    +   '<img src="' + AA_LOGO + '" style="height:11mm;display:block">'
-    +   '<div style="text-align:right">'
-    +     '<div style="font-size:19px;font-weight:bold;letter-spacing:0.04em">AUFTRAG ELEKTRO</div>'
-    +     '<div style="font-size:9px;color:#444;margin-top:1px">Elm Bau GmbH &middot; Braunschweiger Straße 22 B &middot; 38154 Königslutter &middot; Tel. 05353 91348-10</div>'
-    +   '</div>'
-    + '</div>'
+    + elmbauKopf('AUFTRAG ELEKTRO')
     + '<div style="border:1px solid #999;background:#fafafa;padding:4px 7px;margin-bottom:5px;font-size:10.5px">' + artZeile + '</div>'
     + '<table style="margin-bottom:5px">'
     + '<colgroup><col style="width:17%"><col style="width:43%"><col style="width:14%"><col style="width:26%"></colgroup>'
@@ -6430,6 +6509,292 @@ function resetAuftrag() {
 renderAaArbeiten();
 document.getElementById('aa-datum').valueAsDate = new Date();
 
+
+/* ═══════════════════════════════════════
+   PRÜFPROTOKOLL NETZWERK / SAT – Zustand
+   Aufbau nach dem Blatt "Prüfprotokoll Netzwerk" der BV-Daten:
+   12 Datendosen, 10 SAT-Dosen (mit dB-Wert), je Ort/Raum und "geprüft und intakt".
+   ═══════════════════════════════════════ */
+var PN_DATEN_DRUCK = 12;   // so viele Zeilen stehen im Ausdruck mindestens
+var PN_SAT_DRUCK = 10;
+var PN_START = 4;          // so viele Zeilen zeigt das Formular am Anfang
+var PN_MAX = 40;
+
+var pnDaten = [], pnSat = [], pnSeq = 0;
+var pnSigData = null;
+var pnSpeichertGerade = false;
+
+function pnNeu(mitDb) {
+  pnSeq++;
+  var z = { id: pnSeq, ort: '', ok: false };
+  if (mitDb) z.db = '';
+  return z;
+}
+function initPnRows() {
+  pnSeq = 0; pnDaten = []; pnSat = [];
+  for (var i = 0; i < PN_START; i++) { pnDaten.push(pnNeu(false)); pnSat.push(pnNeu(true)); }
+}
+initPnRows();
+
+function pnListe(art) { return art === 'sat' ? pnSat : pnDaten; }
+
+function renderPn() {
+  ['daten','sat'].forEach(function(art) {
+    var el = document.getElementById(art === 'sat' ? 'pnSatArea' : 'pnDatenArea');
+    if (!el) return;
+    var liste = pnListe(art);
+    var name = art === 'sat' ? 'SAT-Dose' : 'Datendose';
+    el.innerHTML = liste.map(function(z, i) {
+      return '<div class="cl-item" style="flex-wrap:wrap;gap:6px">'
+        + '<span style="flex:0 0 62px;font-size:12px;color:var(--text-muted)">' + name.charAt(0) + (i + 1) + '</span>'
+        + '<input class="cl-bem" style="flex:1;min-width:110px" placeholder="Ort / Raum" value="' + escHtml(z.ort) + '" oninput="pnSetOrt(\'' + art + '\',' + z.id + ',this.value)">'
+        + (art === 'sat'
+            ? '<input class="cl-bem" style="width:62px" inputmode="decimal" placeholder="dB" value="' + escHtml(z.db || '') + '" oninput="pnSetDb(' + z.id + ',this.value)">'
+            : '')
+        + '<button class="cl-btn' + (z.ok ? ' yes' : '') + '" style="width:42px" onclick="pnToggle(\'' + art + '\',' + z.id + ')" title="Geprüft und intakt">' + (z.ok ? '&#10003;' : 'i.O.') + '</button>'
+        + (liste.length > 1 ? '<button class="cl-btn" style="width:32px" onclick="pnDel(\'' + art + '\',' + z.id + ')" title="Zeile entfernen">&times;</button>' : '')
+        + '</div>';
+    }).join('');
+  });
+}
+
+function pnFinde(art, id) {
+  var l = pnListe(art);
+  for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+  return null;
+}
+function pnSetOrt(art, id, val) { var z = pnFinde(art, id); if (z) z.ort = val; }
+function pnSetDb(id, val) { var z = pnFinde('sat', id); if (z) z.db = val; }
+function pnToggle(art, id) { var z = pnFinde(art, id); if (z) { z.ok = !z.ok; renderPn(); } }
+function pnDel(art, id) {
+  if (art === 'sat') pnSat = pnSat.filter(function(z){ return z.id !== id; });
+  else pnDaten = pnDaten.filter(function(z){ return z.id !== id; });
+  if (!pnListe(art).length) pnListe(art).push(pnNeu(art === 'sat'));
+  renderPn();
+}
+function pnAdd(art) {
+  if (pnListe(art).length >= PN_MAX) { toast('Mehr als ' + PN_MAX + ' Dosen sind nicht vorgesehen'); return; }
+  if (art === 'sat') pnSat.push(pnNeu(true)); else pnDaten.push(pnNeu(false));
+  renderPn();
+}
+// Setzt alle Zeilen, in denen ein Ort steht, auf geprueft -- oder wieder zurueck
+function pnAlle(art) {
+  var l = pnListe(art);
+  var offen = false;
+  l.forEach(function(z){ if (z.ort.trim() && !z.ok) offen = true; });
+  l.forEach(function(z){ if (z.ort.trim()) z.ok = offen; });
+  renderPn();
+}
+
+/* ═══════════════════════════════════════
+   SIGNATURE – Prüfprotokoll Netzwerk
+   ═══════════════════════════════════════ */
+var pnSigCanvas = document.getElementById('pnSigCanvas');
+var pnSigCtx = pnSigCanvas ? pnSigCanvas.getContext('2d') : null;
+var pnSigDrawing = false, pnSigLX, pnSigLY;
+
+function initPnSig() {
+  if (!pnSigCanvas || !pnSigCtx) return;
+  var r = pnSigCanvas.parentElement.getBoundingClientRect();
+  if (r.width < 10) return;
+  pnSigCanvas.width = r.width;
+  pnSigCanvas.height = 160;
+  pnSigCtx.strokeStyle = '#000000';
+  pnSigCtx.lineWidth = 3;
+  pnSigCtx.lineCap = 'round';
+  pnSigCtx.lineJoin = 'round';
+}
+if (pnSigCanvas) {
+  pnSigCanvas.addEventListener('mousedown', function(e){ pnSigStart(e); });
+  pnSigCanvas.addEventListener('mousemove', function(e){ pnSigMove(e); });
+  pnSigCanvas.addEventListener('mouseup', pnSigEnd);
+  pnSigCanvas.addEventListener('touchstart', function(e){ pnSigStart(e); }, {passive:false});
+  pnSigCanvas.addEventListener('touchmove', function(e){ pnSigMove(e); }, {passive:false});
+  pnSigCanvas.addEventListener('touchend', pnSigEnd);
+}
+function pnSigStart(e) {
+  e.preventDefault(); pnSigDrawing = true;
+  var p = sigPos(e, pnSigCanvas); pnSigLX = p[0]; pnSigLY = p[1];
+  document.getElementById('pnSigHint').style.opacity = '0';
+}
+function pnSigMove(e) {
+  if (!pnSigDrawing) return;
+  e.preventDefault();
+  var p = sigPos(e, pnSigCanvas);
+  pnSigCtx.beginPath(); pnSigCtx.moveTo(pnSigLX, pnSigLY); pnSigCtx.lineTo(p[0], p[1]); pnSigCtx.stroke();
+  pnSigLX = p[0]; pnSigLY = p[1];
+}
+function pnSigEnd() {
+  if (!pnSigDrawing) return;
+  pnSigDrawing = false;
+  pnSigData = sigAlsBild(pnSigCanvas);
+}
+function clearPnSig() {
+  if (!pnSigCtx) return;
+  pnSigCtx.clearRect(0, 0, pnSigCanvas.width, pnSigCanvas.height);
+  pnSigData = null;
+  document.getElementById('pnSigHint').style.opacity = '1';
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Prüfprotokoll Netzwerk / SAT
+   ═══════════════════════════════════════ */
+function getNetzwerkData() {
+  return {
+    bv: document.getElementById('pn-bv').value.trim(),
+    projekt: document.getElementById('pn-projekt').value.trim(),
+    monteur: document.getElementById('pn-monteur').value,
+    datum: document.getElementById('pn-datum').value,
+    daten: pnDaten.map(function(z){ return { ort: z.ort, ok: z.ok }; }),
+    sat: pnSat.map(function(z){ return { ort: z.ort, ok: z.ok, db: z.db || '' }; }),
+    bemerkungen: document.getElementById('pn-bemerkungen').value.trim(),
+    signatur: (pnSigCanvas ? sigAlsBild(pnSigCanvas) : null) || pnSigData
+  };
+}
+
+function buildNetzwerkHtml(data) {
+  var dateFmt = fmtDate(data.datum);
+
+  function block(titel, liste, mindest, mitDb) {
+    var zeilen = (liste || []).slice();
+    while (zeilen.length < mindest) zeilen.push({ ort: '', ok: false, db: '' });
+    var kurz = mitDb ? 'SAT-Dose ' : 'Datendose ';
+    var rows = zeilen.map(function(z, i) {
+      return '<tr>'
+        + '<td class="pn-nr">' + kurz + (i + 1) + '</td>'
+        + '<td style="height:6.4mm">' + escHtml(z.ort || '') + '</td>'
+        + '<td class="c">' + aaBox(!!z.ok) + '</td>'
+        + (mitDb ? '<td class="c">' + escHtml(z.db || '') + '</td>' : '')
+        + '</tr>';
+    }).join('');
+    return '<table style="margin-bottom:6px">'
+      + '<colgroup><col style="width:26mm"><col><col style="width:24mm">'
+      +   (mitDb ? '<col style="width:20mm">' : '') + '</colgroup>'
+      + '<tr><th style="text-align:left;padding-left:6px;letter-spacing:0.04em">' + escHtml(titel) + '</th>'
+      +     '<th style="text-align:left;padding-left:6px">Ort / Raum</th>'
+      +     '<th>Geprüft und intakt</th>' + (mitDb ? '<th>dB-Wert</th>' : '') + '</tr>'
+      + rows
+      + '</table>';
+  }
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Prüfprotokoll Netzwerk/SAT – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
+    + '<style>' + checklisteStil()
+    +   'td, th { border:1px solid #999; }'
+    +   '.pn-nr { width:26mm; font-weight:bold; font-size:9.5px; background:#fafafa; }'
+    +   '.pn-lbl { background:#f2f2f2; font-weight:bold; }'
+    +   '.aa-box { border:1px solid #999; margin-top:5px; }'
+    +   '.aa-box .t { background:#f2f2f2; border-bottom:1px solid #999; padding:3px 6px; font-weight:bold; font-size:10px; }'
+    +   '.aa-box .b { padding:5px 7px; white-space:pre-wrap; line-height:1.35; }'
+    + '</style></head><body>'
+    + elmbauKopf('PRÜFPROTOKOLL NETZWERK- UND SAT-DOSEN')
+    + '<table style="margin-bottom:6px">'
+    + '<colgroup><col style="width:17%"><col style="width:43%"><col style="width:14%"><col style="width:26%"></colgroup>'
+    + '<tr><td class="pn-lbl">Bauvorhaben</td><td><b>' + escHtml(data.bv || '') + '</b></td>'
+    +     '<td class="pn-lbl">Projekt-Nr.</td><td>' + escHtml(data.projekt || '') + '</td></tr>'
+    + '<tr><td class="pn-lbl">Monteur</td><td>' + escHtml(data.monteur || '') + '</td>'
+    +     '<td class="pn-lbl">Datum</td><td>' + escHtml(dateFmt) + '</td></tr>'
+    + '</table>'
+    + block('DATENDOSEN', data.daten, PN_DATEN_DRUCK, false)
+    + block('SAT-DOSEN', data.sat, PN_SAT_DRUCK, true)
+    + (data.bemerkungen
+        ? '<div class="aa-box"><div class="t">Bemerkungen</div><div class="b">' + escHtml(data.bemerkungen) + '</div></div>'
+        : '')
+    + '<div style="display:flex;gap:12mm;margin-top:8mm">'
+    +   '<div style="flex:1">'
+    +     '<div style="height:16mm;display:flex;align-items:flex-end">'
+    +       (data.signatur ? '<img src="' + data.signatur + '" style="max-height:16mm;max-width:100%;display:block">' : '')
+    +     '</div>'
+    +     '<div style="border-top:1px solid #000;padding-top:2px;font-size:9px">Unterschrift'
+    +       (data.monteur ? '<span style="color:#555">&nbsp;&nbsp;' + escHtml(data.monteur) + '</span>' : '') + '</div>'
+    +   '</div>'
+    +   '<div style="flex:1">'
+    +     '<div style="height:16mm;display:flex;align-items:flex-end;font-size:11px">' + escHtml(dateFmt) + '</div>'
+    +     '<div style="border-top:1px solid #000;padding-top:2px;font-size:9px">Datum</div>'
+    +   '</div>'
+    + '</div>'
+    + '</body></html>';
+}
+
+function pruefeNetzwerk(d) {
+  if (!d.bv) return { id: 'pn-bv-btn', text: 'Bitte Bauvorhaben wählen' };
+  if (!d.datum) return { id: 'pn-datum', text: 'Bitte Datum eingeben' };
+  if (!d.monteur) return { id: 'pn-monteur', text: 'Bitte Monteur wählen' };
+  var hat = false;
+  d.daten.concat(d.sat).forEach(function(z){ if ((z.ort || '').trim()) hat = true; });
+  if (!hat) return { id: 'pnDatenArea', text: 'Bitte mindestens eine Dose mit Ort / Raum eintragen' };
+  return null;
+}
+
+function createNetzwerk() {
+  if (pnSpeichertGerade) return;
+  var data = getNetzwerkData();
+
+  var luecke = pruefeNetzwerk(data);
+  if (luecke) {
+    toast(luecke.text);
+    var ziel = document.getElementById(luecke.id);
+    if (ziel) {
+      ziel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var alt = ziel.style.boxShadow;
+      ziel.style.transition = 'box-shadow .2s';
+      ziel.style.boxShadow = '0 0 0 3px var(--danger)';
+      setTimeout(function(){ ziel.style.boxShadow = alt || ''; }, 1600);
+    }
+    return;
+  }
+
+  var label = data.bv || data.projekt || fmtDate(data.datum);
+  var belegt = 0, geprueft = 0;
+  data.daten.concat(data.sat).forEach(function(z) {
+    if (!(z.ort || '').trim()) return;
+    belegt++;
+    if (z.ok) geprueft++;
+  });
+
+  pnSpeichertGerade = true;
+  var btn = document.getElementById('pn-submit');
+  var btnText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Wird eingereicht…'; }
+
+  saveToHistory({ type: 'netzwerk', site: label, date: data.datum, monteur: data.monteur,
+                  dosen: belegt, geprueft: geprueft, daten: data });
+
+  var meta = { baustelle: label, datum: data.datum, monteur: data.monteur, dosen: belegt, geprueft: geprueft };
+  mitZeitlimit(saveReportToFirestore('netzwerk', meta, data), 5000).then(function(ergebnis) {
+    pnSpeichertGerade = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = btnText; }
+    if (ergebnis === 'fehler') { toast('Konnte nicht eingereicht werden – bitte erneut versuchen'); return; }
+
+    document.getElementById('statusBadge').textContent = 'Erstellt';
+    document.getElementById('statusBadge').className = 'status-badge saved';
+    toast(ergebnis === 'gespeichert' ? 'Prüfprotokoll eingereicht' : 'Eingereicht – wird bei Netz übertragen');
+
+    var ziel = isChef ? 'dashboard' : 'history';
+    var navBtn = document.getElementById(isChef ? 'nav-dashboard' : 'nav-history');
+    switchModule(ziel, navBtn);
+  });
+}
+
+function resetNetzwerk() {
+  if (!confirm('Prüfprotokoll zurücksetzen?')) return;
+  ['pn-bv','pn-projekt','pn-monteur','pn-bemerkungen'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('pn-datum').valueAsDate = new Date();
+  initPnRows();
+  renderPn();
+  clearPnSig();
+  document.getElementById('statusBadge').textContent = '';
+  document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
+  toast('Prüfprotokoll zurückgesetzt');
+}
+
+renderPn();
+document.getElementById('pn-datum').valueAsDate = new Date();
+
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
    ═══════════════════════════════════════ */
@@ -6441,6 +6806,9 @@ switchModule = function(name, btn) {
   }
   if (name === 'auftrag') {
     setTimeout(initAaSig, 50);
+  }
+  if (name === 'netzwerk') {
+    setTimeout(initPnSig, 50);
   }
   if (name === 'rohmontage') {
     setTimeout(initRmSig, 50);
