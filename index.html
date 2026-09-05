@@ -805,7 +805,7 @@ body {
 
   <div class="action-bar">
     <button class="btn btn-primary" onclick="createReport()">
-      Bericht erstellen &amp; teilen
+      Bericht erstellen
     </button>
     <button class="btn btn-danger-outline" onclick="resetForm()">
       Formular zurücksetzen
@@ -968,8 +968,8 @@ body {
   </div>
 
   <div class="action-bar">
-    <button class="btn btn-primary" onclick="createRapport()">
-      Tagesrapport erstellen &amp; teilen
+    <button class="btn btn-primary" id="tr-submit" onclick="createRapport()">
+      Tagesrapport erstellen
     </button>
     <button class="btn btn-danger-outline" onclick="resetRapport()">
       Formular zurücksetzen
@@ -1030,7 +1030,7 @@ body {
 
   <div class="action-bar">
     <button class="btn btn-primary" onclick="createRohmontage()">
-      Checkliste erstellen &amp; teilen
+      Checkliste erstellen
     </button>
     <button class="btn btn-danger-outline" onclick="resetRohmontage()">
       Formular zurücksetzen
@@ -1102,7 +1102,7 @@ body {
 
   <div class="action-bar">
     <button class="btn btn-primary" onclick="createFertigmontage()">
-      Checkliste erstellen &amp; teilen
+      Checkliste erstellen
     </button>
     <button class="btn btn-danger-outline" onclick="resetFertigmontage()">
       Formular zurücksetzen
@@ -1179,7 +1179,7 @@ body {
 
   <div class="action-bar">
     <button class="btn btn-primary" onclick="createKabelliste()">
-      Kabelliste erstellen &amp; teilen
+      Kabelliste erstellen
     </button>
     <button class="btn btn-danger-outline" onclick="resetKabelliste()">
       Formular zurücksetzen
@@ -1244,7 +1244,7 @@ body {
 
   <div class="action-bar">
     <button class="btn btn-primary" onclick="createSchalter()">
-      Schalteraufmaß erstellen &amp; teilen
+      Schalteraufmaß erstellen
     </button>
     <button class="btn btn-danger-outline" onclick="resetSchalter()">
       Formular zurücksetzen
@@ -1424,7 +1424,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.7.1';
+var APP_VERSION = 'v1.8.0';
 
 var db = null;
 var storage = null;
@@ -1486,6 +1486,13 @@ function initFirebase(cfg) {
       firebase.initializeApp(cfg);
     }
     db = firebase.firestore();
+    // Schreibvorgänge bei fehlendem Netz lokal zwischenspeichern und
+    // automatisch nachholen. Muss vor jeder anderen Firestore-Nutzung stehen.
+    try {
+      db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
+        console.warn('Offline-Speicher nicht aktiv:', err && err.code);
+      });
+    } catch(e) { console.warn('Offline-Speicher nicht verfügbar:', e); }
     storage = firebase.storage();
     fbAuth = firebase.auth();
 
@@ -2388,7 +2395,7 @@ function dashViewReport(id) {
    SAVE REPORT TO FIRESTORE
    ═══════════════════════════════════════ */
 function saveReportToFirestore(type, data, html) {
-  if (!db || !currentUser) return;
+  if (!db || !currentUser) return Promise.reject(new Error('keine Verbindung'));
   var entry = {
     type: type,
     baustelle: data.baustelle || data.site || '',
@@ -2399,11 +2406,23 @@ function saveReportToFirestore(type, data, html) {
     data: data,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
-  db.collection('berichte').add(entry).then(function() {
-    // silent success
-  }).catch(function(err) {
-    console.error('Save report error:', err);
-    toast('Bericht lokal gespeichert, Cloud-Sync fehlgeschlagen');
+  return db.collection('berichte').add(entry);
+}
+
+// Wartet hoechstens ms Millisekunden auf das Promise. Ohne Netz nimmt Firestore
+// den Schreibvorgang zwar an, bestaetigt ihn aber erst beim naechsten Kontakt --
+// darum darf der Knopf nicht unbegrenzt gesperrt bleiben.
+function mitZeitlimit(promise, ms) {
+  return new Promise(function(resolve) {
+    var erledigt = false;
+    var t = setTimeout(function() {
+      if (!erledigt) { erledigt = true; resolve('wartet'); }
+    }, ms);
+    promise.then(function() {
+      if (!erledigt) { erledigt = true; clearTimeout(t); resolve('gespeichert'); }
+    }).catch(function(err) {
+      if (!erledigt) { erledigt = true; clearTimeout(t); console.error(err); resolve('fehler'); }
+    });
   });
 }
 
@@ -2788,7 +2807,7 @@ function switchModule(name, btn) {
 
   var sub = document.getElementById('headerSubtitle');
   if (name === 'kontrolle') sub.textContent = 'Mängeldokumentation';
-  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(function(){ loadPauseMemory(); calcArbeitszeit(); initTrSig2(); }, 50); }
+  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(function(){ loadPauseMemory(); ladeEntwurf(); calcArbeitszeit(); initTrSig2(); }, 50); }
   else if (name === 'rohmontage') sub.textContent = 'Checkliste Rohmontage';
   else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
@@ -2970,6 +2989,116 @@ function clearSig() {
    ═══════════════════════════════════════ */
 function initTrSig() {}
 function clearTrSig() {}
+// ── Entwurf des Tagesrapports (genau ein Eintrag, wird nach dem Einreichen geloescht) ──
+var ENTWURF_KEY = 'elmbau_rapport_entwurf';
+var ENTWURF_MAX_TAGE = 14;
+var entwurfTimer = null;
+var entwurfGeprueft = false;
+
+function entwurfAnstossen() {
+  if (entwurfTimer) clearTimeout(entwurfTimer);
+  entwurfTimer = setTimeout(speichereEntwurf, 800);
+}
+
+function speichereEntwurf() {
+  try {
+    var bs = document.getElementById('tr-baustelle');
+    if (!bs) return;
+    // Nur sichern, wenn wirklich etwas drinsteht
+    var arb = document.getElementById('tr-arbeiten').value.trim();
+    var hatStunden = trWorkers.some(function(w){ return w.stunden; });
+    if (!bs.value && !arb && !hatStunden) { loescheEntwurf(); return; }
+
+    var e = {
+      v: 1,
+      ts: Date.now(),
+      date: document.getElementById('tr-date').value,
+      baustelle: bs.value,
+      niederlassung: trNiederlassung,
+      beginn: document.getElementById('tr-beginn').value,
+      ende: document.getElementById('tr-ende').value,
+      p1v: document.getElementById('tr-pause1-von').value,
+      p1b: document.getElementById('tr-pause1-bis').value,
+      p2v: document.getElementById('tr-pause2-von').value,
+      p2b: document.getElementById('tr-pause2-bis').value,
+      fahrzeug: document.getElementById('tr-fahrzeug').value,
+      km: document.getElementById('tr-km').value,
+      fahrer: document.getElementById('tr-fahrer').value,
+      hin: document.getElementById('tr-hinfahrt').value,
+      rueck: document.getElementById('tr-rueckfahrt').value,
+      taet: trTaetigkeiten,
+      arbeiten: arb,
+      bemerkungen: document.getElementById('tr-bemerkungen').value,
+      // Unterschrift bewusst nicht sichern - waere gross und wird beim
+      // Uebergeben ohnehin frisch geleistet
+      workers: trWorkers.map(function(w) {
+        return { name: w.name, rolle: w.rolle, datum: w.datum, stunden: w.stunden,
+                 ausloese: !!w.ausloese, verpfl: !!w.verpfl };
+      })
+    };
+    localStorage.setItem(ENTWURF_KEY, JSON.stringify(e));
+  } catch(err) { /* Speicher voll oder gesperrt - Entwurf ist nur Komfort */ }
+}
+
+function loescheEntwurf() {
+  try { localStorage.removeItem(ENTWURF_KEY); } catch(e) {}
+}
+
+function ladeEntwurf() {
+  if (entwurfGeprueft) return;
+  entwurfGeprueft = true;
+  try {
+    var roh = localStorage.getItem(ENTWURF_KEY);
+    if (!roh) return;
+    var e = JSON.parse(roh);
+    if (!e || e.v !== 1) { loescheEntwurf(); return; }
+    // Alte Entwuerfe nicht ewig mitschleppen
+    if (e.ts && (Date.now() - e.ts) > ENTWURF_MAX_TAGE * 86400000) { loescheEntwurf(); return; }
+
+    function setz(id, wert) { var el = document.getElementById(id); if (el && wert) el.value = wert; }
+    setz('tr-date', e.date);
+    setz('tr-baustelle', e.baustelle);
+    if (e.baustelle) autofillFromBaustelle(document.getElementById('tr-baustelle'));
+    setz('tr-beginn', e.beginn);
+    setz('tr-ende', e.ende);
+    setz('tr-pause1-von', e.p1v); setz('tr-pause1-bis', e.p1b);
+    setz('tr-pause2-von', e.p2v); setz('tr-pause2-bis', e.p2b);
+    setz('tr-fahrzeug', e.fahrzeug);
+    setz('tr-km', e.km);
+    setz('tr-fahrer', e.fahrer);
+    setz('tr-hinfahrt', e.hin);
+    setz('tr-rueckfahrt', e.rueck);
+    setz('tr-arbeiten', e.arbeiten);
+    setz('tr-bemerkungen', e.bemerkungen);
+
+    if (e.niederlassung) {
+      trNiederlassung = e.niederlassung;
+      document.querySelectorAll('#tr-niederlassung .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+      var nb = document.querySelector('#tr-niederlassung .chip-toggle[data-val="' + e.niederlassung + '"]');
+      if (nb) nb.classList.add('active');
+    }
+    if (e.taet && e.taet.length) {
+      trTaetigkeiten = e.taet.slice();
+      document.querySelectorAll('#tr-taetigkeit .chip-toggle').forEach(function(b){
+        b.classList.toggle('active', trTaetigkeiten.indexOf(b.getAttribute('data-val')) !== -1);
+      });
+    }
+    if (e.workers && e.workers.length) {
+      trWorkers = [];
+      trWorkerSeq = 0;
+      e.workers.forEach(function(w) {
+        trWorkerSeq++;
+        trWorkers.push({ id: trWorkerSeq, name: w.name || '', rolle: w.rolle || 'Facharbeiter',
+                         datum: w.datum || '', stunden: w.stunden || '',
+                         ausloese: !!w.ausloese, verpfl: !!w.verpfl });
+      });
+      renderWorkers();
+    }
+    calcArbeitszeit();
+    toast('Entwurf wiederhergestellt');
+  } catch(err) { loescheEntwurf(); }
+}
+
 // ── Pause memory (localStorage) ──
 function savePauseMemory() {
   try {
@@ -4001,7 +4130,10 @@ function pruefeRapport(data) {
   return null;
 }
 
+var trSpeichertGerade = false;
+
 function createRapport() {
+  if (trSpeichertGerade) return;
   var data = getRapportData();
 
   var luecke = pruefeRapport(data);
@@ -4026,18 +4158,40 @@ function createRapport() {
 
   var html = buildRapportHtml(data);
   var label = data.baustelle || data.projekt || fmtDate(data.date);
-  var fileName = 'Tagesrapport_' + label.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.date || 'undatiert') + '.html';
 
   var sumStd = 0;
   validW.forEach(function(w){ sumStd += parseFloat(w.stunden) || 0; });
 
+  // Knopf sperren, damit Doppeltippen keine zwei Rapporte erzeugt
+  trSpeichertGerade = true;
+  var btn = document.getElementById('tr-submit');
+  var btnText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Wird eingereicht…'; }
+
   saveToHistory({ type: 'rapport', site: label, date: data.date, workerCount: validW.length, sumStd: sumStd, html: html });
-  saveReportToFirestore('rapport', { baustelle: label, datum: data.date, workerCount: validW.length, sumStd: sumStd }, html);
 
-  document.getElementById('statusBadge').textContent = 'Erstellt';
-  document.getElementById('statusBadge').className = 'status-badge saved';
+  var meta = { baustelle: label, datum: data.date, workerCount: validW.length, sumStd: sumStd };
+  mitZeitlimit(saveReportToFirestore('rapport', meta, html), 5000).then(function(ergebnis) {
+    trSpeichertGerade = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = btnText; }
 
-  shareOrPreview(html, fileName, 'Tagesrapport – ' + label, 'Tagesrapport vom ' + fmtDate(data.date) + ', ' + validW.length + ' Mitarbeiter');
+    if (ergebnis === 'fehler') {
+      toast('Konnte nicht eingereicht werden – bitte erneut versuchen');
+      return;
+    }
+
+    // 'gespeichert' = bestätigt, 'wartet' = liegt im Offline-Speicher und geht
+    // automatisch raus, sobald wieder Netz da ist
+    loescheEntwurf();
+    resetRapportFelder();
+    entwurfGeprueft = true;
+    document.getElementById('statusBadge').textContent = 'Erstellt';
+    document.getElementById('statusBadge').className = 'status-badge saved';
+    toast(ergebnis === 'gespeichert' ? 'Tagesrapport eingereicht' : 'Eingereicht – wird bei Netz übertragen');
+
+    var navBtn = document.querySelector('.module-btn[onclick*="\'history\'"]');
+    switchModule('history', navBtn);
+  });
 }
 
 /* ═══════════════════════════════════════
@@ -4628,6 +4782,13 @@ function resetForm() {
 
 function resetRapport() {
   if (!confirm('Tagesrapport zurücksetzen?')) return;
+  resetRapportFelder();
+  loescheEntwurf();
+  toast('Tagesrapport zurückgesetzt');
+}
+
+// Leert die Felder ohne Rueckfrage - wird auch nach dem Einreichen benutzt
+function resetRapportFelder() {
   document.getElementById('tr-date').valueAsDate = new Date();
   document.getElementById('tr-kostenstelle').value = '';
   document.getElementById('tr-projekt').value = '';
@@ -4658,7 +4819,6 @@ function resetRapport() {
   clearTrSig2();
   document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
-  toast('Tagesrapport zurückgesetzt');
 }
 
 function resetRohmontage() {
@@ -4763,6 +4923,22 @@ switchModule = function(name, btn) {
     setTimeout(initFmSig, 50);
   }
 };
+
+/* ═══════════════════════════════════════
+   ENTWURF – Aenderungen im Rapport mitschreiben
+   ═══════════════════════════════════════ */
+(function() {
+  var mod = document.getElementById('mod-rapport');
+  if (!mod) return;
+  mod.addEventListener('input', entwurfAnstossen);
+  mod.addEventListener('change', entwurfAnstossen);
+  mod.addEventListener('click', function(e) {
+    var t = e.target;
+    if (t && t.classList && (t.classList.contains('chip-toggle') || t.classList.contains('worker-chip'))) {
+      entwurfAnstossen();
+    }
+  });
+})();
 
 /* ═══════════════════════════════════════
    APP BOOT – Firebase init
