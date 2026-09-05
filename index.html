@@ -839,6 +839,13 @@ body {
       <select id="tr-baustelle" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
     </div>
     <div class="field">
+      <label>Niederlassung</label>
+      <div class="chip-group" id="tr-niederlassung">
+        <button class="chip-toggle active" data-val="Königslutter" onclick="setNiederlassung(this)">Königslutter</button>
+        <button class="chip-toggle" data-val="Lampertswalde" onclick="setNiederlassung(this)">Lampertswalde</button>
+      </div>
+    </div>
+    <div class="field">
       <label>Kategorie</label>
       <div class="chip-group" id="tr-kategorie">
         <button class="chip-toggle active" data-val="Elektro" onclick="setKategorie(this)">Elektro</button>
@@ -1426,7 +1433,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.4.0';
+var APP_VERSION = 'v1.5.0';
 
 var db = null;
 var storage = null;
@@ -2455,6 +2462,7 @@ addMangel();
 var trWorkers = [];
 var trWorkerSeq = 0;
 var trKategorie = 'Elektro';
+var trNiederlassung = 'Königslutter';
 var trTaetigkeiten = [];
 var trSigData = null;
 var trHasSigned = false;
@@ -3155,6 +3163,12 @@ function clearFmSig() {
 /* ═══════════════════════════════════════
    TAGESRAPPORT – Kategorie
    ═══════════════════════════════════════ */
+function setNiederlassung(btn) {
+  document.querySelectorAll('#tr-niederlassung .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  trNiederlassung = btn.getAttribute('data-val');
+}
+
 function setKategorie(btn) {
   document.querySelectorAll('#tr-kategorie .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
@@ -3416,6 +3430,7 @@ function getRapportData() {
     projekt: document.getElementById('tr-projekt').value.trim(),
     baustelle: document.getElementById('tr-baustelle').value.trim(),
     kategorie: trKategorie,
+    niederlassung: trNiederlassung,
     beginn: document.getElementById('tr-beginn').value,
     ende: document.getElementById('tr-ende').value,
     pause1von: document.getElementById('tr-pause1-von').value,
@@ -3488,9 +3503,13 @@ function buildRapportHtml(data) {
     }
   }
 
+  // Niederlassung ankreuzen, Koenigslutter ist die Vorgabe
+  var kreuzLam = (data.niederlassung === 'Lampertswalde') ? 'X' : '';
+  var kreuzKgl = (data.niederlassung === 'Lampertswalde') ? '' : 'X';
+
   var kundeSigImg = '';
   if (data.kundeSignature) {
-    kundeSigImg = '<img src="' + data.kundeSignature + '" style="max-height:55px;max-width:180px">';
+    kundeSigImg = '<img src="' + data.kundeSignature + '" style="display:block;margin-left:auto;max-height:12mm;max-width:45mm">';
   }
 
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
@@ -3524,54 +3543,68 @@ function buildRapportHtml(data) {
     + '</style></head>'
     + '<body>'
 
-    // ===== HEADER TABLE (3 columns: 16% / 61% / 23%) =====
+    // ===== HEADER TABLE (3 Spalten: 16% / 61% / 23%) =====
     + '<table class="hdr-tbl"><colgroup>'
     + '<col style="width:16%"><col style="width:61%"><col style="width:23%">'
     + '</colgroup>'
 
-    // Row 1: Company | Title | Entfernung
+    // Zeile 1: Firmenname | Baustellendaten (ueber alle 4 Zeilen) | Entfernung
     + '<tr class="hr1">'
-    + '<td rowspan="2" style="font-weight:bold;font-size:13px;vertical-align:top;padding:3px">'
-    +   'Elm Bau GmbH<br><span style="font-size:9.5px;font-weight:normal">Braunschweiger Str.22b<br>38154 Kgl.</span>'
+    + '<td rowspan="2" class="c" style="font-weight:bold;font-size:16px;vertical-align:middle;padding:3px">'
+    +   'Elm Bau GmbH'
     + '</td>'
-    + '<td rowspan="2" class="c" style="padding:4px">'
+    + '<td rowspan="4" class="c" style="padding:4px 6px;vertical-align:top">'
     +   '<div style="font-size:21px;font-weight:bold">Tagesrapport</div>'
-    +   '<div style="font-size:9.5px">einen Tagesrapport separat ausfüllen</div>'
-    +   '<div style="font-size:15px;font-weight:bold;margin-top:2px">' + escHtml(data.baustelle || '') + '</div>'
+    +   '<div style="font-size:10px">einen Tagesrapport separat ausfüllen</div>'
+    +   '<div style="font-size:18px;font-weight:bold;margin-top:4mm">' + escHtml(data.baustelle || '') + '</div>'
+    +   '<div style="margin-top:5mm;font-size:14px">'
+    +     'Kostenstelle: <b style="color:#c00;font-size:16px">' + escHtml(data.kostenstelle || '') + '</b>'
+    +     '<span style="margin-left:16mm">Projekt Nr.: <b style="color:#c00;font-size:16px">' + escHtml(data.projekt || '') + '</b></span>'
+    +   '</div>'
+    +   '<div style="margin-top:2mm;font-size:12px">' + escHtml(data.kategorie || '') + '</div>'
     + '</td>'
-    + '<td style="font-size:7px;padding:2px 4px">'
-    +   'Entfernung zum BV<br>in km (ab 50km): <b style="font-size:12px">' + escHtml(data.km || '') + '</b>'
+    + '<td style="font-size:11px;padding:2px 4px">'
+    +   'Entfernung zum BV<br>in km (ab 50km): <b style="font-size:14px">' + escHtml(data.km || '') + '</b>'
     + '</td>'
     + '</tr>'
 
-    // Row 2: (cont) | (cont) | Fahrzeug
+    // Zeile 2: | | Fahrzeug
     + '<tr class="hr2">'
-    + '<td style="font-size:7px;padding:2px 4px">'
-    +   'Fahrzeug: <b style="font-size:12px">' + escHtml(data.fahrzeug || '') + '</b>'
+    + '<td style="font-size:11px;padding:2px 4px">'
+    +   'Fahrzeug: <b style="font-size:14px">' + escHtml(data.fahrzeug || '') + '</b>'
     + '</td>'
     + '</tr>'
 
-    // Row 3: Address2 + Kostenstelle | Projekt | Fahrer/Hinfahrt
+    // Zeile 3: Niederlassung ankreuzen (ueber 2 Zeilen) | | Fahrer
     + '<tr class="hr3">'
-    + '<td rowspan="2" style="font-size:7px;padding:2px 3px;vertical-align:top">'
-    +   '<span style="font-size:8.5px">Am Mart 17 / 01561 Lampertswalde</span><br>'
-    +   'Kostenstelle: <b style="color:#c00;font-size:12px">' + escHtml(data.kostenstelle || '') + '</b>'
+    + '<td rowspan="2" style="padding:0;vertical-align:top">'
+    +   '<table style="width:100%;height:100%;border-collapse:collapse">'
+    +   '<colgroup><col style="width:74%"><col style="width:26%"></colgroup>'
+    +   '<tr>'
+    +     '<td style="border:none;border-bottom:1px solid #000;font-size:10.5px;padding:2px 4px;vertical-align:middle">'
+    +       'Braunschweiger Str.22b<br>38154 Königslutter'
+    +     '</td>'
+    +     '<td class="c" style="border:none;border-left:1px solid #000;border-bottom:1px solid #000;font-size:17px;font-weight:bold;vertical-align:middle">' + kreuzKgl + '</td>'
+    +   '</tr>'
+    +   '<tr>'
+    +     '<td style="border:none;font-size:10.5px;padding:2px 4px;vertical-align:middle">'
+    +       'Am Mart 17<br>01561 Lampertswalde'
+    +     '</td>'
+    +     '<td class="c" style="border:none;border-left:1px solid #000;font-size:17px;font-weight:bold;vertical-align:middle">' + kreuzLam + '</td>'
+    +   '</tr>'
+    +   '</table>'
     + '</td>'
-    + '<td rowspan="2" style="padding:2px 4px;vertical-align:top">'
-    +   'Projekt Nr.: <b style="color:#c00;font-size:12px">' + escHtml(data.projekt || '') + '</b>'
-    +   '<span style="margin-left:20px;font-size:10.5px">' + escHtml(data.kategorie || '') + '</span>'
-    + '</td>'
-    + '<td style="font-size:7px;padding:2px 4px">'
-    +   'Fahrer: <b>' + escHtml(data.fahrer || '') + '</b><br>'
+    + '<td style="font-size:11px;padding:2px 4px">'
+    +   'Fahrer: <b style="font-size:13px">' + escHtml(data.fahrer || '') + '</b><br>'
     +   'Hinfahrt: <b>' + escHtml(data.hinfahrt || '') + '</b> &nbsp; Rückfahrt: <b>' + escHtml(data.rueckfahrt || '') + '</b>'
     + '</td>'
     + '</tr>'
 
-    // Row 4: leeres Unterschriftenfeld fuer den Chef (wird per Hand ausgefuellt)
+    // Zeile 4: | | leeres Unterschriftenfeld fuer den Chef
     + '<tr class="hr4">'
-    + '<td style="padding:2px 4px;vertical-align:bottom;height:34px">'
-    +   '<div style="height:20px"></div>'
-    +   '<div style="font-size:8.5px;border-top:1px solid #000;padding-top:1px">Datum / Unterschrift Vorgesetzter</div>'
+    + '<td style="padding:2px 4px;vertical-align:bottom">'
+    +   '<div style="height:22px"></div>'
+    +   '<div style="font-size:9px;border-top:1px solid #000;padding-top:1px">Datum / Unterschrift Vorgesetzter</div>'
     + '</td>'
     + '</tr>'
     + '</table>'
@@ -3622,13 +3655,13 @@ function buildRapportHtml(data) {
     +   'FM = Fertigmontage<br>'
     +   'KD = Kundendienst'
     + '</td>'
-    + '<td rowspan="2" style="vertical-align:top;padding:3px 4px">'
-    +   '<b>Besondere Anmerkungen / Urlaubswünsche usw.:</b><br>'
-    +   '<span style="white-space:pre-wrap;font-size:10px">' + escHtml(data.bemerkungen || '') + '</span>'
-    +   '<div style="position:relative;min-height:50px">'
-    +     '<div style="position:absolute;bottom:0;right:0;text-align:right">'
-    +       '<span style="font-size:8.5px;color:#666">Unterschrift Kunde:</span><br>'
+    + '<td rowspan="2" style="vertical-align:top;padding:0">'
+    +   '<div style="display:flex;flex-direction:column;height:29mm;padding:3px 4px;box-sizing:border-box">'
+    +     '<div style="flex:0 0 auto"><b>Besondere Anmerkungen / Urlaubswünsche usw.:</b></div>'
+    +     '<div style="flex:1 1 auto;overflow:hidden;white-space:pre-wrap;font-size:10px">' + escHtml(data.bemerkungen || '') + '</div>'
+    +     '<div style="flex:0 0 auto;text-align:right;line-height:1">'
     +       kundeSigImg
+    +       '<div style="font-size:9px;color:#444;border-top:1px solid #000;display:inline-block;padding-top:1px;min-width:45mm;text-align:center">Unterschrift Kunde</div>'
     +     '</div>'
     +   '</div>'
     + '</td>'
@@ -4631,6 +4664,9 @@ function resetRapport() {
   trKategorie = 'Elektro';
   document.querySelectorAll('#tr-kategorie .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
   document.querySelector('#tr-kategorie .chip-toggle[data-val="Elektro"]').classList.add('active');
+  trNiederlassung = 'Königslutter';
+  document.querySelectorAll('#tr-niederlassung .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelector('#tr-niederlassung .chip-toggle[data-val="Königslutter"]').classList.add('active');
   trTaetigkeiten = [];
   document.querySelectorAll('#tr-taetigkeit .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
   trWorkers = [];
