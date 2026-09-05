@@ -845,15 +845,6 @@ body {
         <button class="chip-toggle" data-val="Lampertswalde" onclick="setNiederlassung(this)">Lampertswalde</button>
       </div>
     </div>
-    <div class="field">
-      <label>Kategorie</label>
-      <div class="chip-group" id="tr-kategorie">
-        <button class="chip-toggle active" data-val="Elektro" onclick="setKategorie(this)">Elektro</button>
-        <button class="chip-toggle" data-val="Elmbau" onclick="setKategorie(this)">Elmbau</button>
-        <button class="chip-toggle" data-val="Lager" onclick="setKategorie(this)">Lager</button>
-        <button class="chip-toggle" data-val="Sonstiges" onclick="setKategorie(this)">Sonstiges</button>
-      </div>
-    </div>
   </div>
 
   <div class="section">
@@ -1433,7 +1424,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.5.0';
+var APP_VERSION = 'v1.6.0';
 
 var db = null;
 var storage = null;
@@ -2461,7 +2452,6 @@ addMangel();
    ═══════════════════════════════════════ */
 var trWorkers = [];
 var trWorkerSeq = 0;
-var trKategorie = 'Elektro';
 var trNiederlassung = 'Königslutter';
 var trTaetigkeiten = [];
 var trSigData = null;
@@ -3169,12 +3159,6 @@ function setNiederlassung(btn) {
   trNiederlassung = btn.getAttribute('data-val');
 }
 
-function setKategorie(btn) {
-  document.querySelectorAll('#tr-kategorie .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-  trKategorie = btn.getAttribute('data-val');
-}
-
 /* ═══════════════════════════════════════
    TAGESRAPPORT – Tätigkeit
    ═══════════════════════════════════════ */
@@ -3423,13 +3407,22 @@ function calcArbeitszeit() {
   savePauseMemory();
 }
 
+// Adresse/Ort der Baustelle aus den Stammdaten holen
+function baustellenOrt(name) {
+  if (!name) return '';
+  for (var i = 0; i < BAUSTELLEN.length; i++) {
+    if (BAUSTELLEN[i].name === name) return BAUSTELLEN[i].adresse || '';
+  }
+  return '';
+}
+
 function getRapportData() {
   return {
     date: document.getElementById('tr-date').value,
     kostenstelle: document.getElementById('tr-kostenstelle').value.trim(),
     projekt: document.getElementById('tr-projekt').value.trim(),
     baustelle: document.getElementById('tr-baustelle').value.trim(),
-    kategorie: trKategorie,
+    ort: baustellenOrt(document.getElementById('tr-baustelle').value.trim()),
     niederlassung: trNiederlassung,
     beginn: document.getElementById('tr-beginn').value,
     ende: document.getElementById('tr-ende').value,
@@ -3557,11 +3550,11 @@ function buildRapportHtml(data) {
     +   '<div style="font-size:21px;font-weight:bold">Tagesrapport</div>'
     +   '<div style="font-size:10px">einen Tagesrapport separat ausfüllen</div>'
     +   '<div style="font-size:18px;font-weight:bold;margin-top:4mm">' + escHtml(data.baustelle || '') + '</div>'
-    +   '<div style="margin-top:5mm;font-size:14px">'
+    +   (data.ort ? '<div style="font-size:13px;margin-top:1mm">' + escHtml(data.ort) + '</div>' : '')
+    +   '<div style="margin-top:4mm;font-size:14px">'
     +     'Kostenstelle: <b style="color:#c00;font-size:16px">' + escHtml(data.kostenstelle || '') + '</b>'
     +     '<span style="margin-left:16mm">Projekt Nr.: <b style="color:#c00;font-size:16px">' + escHtml(data.projekt || '') + '</b></span>'
     +   '</div>'
-    +   '<div style="margin-top:2mm;font-size:12px">' + escHtml(data.kategorie || '') + '</div>'
     + '</td>'
     + '<td style="font-size:11px;padding:2px 4px">'
     +   'Entfernung zum BV<br>in km (ab 50km): <b style="font-size:14px">' + escHtml(data.km || '') + '</b>'
@@ -4661,9 +4654,6 @@ function resetRapport() {
   document.getElementById('tr-pause2-bis').value = '';
   document.getElementById('tr-arbeiten').value = '';
   document.getElementById('tr-bemerkungen').value = '';
-  trKategorie = 'Elektro';
-  document.querySelectorAll('#tr-kategorie .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelector('#tr-kategorie .chip-toggle[data-val="Elektro"]').classList.add('active');
   trNiederlassung = 'Königslutter';
   document.querySelectorAll('#tr-niederlassung .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
   document.querySelector('#tr-niederlassung .chip-toggle[data-val="Königslutter"]').classList.add('active');
