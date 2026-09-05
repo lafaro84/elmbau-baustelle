@@ -819,6 +819,7 @@ body {
   <div class="section">
     <div class="section-label">Mängelliste</div>
     <div id="maengelList"></div>
+    <div id="fotoHinweis" style="margin-top:10px;font-size:12px;color:var(--text-muted);text-align:right"></div>
     <button class="btn btn-secondary" onclick="addMangel()" style="margin-top:8px">
       + Mangel hinzufügen
     </button>
@@ -1487,7 +1488,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.13.0';
+var APP_VERSION = 'v1.14.0';
 
 var db = null;
 var storage = null;
@@ -3451,6 +3452,18 @@ function renderMaengel() {
       + '</div></div></div>';
   });
   el.innerHTML = html;
+  aktualisiereFotoHinweis();
+}
+
+// Zeigt an, wie viel Platz die Fotos belegen, sobald es relevant wird
+function aktualisiereFotoHinweis() {
+  var el = document.getElementById('fotoHinweis');
+  if (!el) return;
+  var anz = fotoAnzahlGesamt();
+  if (!anz) { el.textContent = ''; return; }
+  var kb = Math.round(fotoBytesGesamt() / 1024);
+  el.textContent = anz + (anz === 1 ? ' Foto' : ' Fotos') + ' · ' + kb + ' KB';
+  el.style.color = (fotoBytesGesamt() > BERICHT_WARNUNG) ? 'var(--danger)' : 'var(--text-muted)';
 }
 
 function updMangel(id, val) {
@@ -3473,12 +3486,47 @@ function triggerCam(mid) {
   inp.click();
 }
 
+// Fotos werden auf 1000 Bildpunkte bei Qualitaet 0,6 gerechnet. Fuer eine
+// Mangeldokumentation reicht das, und ein Bericht bleibt sicher unter der
+// 1-MiB-Grenze, die Firestore je Dokument setzt.
+var FOTO_MAX_KANTE = 1000;
+var FOTO_QUALITAET = 0.6;
+// Ab hier wird gewarnt bzw. abgelehnt (Firestore-Grenze ist 1 MiB = 1048576)
+var BERICHT_WARNUNG = 700 * 1024;
+var BERICHT_GRENZE = 900 * 1024;
+
+// Grobe Groesse aller Fotos im Bericht. Base64 traegt rund ein Drittel
+// Aufschlag, den die Zeichenkettenlaenge bereits enthaelt.
+function fotoBytesGesamt() {
+  var summe = 0;
+  maengel.forEach(function(m) {
+    m.fotos.forEach(function(f) { summe += f.length; });
+  });
+  return summe;
+}
+
+function fotoAnzahlGesamt() {
+  var anz = 0;
+  maengel.forEach(function(m) { anz += m.fotos.length; });
+  return anz;
+}
+
 document.getElementById('camInput').addEventListener('change', function() {
   var file = this.files && this.files[0];
   if (!file || !activePhotoMId) return;
-  compressImg(file, 1200, 0.7, function(dataUrl) {
+  compressImg(file, FOTO_MAX_KANTE, FOTO_QUALITAET, function(dataUrl) {
+    if (fotoBytesGesamt() + dataUrl.length > BERICHT_GRENZE) {
+      toast('Zu viele Fotos – bitte einen zweiten Bericht anlegen');
+      return;
+    }
     var m = maengel.find(function(x){ return x.id === activePhotoMId; });
-    if (m) { m.fotos.push(dataUrl); renderMaengel(); }
+    if (m) {
+      m.fotos.push(dataUrl);
+      renderMaengel();
+      if (fotoBytesGesamt() > BERICHT_WARNUNG) {
+        toast('Achtung: viele Fotos – Platz wird knapp');
+      }
+    }
   });
 });
 
@@ -4744,6 +4792,13 @@ function buildSchalterHtml(data) {
 function createReport() {
   var data = getFormData();
   if (!data.site) { toast('Bitte Baustellenname eingeben'); return; }
+
+  // Firestore nimmt hoechstens 1 MiB je Dokument. Lieber hier abfangen als
+  // beim Speichern scheitern, wenn der Bericht schon fertig ist.
+  if (fotoBytesGesamt() > BERICHT_GRENZE) {
+    toast('Bericht zu groß (' + Math.round(fotoBytesGesamt()/1024) + ' KB Fotos) – bitte auf zwei Berichte aufteilen');
+    return;
+  }
 
   try { localStorage.setItem('bk_inspector', data.inspector); } catch(e) {}
 
