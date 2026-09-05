@@ -893,6 +893,9 @@ body {
   <div class="section">
     <div class="section-label">Personal &amp; Stunden</div>
     <div id="workerList"></div>
+    <button class="btn btn-secondary" onclick="addTag()" style="margin-top:8px">
+      + Weiterer Tag
+    </button>
 <div style="margin-top:12px;padding:12px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:14px;font-weight:600;color:var(--accent-dark)">Netto-Arbeitszeit</span>
       <span id="tr-az-display" style="font-size:18px;font-weight:700;color:var(--accent-dark);letter-spacing:0.02em">—</span>
@@ -1423,7 +1426,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.3.0';
+var APP_VERSION = 'v1.4.0';
 
 var db = null;
 var storage = null;
@@ -3172,6 +3175,11 @@ function toggleTaetigkeit(btn) {
 /* ═══════════════════════════════════════
    TAGESRAPPORT – Workers
    ═══════════════════════════════════════ */
+function heuteIso() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function addWorker() {
   trWorkerSeq++;
   var workerName = '';
@@ -3181,7 +3189,38 @@ function addWorker() {
     workerName = currentUser.name;
     workerRolle = PERSONAL.rollen[currentUser.name] || 'Facharbeiter';
   }
-  trWorkers.push({ id: trWorkerSeq, name: workerName, rolle: workerRolle, stunden: '', ausloese: false, verpfl: false });
+  var dEl = document.getElementById('tr-date');
+  var startDatum = (dEl && dEl.value) ? dEl.value : heuteIso();
+  trWorkers.push({ id: trWorkerSeq, name: workerName, rolle: workerRolle, datum: startDatum, stunden: '', ausloese: false, verpfl: false });
+  renderWorkers();
+  setTimeout(function(){
+    var items = document.querySelectorAll('.worker-item');
+    if (items.length) items[items.length-1].scrollIntoView({behavior:'smooth', block:'center'});
+  }, 50);
+}
+
+// Weiterer Tag auf demselben Stundenzettel: gleiche Person, Datum + 1
+function addTag() {
+  if (trWorkers.length >= 10) { toast('Mehr als 10 Zeilen passen nicht auf das Blatt'); return; }
+  var letzte = trWorkers[trWorkers.length - 1];
+  trWorkerSeq++;
+  var neuesDatum = '';
+  if (letzte && letzte.datum) {
+    var d = new Date(letzte.datum + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    neuesDatum = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  } else {
+    neuesDatum = heuteIso();
+  }
+  trWorkers.push({
+    id: trWorkerSeq,
+    name: letzte ? letzte.name : '',
+    rolle: letzte ? letzte.rolle : 'Facharbeiter',
+    datum: neuesDatum,
+    stunden: '',
+    ausloese: false,
+    verpfl: false
+  });
   renderWorkers();
   setTimeout(function(){
     var items = document.querySelectorAll('.worker-item');
@@ -3219,17 +3258,20 @@ function renderWorkers() {
     }
 
     html += '<div class="worker-item" data-id="' + w.id + '">'
-      + '<div class="worker-num">Mitarbeiter ' + String(i+1).padStart(2,'0') + '</div>'
+      + '<div class="worker-num">Tag ' + String(i+1).padStart(2,'0') + '</div>'
       + (trWorkers.length > 1 ? '<button class="worker-remove" onclick="removeWorker(' + w.id + ')" title="Entfernen">&#10005;</button>' : '')
       + '<div class="field"><label>Name</label>'
       + '<select onchange="updWorker(' + w.id + ',\'name\',this.value)">' + optionsHtml + '</select></div>'
       + '<div class="row">'
-      + '<div class="field"><label>Rolle</label>'
-      + '<input type="text" value="' + (w.rolle || 'Facharbeiter') + '" readonly style="opacity:.7;cursor:default"></div>'
+      + '<div class="field"><label>Datum</label>'
+      + '<input type="date" value="' + (w.datum || '') + '" '
+      + 'onchange="updWorker(' + w.id + ',\'datum\',this.value)"></div>'
       + '<div class="field"><label>Stunden</label>'
       + '<input type="number" step="0.5" min="0" max="24" value="' + (w.stunden || '') + '" placeholder="Std." '
       + 'oninput="updWorker(' + w.id + ',\'stunden\',this.value);updateStundenSumme()"></div>'
       + '</div>'
+      + '<div class="field"><label>Rolle</label>'
+      + '<input type="text" value="' + (w.rolle || 'Facharbeiter') + '" readonly style="opacity:.7;cursor:default"></div>'
       + '<div class="worker-chips">'
       + '<button class="worker-chip' + (w.ausloese ? ' active' : '') + '" onclick="toggleWorkerFlag(' + w.id + ',\'ausloese\',this)">Auslöse</button>'
       + '<button class="worker-chip' + (w.verpfl ? ' active' : '') + '" onclick="toggleWorkerFlag(' + w.id + ',\'verpfl\',this)">Verpfl.geld</button>'
@@ -3408,19 +3450,21 @@ function buildRapportHtml(data) {
   var wRows = '';
   for (var i = 0; i < 10; i++) {
     var w = validW[i];
-    var fachStd = '', probeStd = '', lehrStd = '', ausloese = '', verpfl = '', wname = '', arbeiten = '';
+    var fachStd = '', probeStd = '', lehrStd = '', ausloese = '', verpfl = '', wname = '', arbeiten = '', zDatum = '';
     if (w) {
       wname = escHtml(w.name);
+      // jede Zeile traegt ihr eigenes Datum (mehrere Tage pro Blatt moeglich)
+      zDatum = w.datum ? fmtDate(w.datum) : dateFmt;
       if (w.rolle === 'Facharbeiter') fachStd = w.stunden || '';
       if (w.rolle === 'Probearbeit') probeStd = w.stunden || '';
       if (w.rolle === 'Lehrling') lehrStd = w.stunden || '';
       ausloese = w.ausloese ? 'x' : '';
       verpfl = w.verpfl ? 'x' : '';
-      if (i === 0 && taetKuerzel) arbeiten = escHtml(taetKuerzel);
+      if (taetKuerzel) arbeiten = escHtml(taetKuerzel);
     }
     if (i === 0) {
       wRows += '<tr class="drow">'
-        + '<td class="c">' + (w ? dateFmt : '') + '</td>'
+        + '<td class="c">' + zDatum + '</td>'
         + '<td class="c">' + ausloese + '</td>'
         + '<td class="c">' + verpfl + '</td>'
         + '<td>' + wname + '</td>'
@@ -3428,18 +3472,18 @@ function buildRapportHtml(data) {
         + '<td class="c">' + probeStd + '</td>'
         + '<td class="c">' + lehrStd + '</td>'
         + '<td class="c sm">' + arbeiten + '</td>'
-        + '<td rowspan="10" style="vertical-align:top;padding:3px 5px;font-size:8px;white-space:pre-wrap">' + escHtml(data.arbeiten || '') + '</td>'
+        + '<td rowspan="10" style="vertical-align:top;padding:4px 6px;font-size:12px;white-space:pre-wrap">' + escHtml(data.arbeiten || '') + '</td>'
         + '</tr>';
     } else {
       wRows += '<tr class="drow">'
-        + '<td class="c">' + (w ? dateFmt : '') + '</td>'
+        + '<td class="c">' + zDatum + '</td>'
         + '<td class="c">' + ausloese + '</td>'
         + '<td class="c">' + verpfl + '</td>'
         + '<td>' + wname + '</td>'
         + '<td class="c">' + fachStd + '</td>'
         + '<td class="c">' + probeStd + '</td>'
         + '<td class="c">' + lehrStd + '</td>'
-        + '<td class="c sm"></td>'
+        + '<td class="c sm">' + arbeiten + '</td>'
         + '</tr>';
     }
   }
@@ -3456,20 +3500,20 @@ function buildRapportHtml(data) {
     + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #000; background: #fff; margin: 0; padding: 0; width: 281mm; height: 194mm; box-sizing: border-box; }'
     + '@media print { body { width: 281mm; height: 194mm; } }'
     + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
-    + 'td, th { border: 1px solid #000; padding: 1px 3px; vertical-align: middle; overflow: hidden; font-size: 8px; }'
+    + 'td, th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; overflow: hidden; font-size: 11px; }'
     + '.c { text-align: center; }'
     + '.b { font-weight: bold; }'
-    + '.sm { font-size: 7px; }'
+    + '.sm { font-size: 9px; }'
     + '.nb { border: none; }'
     + '.nbl { border-left: none; }'
     + '.nbr { border-right: none; }'
     + '.nbt { border-top: none; }'
     + '.nbb { border-bottom: none; }'
-    + 'th { background: #eee; font-size: 7px; padding: 2px 2px; }'
-    + '.drow td { height: 9.7mm; font-size: 10px; }'
-    + '.data-tbl th { height: 9.1mm; }'
-    + '.hdr-tbl td { font-size: 8px; }'
-    + '.ftr-tbl td { font-size: 8px; }'
+    + 'th { background: #eee; font-size: 9.5px; padding: 2px 3px; }'
+    + '.drow td { height: 9.2mm; font-size: 13px; }'
+    + '.data-tbl th { height: 8.7mm; }'
+    + '.hdr-tbl td { font-size: 10.5px; }'
+    + '.ftr-tbl td { font-size: 10.5px; }'
     // Kopf 48mm + Daten 116mm + Fuss 30mm = 194mm Nutzhoehe
     + '.hr1 { height: 11mm; }'
     + '.hr2 { height: 11mm; }'
@@ -3487,35 +3531,35 @@ function buildRapportHtml(data) {
 
     // Row 1: Company | Title | Entfernung
     + '<tr class="hr1">'
-    + '<td rowspan="2" style="font-weight:bold;font-size:10px;vertical-align:top;padding:3px">'
-    +   'Elm Bau GmbH<br><span style="font-size:7px;font-weight:normal">Braunschweiger Str.22b<br>38154 Kgl.</span>'
+    + '<td rowspan="2" style="font-weight:bold;font-size:13px;vertical-align:top;padding:3px">'
+    +   'Elm Bau GmbH<br><span style="font-size:9.5px;font-weight:normal">Braunschweiger Str.22b<br>38154 Kgl.</span>'
     + '</td>'
     + '<td rowspan="2" class="c" style="padding:4px">'
-    +   '<div style="font-size:16px;font-weight:bold">Tagesrapport</div>'
-    +   '<div style="font-size:7px">einen Tagesrapport separat ausfüllen</div>'
-    +   '<div style="font-size:11px;font-weight:bold;margin-top:2px">' + escHtml(data.baustelle || '') + '</div>'
+    +   '<div style="font-size:21px;font-weight:bold">Tagesrapport</div>'
+    +   '<div style="font-size:9.5px">einen Tagesrapport separat ausfüllen</div>'
+    +   '<div style="font-size:15px;font-weight:bold;margin-top:2px">' + escHtml(data.baustelle || '') + '</div>'
     + '</td>'
     + '<td style="font-size:7px;padding:2px 4px">'
-    +   'Entfernung zum BV<br>in km (ab 50km): <b style="font-size:9px">' + escHtml(data.km || '') + '</b>'
+    +   'Entfernung zum BV<br>in km (ab 50km): <b style="font-size:12px">' + escHtml(data.km || '') + '</b>'
     + '</td>'
     + '</tr>'
 
     // Row 2: (cont) | (cont) | Fahrzeug
     + '<tr class="hr2">'
     + '<td style="font-size:7px;padding:2px 4px">'
-    +   'Fahrzeug: <b style="font-size:9px">' + escHtml(data.fahrzeug || '') + '</b>'
+    +   'Fahrzeug: <b style="font-size:12px">' + escHtml(data.fahrzeug || '') + '</b>'
     + '</td>'
     + '</tr>'
 
     // Row 3: Address2 + Kostenstelle | Projekt | Fahrer/Hinfahrt
     + '<tr class="hr3">'
     + '<td rowspan="2" style="font-size:7px;padding:2px 3px;vertical-align:top">'
-    +   '<span style="font-size:6px">Am Mart 17 / 01561 Lampertswalde</span><br>'
-    +   'Kostenstelle: <b style="color:#c00;font-size:9px">' + escHtml(data.kostenstelle || '') + '</b>'
+    +   '<span style="font-size:8.5px">Am Mart 17 / 01561 Lampertswalde</span><br>'
+    +   'Kostenstelle: <b style="color:#c00;font-size:12px">' + escHtml(data.kostenstelle || '') + '</b>'
     + '</td>'
     + '<td rowspan="2" style="padding:2px 4px;vertical-align:top">'
-    +   'Projekt Nr.: <b style="color:#c00;font-size:9px">' + escHtml(data.projekt || '') + '</b>'
-    +   '<span style="margin-left:20px;font-size:7px">' + escHtml(data.kategorie || '') + '</span>'
+    +   'Projekt Nr.: <b style="color:#c00;font-size:12px">' + escHtml(data.projekt || '') + '</b>'
+    +   '<span style="margin-left:20px;font-size:10.5px">' + escHtml(data.kategorie || '') + '</span>'
     + '</td>'
     + '<td style="font-size:7px;padding:2px 4px">'
     +   'Fahrer: <b>' + escHtml(data.fahrer || '') + '</b><br>'
@@ -3527,7 +3571,7 @@ function buildRapportHtml(data) {
     + '<tr class="hr4">'
     + '<td style="padding:2px 4px;vertical-align:bottom;height:34px">'
     +   '<div style="height:20px"></div>'
-    +   '<div style="font-size:6px;border-top:1px solid #000;padding-top:1px">Datum / Unterschrift Vorgesetzter</div>'
+    +   '<div style="font-size:8.5px;border-top:1px solid #000;padding-top:1px">Datum / Unterschrift Vorgesetzter</div>'
     + '</td>'
     + '</tr>'
     + '</table>'
@@ -3572,7 +3616,7 @@ function buildRapportHtml(data) {
     +   '<b>Arbeitszeitende (Uhrzeit):</b> ' + escHtml(data.ende || '') + '<br>'
     +   '<b>Netto-Arbeitszeit:</b> ' + escHtml(data.arbeitszeit || '')
     + '</td>'
-    + '<td style="vertical-align:top;padding:3px 4px;font-size:7px">'
+    + '<td style="vertical-align:top;padding:3px 4px;font-size:10px">'
     +   '<b><u>Kürzel:</u></b><br>'
     +   'RB = Rohbau<br>'
     +   'FM = Fertigmontage<br>'
@@ -3580,10 +3624,10 @@ function buildRapportHtml(data) {
     + '</td>'
     + '<td rowspan="2" style="vertical-align:top;padding:3px 4px">'
     +   '<b>Besondere Anmerkungen / Urlaubswünsche usw.:</b><br>'
-    +   '<span style="white-space:pre-wrap;font-size:7px">' + escHtml(data.bemerkungen || '') + '</span>'
+    +   '<span style="white-space:pre-wrap;font-size:10px">' + escHtml(data.bemerkungen || '') + '</span>'
     +   '<div style="position:relative;min-height:50px">'
     +     '<div style="position:absolute;bottom:0;right:0;text-align:right">'
-    +       '<span style="font-size:6px;color:#666">Unterschrift Kunde:</span><br>'
+    +       '<span style="font-size:8.5px;color:#666">Unterschrift Kunde:</span><br>'
     +       kundeSigImg
     +     '</div>'
     +   '</div>'
