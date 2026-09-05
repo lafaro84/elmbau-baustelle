@@ -1421,7 +1421,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = '';
+var APP_VERSION = 'v1.1.0';
 
 var db = null;
 var storage = null;
@@ -1628,7 +1628,7 @@ function afterLogin() {
 
   // Show user badge and version
   document.getElementById('currentUserBadge').textContent = currentUser.name;
-  // version display removed
+  document.getElementById('statusBadge').textContent = APP_VERSION;
 
   // Show/hide chef modules
   document.getElementById('nav-stammdaten').style.display = isChef ? '' : 'none';
@@ -3456,7 +3456,7 @@ function buildRapportHtml(data) {
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
     + '<title>Tagesrapport - ' + escHtml(data.baustelle || data.projekt || dateFmt) + '</title>'
     + '<style>'
-    + '@page { size: 297mm 210mm; margin: 8mm; }'
+    + '@page { size: A4 landscape; margin: 8mm; }'
     + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #000; background: #fff; margin: 0; padding: 0; width: 281mm; height: 194mm; box-sizing: border-box; }'
     + '@media print { body { width: 281mm; height: 194mm; } }'
     + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
