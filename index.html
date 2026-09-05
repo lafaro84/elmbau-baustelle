@@ -266,26 +266,6 @@ body {
   color: var(--info);
 }
 
-/* ── Speech-to-Text Mic Button ── */
-.mic-wrap { position: relative; }
-.mic-wrap textarea { padding-right: 44px; }
-.mic-btn {
-  position: absolute; right: 8px; bottom: 10px;
-  width: 32px; height: 32px; border-radius: 50%;
-  border: none; cursor: pointer;
-  background: var(--surface-alt); color: var(--text-muted);
-  font-size: 18px; display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s;
-}
-.mic-btn:hover { background: var(--accent); color: #fff; }
-.mic-btn.recording {
-  background: var(--danger); color: #fff;
-  animation: mic-pulse 1s ease-in-out infinite;
-}
-@keyframes mic-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
-}
 
 /* ── Photos ── */
 .photo-grid {
@@ -960,7 +940,7 @@ body {
     </div>
     <div class="field">
       <label for="tr-arbeiten">Beschreibung</label>
-      <div class="mic-wrap"><textarea id="tr-arbeiten" placeholder="Was wurde heute gemacht?"></textarea><button type="button" class="mic-btn" onclick="startDictation('tr-arbeiten',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="tr-arbeiten" placeholder="Was wurde heute gemacht?"></textarea>
     </div>
   </div>
 
@@ -968,7 +948,7 @@ body {
     <div class="section-label">Bemerkungen</div>
     <div class="field">
       <label for="tr-bemerkungen">Anmerkungen / Urlaubswünsche</label>
-      <div class="mic-wrap"><textarea id="tr-bemerkungen" placeholder="Besondere Vorkommnisse, Urlaubswünsche etc."></textarea><button type="button" class="mic-btn" onclick="startDictation('tr-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="tr-bemerkungen" placeholder="Besondere Vorkommnisse, Urlaubswünsche etc."></textarea>
     </div>
   </div>
 
@@ -1029,7 +1009,7 @@ body {
   <div class="section">
     <div class="section-label">Sonstiges / Bemerkungen</div>
     <div class="field">
-      <div class="mic-wrap"><textarea id="rm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea><button type="button" class="mic-btn" onclick="startDictation('rm-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="rm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea>
     </div>
   </div>
 
@@ -1101,7 +1081,7 @@ body {
   <div class="section">
     <div class="section-label">Sonstiges / Bemerkungen</div>
     <div class="field">
-      <div class="mic-wrap"><textarea id="fm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea><button type="button" class="mic-btn" onclick="startDictation('fm-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="fm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea>
     </div>
   </div>
 
@@ -4485,64 +4465,7 @@ function escHtml(s) {
   return d.innerHTML;
 }
 
-/* ═══════════════════════════════════════
-   SPEECH-TO-TEXT (Web Speech API)
-   ═══════════════════════════════════════ */
-var activeDictation = null;
 
-function startDictation(textareaId, btn) {
-  // If already recording, stop
-  if (activeDictation && activeDictation.textareaId === textareaId) {
-    activeDictation.recognition.stop();
-    return;
-  }
-  // Stop any other active dictation
-  if (activeDictation) {
-    activeDictation.recognition.stop();
-  }
-
-  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    toast('Spracherkennung nicht verfügbar. Bitte Chrome oder Safari nutzen.');
-    return;
-  }
-
-  var recognition = new SpeechRecognition();
-  recognition.lang = 'de-DE';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-
-  var textarea = document.getElementById(textareaId);
-  var startText = textarea.value;
-  btn.classList.add('recording');
-
-  activeDictation = { recognition: recognition, textareaId: textareaId, btn: btn };
-
-  recognition.onresult = function(event) {
-    var transcript = '';
-    for (var i = 0; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-    textarea.value = startText + (startText ? ' ' : '') + transcript;
-  };
-
-  recognition.onerror = function(event) {
-    btn.classList.remove('recording');
-    activeDictation = null;
-    if (event.error === 'not-allowed') {
-      toast('Mikrofonzugriff verweigert. Bitte in den Browsereinstellungen erlauben.');
-    } else if (event.error !== 'aborted') {
-      toast('Spracherkennung-Fehler: ' + event.error);
-    }
-  };
-
-  recognition.onend = function() {
-    btn.classList.remove('recording');
-    activeDictation = null;
-  };
-
-  recognition.start();
-}
 
 function toast(msg) {
   var t = document.getElementById('toast');
