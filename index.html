@@ -1392,6 +1392,36 @@ body {
     </div>
   </div>
   <div class="section">
+    <div class="section-label">Sammel-Export als PDF</div>
+    <div class="row">
+      <div class="field"><label for="dx-von">Von</label><input type="date" id="dx-von"></div>
+      <div class="field"><label for="dx-bis">Bis</label><input type="date" id="dx-bis"></div>
+    </div>
+    <div class="field">
+      <label for="dx-typ">Berichtsart</label>
+      <select id="dx-typ">
+        <option value="">Alle Typen</option>
+        <option value="kontrolle">Kontrolle</option>
+        <option value="rapport">Tagesrapport</option>
+        <option value="rohmontage">Rohmontage</option>
+        <option value="fertigmontage">Fertigmontage</option>
+        <option value="kabelliste">Kabelliste</option>
+        <option value="schalter">Schalter</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Mitarbeiter</label>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button type="button" class="btn-sm" onclick="dxAlle(true)">Alle</button>
+        <button type="button" class="btn-sm" onclick="dxAlle(false)">Keine</button>
+      </div>
+      <div id="dx-nutzer" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;background:var(--surface)"></div>
+    </div>
+    <button class="btn btn-primary" id="dx-btn" onclick="dxExport()">Als PDF exportieren</button>
+    <div id="dx-status" style="margin-top:10px;font-size:13px;color:var(--text-muted);text-align:center"></div>
+  </div>
+
+  <div class="section">
     <div class="section-label">Eingereichte Berichte</div>
     <div class="dash-filters">
       <select id="dash-filter-type" onchange="dashLoadReports()">
@@ -1429,7 +1459,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.9.1';
+var APP_VERSION = 'v1.10.0';
 
 var db = null;
 var storage = null;
@@ -2345,9 +2375,13 @@ function dashLoadReports() {
     var weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
     var countToday = 0, countWeek = 0, countTotal = 0;
 
+    var erstellerGesehen = {};
     snap.forEach(function(doc) {
       var d = doc.data();
       d.id = doc.id;
+
+      // Namen fuer den Sammel-Export sammeln, bevor die Filter greifen
+      if (d.ersteller) erstellerGesehen[d.ersteller] = true;
 
       // Client-side filters
       if (typeFilter && d.type !== typeFilter) return;
@@ -2370,6 +2404,9 @@ function dashLoadReports() {
       return tb - ta;
     });
     if (reports.length > 100) reports = reports.slice(0, 100);
+
+    dashErsteller = Object.keys(erstellerGesehen).sort(function(a, b){ return a.localeCompare(b); });
+    dxFuelleNutzer();
 
     document.getElementById('dash-count-today').textContent = countToday;
     document.getElementById('dash-count-week').textContent = countWeek;
@@ -2407,6 +2444,161 @@ function dashLoadReports() {
     console.error('Dashboard error:', err);
     document.getElementById('dash-report-list').innerHTML = '<div class="dash-empty"><p>Fehler beim Laden: ' + escHtml(err.message) + '</p></div>';
   });
+}
+
+/* ═══════════════════════════════════════
+   DASHBOARD – Sammel-Export als PDF
+   ═══════════════════════════════════════ */
+var dashErsteller = [];
+var dxLaeuft = false;
+
+function dxIsoHeute() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// Vorgabe: laufender Monat bis heute
+function dxSetzeVorgaben() {
+  var von = document.getElementById('dx-von');
+  var bis = document.getElementById('dx-bis');
+  if (von && !von.value) {
+    var d = new Date();
+    von.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+  }
+  if (bis && !bis.value) bis.value = dxIsoHeute();
+}
+
+function dxFuelleNutzer() {
+  var el = document.getElementById('dx-nutzer');
+  if (!el) return;
+  // bisherige Auswahl merken
+  var vorher = {};
+  var alte = el.querySelectorAll('input[type=checkbox]');
+  for (var i = 0; i < alte.length; i++) vorher[alte[i].value] = alte[i].checked;
+
+  if (!dashErsteller.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-muted)">Noch keine Berichte vorhanden</div>';
+    return;
+  }
+  var html = '';
+  dashErsteller.forEach(function(name) {
+    var an = (vorher[name] === undefined) ? true : vorher[name];
+    html += '<label style="display:flex;align-items:center;gap:10px;padding:6px 2px;font-size:14px;cursor:pointer">'
+      + '<input type="checkbox" value="' + escHtml(name) + '"' + (an ? ' checked' : '')
+      + ' style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent)">'
+      + '<span>' + escHtml(name) + '</span></label>';
+  });
+  el.innerHTML = html;
+}
+
+function dxAlle(an) {
+  var boxen = document.querySelectorAll('#dx-nutzer input[type=checkbox]');
+  for (var i = 0; i < boxen.length; i++) boxen[i].checked = an;
+}
+
+function dxGewaehlteNutzer() {
+  var raus = [];
+  var boxen = document.querySelectorAll('#dx-nutzer input[type=checkbox]');
+  for (var i = 0; i < boxen.length; i++) if (boxen[i].checked) raus.push(boxen[i].value);
+  return raus;
+}
+
+function dxStatus(text) {
+  var el = document.getElementById('dx-status');
+  if (el) el.textContent = text || '';
+}
+
+function dxExport() {
+  if (dxLaeuft) return;
+  if (!db) { toast('Keine Verbindung'); return; }
+  if (!pdfBereit()) return;
+
+  var von = document.getElementById('dx-von').value;
+  var bis = document.getElementById('dx-bis').value;
+  var typ = document.getElementById('dx-typ').value;
+  var nutzer = dxGewaehlteNutzer();
+
+  if (!von) { toast('Bitte ein Von-Datum wählen'); return; }
+  if (!bis) { bis = dxIsoHeute(); document.getElementById('dx-bis').value = bis; }
+  if (bis < von) { toast('Bis-Datum liegt vor dem Von-Datum'); return; }
+  if (!nutzer.length) { toast('Bitte mindestens einen Mitarbeiter auswählen'); return; }
+
+  var imBereich = {};
+  nutzer.forEach(function(nm){ imBereich[nm] = true; });
+
+  var btn = document.getElementById('dx-btn');
+  dxLaeuft = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Berichte werden gesucht…'; }
+  dxStatus('');
+
+  db.collection('berichte').get().then(function(snap) {
+    var liste = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if (!d.html) return;
+      if (!d.ersteller || !imBereich[d.ersteller]) return;
+      if (typ && d.type !== typ) return;
+      if (!d.datum || d.datum < von || d.datum > bis) return;
+      liste.push(d);
+    });
+
+    // nach Datum, dann nach Name sortieren
+    liste.sort(function(a, b) {
+      if (a.datum !== b.datum) return a.datum < b.datum ? -1 : 1;
+      return (a.ersteller || '').localeCompare(b.ersteller || '');
+    });
+
+    if (!liste.length) {
+      dxFertig(btn);
+      dxStatus('Keine Berichte im gewählten Zeitraum gefunden');
+      return;
+    }
+    if (liste.length > 40 && !confirm(liste.length + ' Berichte werden zusammengefasst. Das kann einige Minuten dauern. Fortfahren?')) {
+      dxFertig(btn);
+      dxStatus('');
+      return;
+    }
+
+    var PDF = window.jspdf.jsPDF;
+    var pdf = null;
+
+    function naechster(i) {
+      if (i >= liste.length) {
+        var name = 'Berichte_' + von + '_bis_' + bis + '.pdf';
+        pdf.save(name);
+        dxFertig(btn);
+        dxStatus(liste.length + ' Berichte exportiert');
+        toast('PDF mit ' + liste.length + ' Berichten heruntergeladen');
+        return;
+      }
+      dxStatus('Bericht ' + (i+1) + ' von ' + liste.length + ' – ' + (liste[i].ersteller || '') + ', ' + fmtDate(liste[i].datum));
+      if (btn) btn.textContent = 'Erstelle PDF… ' + (i+1) + '/' + liste.length;
+
+      htmlZuBild(liste[i].html).then(function(s) {
+        if (!pdf) {
+          pdf = new PDF({ orientation: s.landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+        } else {
+          pdf.addPage([s.pageW, s.pageH], s.landscape ? 'landscape' : 'portrait');
+        }
+        seiteEinfuegen(pdf, s);
+        // kurz Luft lassen, damit die Anzeige nachkommt
+        setTimeout(function(){ naechster(i + 1); }, 30);
+      }).catch(function(e) {
+        dxFertig(btn);
+        dxStatus('Fehler bei Bericht ' + (i+1) + ': ' + (e && e.message ? e.message : e));
+      });
+    }
+    naechster(0);
+
+  }).catch(function(err) {
+    dxFertig(btn);
+    dxStatus('Fehler beim Laden: ' + (err.message || err));
+  });
+}
+
+function dxFertig(btn) {
+  dxLaeuft = false;
+  if (btn) { btn.disabled = false; btn.textContent = 'Als PDF exportieren'; }
 }
 
 function dashViewReport(id) {
@@ -2849,7 +3041,7 @@ function switchModule(name, btn) {
   else if (name === 'schalter') sub.textContent = 'Schalteraufmaß';
   else if (name === 'history') { sub.textContent = 'Berichte'; renderHistory(); }
   else if (name === 'stammdaten') { sub.textContent = 'Stammdaten verwalten'; sdSwitchTab('mitarbeiter', document.querySelector('.sd-tab')); }
-  else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dashLoadReports(); }
+  else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dxSetzeVorgaben(); dashLoadReports(); }
 }
 
 /* ═══════════════════════════════════════
@@ -4337,70 +4529,83 @@ function shareOrPreview(html, fileName, title, text) {
 /* ═══════════════════════════════════════
    PREVIEW & DOWNLOAD FALLBACK
    ═══════════════════════════════════════ */
-function exportPdf(html, fileName) {
+function pdfBereit() {
   if (typeof html2canvas === 'undefined' || !window.jspdf) {
     toast('PDF-Bibliothek nicht geladen \u2013 Internetverbindung pruefen');
+    return false;
+  }
+  return true;
+}
+
+// Rendert einen Bericht in ein Bild und liefert alle Masse mit, die zum
+// Platzieren auf einer PDF-Seite noetig sind.
+// Querformat-Rapport: body ist exakt 281x194mm bei 8mm Rand -> genau eine Seite.
+// Hochformat-Berichte: body 190mm + 2x10mm Padding = 210mm, Hoehe variabel.
+function htmlZuBild(html) {
+  return new Promise(function(resolve, reject) {
+    var landscape = html.indexOf('A4 landscape') !== -1 || html.indexOf('297mm 210mm') !== -1;
+    var pageW = landscape ? 297 : 210;
+    var pageH = landscape ? 210 : 297;
+    var offX = landscape ? 8 : 0;
+    var offY = landscape ? 8 : 0;
+    var contentW = pageW - 2 * offX;
+    var contentH = pageH - 2 * offY;
+    var pxPerMm = 96 / 25.4;
+    var wpx = Math.round(contentW * pxPerMm);
+    var hpx = Math.round(contentH * pxPerMm);
+
+    var ifr = document.createElement('iframe');
+    ifr.style.cssText = 'position:fixed;left:-10000px;top:0;border:0;width:' + wpx + 'px;height:' + hpx + 'px';
+    document.body.appendChild(ifr);
+    var idoc = ifr.contentDocument || ifr.contentWindow.document;
+    idoc.open(); idoc.write(html); idoc.close();
+
+    setTimeout(function() {
+      var opts = { scale: 2, backgroundColor: '#ffffff', width: wpx, windowWidth: wpx, useCORS: true };
+      if (landscape) { opts.height = hpx; opts.windowHeight = hpx; }
+
+      html2canvas(idoc.body, opts).then(function(canvas) {
+        var img = canvas.toDataURL('image/jpeg', 0.92);
+        var totalH = canvas.height * contentW / canvas.width;
+        if (ifr.parentNode) document.body.removeChild(ifr);
+        resolve({ img: img, landscape: landscape, pageW: pageW, pageH: pageH,
+                  offX: offX, offY: offY, contentW: contentW, contentH: contentH, totalH: totalH });
+      }).catch(function(e) {
+        if (ifr.parentNode) document.body.removeChild(ifr);
+        reject(e);
+      });
+    }, 350);
+  });
+}
+
+// Setzt ein fertiges Bild auf die aktuelle Seite. Hochformat-Berichte, die
+// laenger als eine Seite sind, werden dabei umbrochen.
+function seiteEinfuegen(pdf, s) {
+  if (s.landscape) {
+    pdf.addImage(s.img, 'JPEG', s.offX, s.offY, s.contentW, s.contentH);
     return;
   }
-  var landscape = html.indexOf('A4 landscape') !== -1 || html.indexOf('297mm 210mm') !== -1;
-  var pageW = landscape ? 297 : 210;
-  var pageH = landscape ? 210 : 297;
-  // Querformat-Rapport: body ist exakt 281x194mm bei 8mm Rand -> genau eine Seite.
-  // Hochformat-Berichte: body 190mm + 2x10mm Padding = 210mm, Hoehe variabel.
-  var offX = landscape ? 8 : 0;
-  var offY = landscape ? 8 : 0;
-  var contentW = pageW - 2 * offX;
-  var contentH = pageH - 2 * offY;
-  var pxPerMm = 96 / 25.4;
-  var wpx = Math.round(contentW * pxPerMm);
-  var hpx = Math.round(contentH * pxPerMm);
+  var pos = 0;
+  pdf.addImage(s.img, 'JPEG', s.offX, s.offY, s.contentW, s.totalH);
+  while (pos + s.contentH < s.totalH - 0.5) {
+    pos += s.contentH;
+    pdf.addPage([s.pageW, s.pageH], 'portrait');
+    pdf.addImage(s.img, 'JPEG', s.offX, s.offY - pos, s.contentW, s.totalH);
+  }
+}
 
+function exportPdf(html, fileName) {
+  if (!pdfBereit()) return;
   toast('PDF wird erstellt\u2026');
-
-  var ifr = document.createElement('iframe');
-  ifr.style.cssText = 'position:fixed;left:-10000px;top:0;border:0;width:' + wpx + 'px;height:' + hpx + 'px';
-  document.body.appendChild(ifr);
-  var idoc = ifr.contentDocument || ifr.contentWindow.document;
-  idoc.open(); idoc.write(html); idoc.close();
-
-  setTimeout(function() {
-    var opts = {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      width: wpx,
-      windowWidth: wpx,
-      useCORS: true
-    };
-    // Querformat hat feste Hoehe -> exakt diesen Bereich aufnehmen
-    if (landscape) { opts.height = hpx; opts.windowHeight = hpx; }
-
-    html2canvas(idoc.body, opts).then(function(canvas) {
-      var PDF = window.jspdf.jsPDF;
-      var pdf = new PDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
-      var img = canvas.toDataURL('image/jpeg', 0.92);
-
-      if (landscape) {
-        // Seite exakt fuellen, kein Seitenumbruch
-        pdf.addImage(img, 'JPEG', offX, offY, contentW, contentH);
-      } else {
-        var totalH = canvas.height * contentW / canvas.width;
-        var pos = 0;
-        pdf.addImage(img, 'JPEG', offX, offY, contentW, totalH);
-        while (pos + contentH < totalH - 0.5) {
-          pos += contentH;
-          pdf.addPage();
-          pdf.addImage(img, 'JPEG', offX, offY - pos, contentW, totalH);
-        }
-      }
-
-      pdf.save(fileName.replace(/\.html$/i, '') + '.pdf');
-      document.body.removeChild(ifr);
-      toast('PDF heruntergeladen');
-    }).catch(function(e) {
-      if (ifr.parentNode) document.body.removeChild(ifr);
-      toast('PDF-Fehler: ' + (e && e.message ? e.message : e));
-    });
-  }, 350);
+  htmlZuBild(html).then(function(s) {
+    var PDF = window.jspdf.jsPDF;
+    var pdf = new PDF({ orientation: s.landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+    seiteEinfuegen(pdf, s);
+    pdf.save(fileName.replace(/\.html$/i, '') + '.pdf');
+    toast('PDF heruntergeladen');
+  }).catch(function(e) {
+    toast('PDF-Fehler: ' + (e && e.message ? e.message : e));
+  });
 }
 
 function showPreview(html, fileName) {
