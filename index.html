@@ -1691,7 +1691,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.20.0';
+var APP_VERSION = 'v1.20.1';
 
 var db = null;
 var storage = null;
@@ -6732,6 +6732,9 @@ function buildNetzwerkHtml(data) {
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
     + '<title>Prüfprotokoll Netzwerk/SAT – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
     + '<style>' + checklisteStil()
+    // Schmalerer Satzspiegel: 20 mm Rand links wie rechts. Links wird gelocht,
+    // deshalb darf die Tabelle dort nicht bis an den Blattrand laufen.
+    +   'body { width:170mm; padding:0 20mm; }'
     +   'td, th { border:1px solid #999; }'
     +   '.pn-nr { width:26mm; font-weight:bold; font-size:9.5px; background:#fafafa; }'
     +   '.pn-lbl { background:#f2f2f2; font-weight:bold; }'
