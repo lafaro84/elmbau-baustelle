@@ -872,11 +872,11 @@ body {
     <div class="row">
       <div class="field">
         <label for="tr-beginn">Beginn</label>
-        <input type="time" id="tr-beginn" value="07:00" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-beginn" value="07:00" onchange="calcArbeitszeit();document.getElementById('tr-hinfahrt').value=this.value">
       </div>
       <div class="field">
         <label for="tr-ende">Ende</label>
-        <input type="time" id="tr-ende" value="16:00" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-ende" value="16:00" onchange="calcArbeitszeit();document.getElementById('tr-rueckfahrt').value=this.value">
       </div>
     </div>
     <div class="row">
@@ -939,11 +939,11 @@ body {
     <div class="row">
       <div class="field">
         <label for="tr-hinfahrt">Hinfahrt</label>
-        <input type="time" id="tr-hinfahrt">
+        <input type="time" id="tr-hinfahrt" value="07:00">
       </div>
       <div class="field">
         <label for="tr-rueckfahrt">Rückfahrt</label>
-        <input type="time" id="tr-rueckfahrt">
+        <input type="time" id="tr-rueckfahrt" value="16:00">
       </div>
     </div>
   </div>
@@ -4384,8 +4384,8 @@ function resetRapport() {
   document.getElementById('tr-fahrzeug').value = '';
   document.getElementById('tr-km').value = '';
   document.getElementById('tr-fahrer').value = '';
-  document.getElementById('tr-hinfahrt').value = '';
-  document.getElementById('tr-rueckfahrt').value = '';
+  document.getElementById('tr-hinfahrt').value = document.getElementById('tr-beginn').value;
+  document.getElementById('tr-rueckfahrt').value = document.getElementById('tr-ende').value;
   document.getElementById('tr-beginn').value = '07:00';
   document.getElementById('tr-ende').value = '16:00';
   document.getElementById('tr-pause1-von').value = '09:30';
@@ -4503,7 +4503,7 @@ function startDictation(textareaId, btn) {
 
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    toast('Spracherkennung wird von diesem Browser nicht unterstützt');
+    toast('Spracherkennung nicht verfügbar. Bitte Chrome oder Safari nutzen.');
     return;
   }
 
