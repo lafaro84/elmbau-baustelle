@@ -1424,7 +1424,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.8.0';
+var APP_VERSION = 'v1.8.1';
 
 var db = null;
 var storage = null;
@@ -2402,6 +2402,9 @@ function saveReportToFirestore(type, data, html) {
     datum: data.datum || data.date || '',
     ersteller: currentUser.name,
     erstellerId: currentUser.id,
+    // Firebase-Auth-Kennung des Geraets - Grundlage fuer die Sicherheitsregel
+    // "nur der Ersteller darf seinen Bericht aendern"
+    authUid: (fbAuth && fbAuth.currentUser) ? fbAuth.currentUser.uid : null,
     html: html,
     data: data,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -4737,7 +4740,10 @@ function editFirestoreReport(docId) {
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Speichere...';
-      db.collection('berichte').doc(docId).update({ html: newHtml }).then(function() {
+      var aenderung = { html: newHtml };
+      // Fehlt die Kennung noch (Altbestand), beim ersten Speichern nachtragen
+      if (!d.authUid && fbAuth && fbAuth.currentUser) aenderung.authUid = fbAuth.currentUser.uid;
+      db.collection('berichte').doc(docId).update(aenderung).then(function() {
         toast('Bericht gespeichert');
         document.body.removeChild(overlay);
         renderHistory();
