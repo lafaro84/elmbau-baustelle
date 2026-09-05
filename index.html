@@ -1487,7 +1487,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.10.1';
+var APP_VERSION = 'v1.11.0';
 
 var db = null;
 var storage = null;
@@ -2397,12 +2397,9 @@ function dashLoadReports() {
   var siteFilter = document.getElementById('dash-filter-site').value;
   var fromFilter = document.getElementById('dash-filter-from').value;
 
-  db.collection('berichte').get().then(function(snap) {
+  // Nur die neuesten Berichte holen statt der ganzen Sammlung
+  db.collection('berichte').orderBy('createdAt', 'desc').limit(dashLimit).get().then(function(snap) {
     var reports = [];
-    var today = new Date(); today.setHours(0,0,0,0);
-    var weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
-    var countToday = 0, countWeek = 0, countTotal = 0;
-
     var erstellerGesehen = {};
     snap.forEach(function(doc) {
       var d = doc.data();
@@ -2417,28 +2414,13 @@ function dashLoadReports() {
       if (fromFilter && d.datum < fromFilter) return;
 
       reports.push(d);
-      countTotal++;
-      if (d.createdAt && d.createdAt.toDate) {
-        var dt = d.createdAt.toDate();
-        if (dt >= today) countToday++;
-        if (dt >= weekAgo) countWeek++;
-      }
     });
 
-    // Client-side sort to avoid Firestore index requirements
-    reports.sort(function(a, b) {
-      var ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
-      var tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
-      return tb - ta;
-    });
-    if (reports.length > 100) reports = reports.slice(0, 100);
+    var mehrDa = snap.size >= dashLimit;
 
     dashErsteller = Object.keys(erstellerGesehen).sort(function(a, b){ return a.localeCompare(b); });
     dxFuelleNutzer();
-
-    document.getElementById('dash-count-today').textContent = countToday;
-    document.getElementById('dash-count-week').textContent = countWeek;
-    document.getElementById('dash-count-total').textContent = countTotal;
+    dashKennzahlen();
 
     var listEl = document.getElementById('dash-report-list');
     if (!reports.length) {
@@ -2468,10 +2450,51 @@ function dashLoadReports() {
         + '<button class="history-btn" onclick="deleteFirestoreReport(\'' + r.id + '\');dashLoadReports()" title="L&ouml;schen" style="color:#e74c3c">&#10005;</button>'
         + '</div></div>';
     }).join('');
+    if (mehrDa) {
+      listEl.innerHTML += '<div style="margin-top:12px">'
+        + '<button class="btn btn-secondary" onclick="dashMehr()">Weitere 20 laden</button></div>';
+    }
   }).catch(function(err) {
     console.error('Dashboard error:', err);
     document.getElementById('dash-report-list').innerHTML = '<div class="dash-empty"><p>Fehler beim Laden: ' + escHtml(err.message) + '</p></div>';
   });
+}
+
+var dashLimit = 20;
+
+function dashMehr() {
+  dashLimit += 20;
+  dashLoadReports();
+}
+
+// Kennzahlen ueber schmale Abfragen statt ueber die ganze Sammlung.
+// "Heute" und "Diese Woche" lesen nur die betroffenen Dokumente,
+// "Gesamt" nutzt die Zaehlfunktion (1 Lesevorgang je 1000 Dokumente).
+function dashKennzahlen() {
+  if (!db) return;
+  var heute = dxIsoHeute();
+  var d = new Date(); d.setDate(d.getDate() - 7);
+  var vorWoche = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+  db.collection('berichte').where('datum', '==', heute).get().then(function(s) {
+    document.getElementById('dash-count-today').textContent = s.size;
+  }).catch(function(){});
+
+  db.collection('berichte').where('datum', '>=', vorWoche).get().then(function(s) {
+    document.getElementById('dash-count-week').textContent = s.size;
+  }).catch(function(){});
+
+  var gesamtEl = document.getElementById('dash-count-total');
+  try {
+    var zaehler = db.collection('berichte').count();
+    zaehler.get().then(function(res) {
+      gesamtEl.textContent = res.data().count;
+    }).catch(function() { gesamtEl.textContent = '–'; });
+  } catch(e) {
+    // Zaehlfunktion nicht verfuegbar -- lieber nichts anzeigen als die
+    // ganze Sammlung dafuer zu lesen
+    gesamtEl.textContent = '–';
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -2558,11 +2581,13 @@ function dxExport() {
   if (btn) { btn.disabled = true; btn.textContent = 'Berichte werden gesucht…'; }
   dxStatus('');
 
-  db.collection('berichte').get().then(function(snap) {
+  // Bereichsabfrage auf einem Feld -- liest nur die Berichte im Zeitraum,
+  // nicht die ganze Sammlung. Kein zusammengesetzter Index noetig.
+  db.collection('berichte').where('datum', '>=', von).where('datum', '<=', bis).get().then(function(snap) {
     var liste = [];
     snap.forEach(function(doc) {
       var d = doc.data();
-      if (!d.html) return;
+      if (!d.html && !d.daten) return;
       if (!d.ersteller || !imBereich[d.ersteller]) return;
       if (typ && d.type !== typ) return;
       if (!d.datum || d.datum < von || d.datum > bis) return;
@@ -2601,7 +2626,9 @@ function dxExport() {
       dxStatus('Bericht ' + (i+1) + ' von ' + liste.length + ' – ' + (liste[i].ersteller || '') + ', ' + fmtDate(liste[i].datum));
       if (btn) btn.textContent = 'Erstelle PDF… ' + (i+1) + '/' + liste.length;
 
-      htmlZuBild(liste[i].html).then(function(s) {
+      var berHtml = berichtHtml(liste[i]);
+      if (!berHtml) { setTimeout(function(){ naechster(i + 1); }, 10); return; }
+      htmlZuBild(berHtml).then(function(s) {
         if (!pdf) {
           pdf = new PDF({ orientation: s.landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
         } else {
@@ -2632,32 +2659,63 @@ function dashViewReport(id) {
   db.collection('berichte').doc(id).get().then(function(doc) {
     if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
     var d = doc.data();
-    if (d.html) {
-      var prefix = (HISTORY_FILE_PREFIXES[d.type] || 'Bericht_');
-      var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '') + '.html';
-      showPreview(d.html, fn);
-    } else {
-      toast('Kein HTML-Bericht vorhanden');
-    }
+    var html = berichtHtml(d);
+    if (!html) { toast('Bericht konnte nicht aufgebaut werden'); return; }
+    showPreview(html, berichtDateiname(d));
   });
+}
+
+/* ═══════════════════════════════════════
+   BERICHT AUS GESPEICHERTEN DATEN AUFBAUEN
+   ═══════════════════════════════════════ */
+// Berichte werden als Daten gespeichert, nicht als fertiges HTML.
+// Das spart je Tagesrapport rund 7 KB und beim Laden der Listen ein
+// Vielfaches davon, weil die Berichte nicht mehr mitgeschleppt werden.
+function berichtHtml(d) {
+  if (!d) return null;
+  // Altbestand und von Hand bearbeitete Berichte tragen ihr HTML weiterhin mit
+  if (d.html) return d.html;
+  var daten = d.daten;
+  if (!daten) return null;
+  try {
+    if (d.type === 'rapport') return buildRapportHtml(daten);
+    if (d.type === 'kontrolle') return buildReportHtml(daten);
+    if (d.type === 'rohmontage') return buildRohmontageHtml(daten);
+    if (d.type === 'fertigmontage') return buildFertigmontageHtml(daten);
+    if (d.type === 'kabelliste') return buildKabellisteHtml(daten);
+    if (d.type === 'schalter') return buildSchalterHtml(daten);
+  } catch(e) {
+    console.error('Bericht konnte nicht aufgebaut werden:', e);
+    return null;
+  }
+  return null;
+}
+
+function berichtDateiname(d) {
+  var prefix = HISTORY_FILE_PREFIXES[d.type] || 'Bericht_';
+  var ort = d.baustelle || d.site || 'Baustelle';
+  var dat = d.datum || d.date || '';
+  return prefix + String(ort).replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + dat;
 }
 
 /* ═══════════════════════════════════════
    SAVE REPORT TO FIRESTORE
    ═══════════════════════════════════════ */
-function saveReportToFirestore(type, data, html) {
+function saveReportToFirestore(type, meta, vollDaten) {
   if (!db || !currentUser) return Promise.reject(new Error('keine Verbindung'));
   var entry = {
     type: type,
-    baustelle: data.baustelle || data.site || '',
-    datum: data.datum || data.date || '',
+    baustelle: meta.baustelle || meta.site || '',
+    datum: meta.datum || meta.date || '',
     ersteller: currentUser.name,
     erstellerId: currentUser.id,
     // Firebase-Auth-Kennung des Geraets - Grundlage fuer die Sicherheitsregel
     // "nur der Ersteller darf seinen Bericht aendern"
     authUid: (fbAuth && fbAuth.currentUser) ? fbAuth.currentUser.uid : null,
-    html: html,
-    data: data,
+    // Vollstaendige Formulardaten - daraus wird der Bericht beim Ansehen
+    // neu aufgebaut. Kein fertiges HTML mehr im Dokument.
+    daten: vollDaten,
+    meta: meta,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   return db.collection('berichte').add(entry);
@@ -3066,9 +3124,9 @@ function switchModule(name, btn) {
   else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
   else if (name === 'schalter') sub.textContent = 'Schalteraufmaß';
-  else if (name === 'history') { sub.textContent = 'Berichte'; renderHistory(); }
+  else if (name === 'history') { sub.textContent = 'Berichte'; historyLimit = 20; renderHistory(); }
   else if (name === 'stammdaten') { sub.textContent = 'Stammdaten verwalten'; sdSwitchTab('mitarbeiter', document.querySelector('.sd-tab')); }
-  else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dxSetzeVorgaben(); dashLoadReports(); }
+  else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dashLimit = 20; dxSetzeVorgaben(); dashLoadReports(); }
 }
 
 /* ═══════════════════════════════════════
@@ -3174,6 +3232,34 @@ function closeLB() {
 }
 
 /* ═══════════════════════════════════════
+   SIGNATUR – Groesse beim Speichern begrenzen
+   ═══════════════════════════════════════ */
+// Die Unterschrift wird im Ausdruck hoechstens 45 mm breit dargestellt, das
+// sind bei doppelter Aufloesung rund 340 Bildpunkte. Der Zeichenbereich ist
+// aber je nach Geraet 600 Punkte breit oder mehr. Ungekuerzt macht die
+// Unterschrift den groessten Teil eines gespeicherten Berichts aus, deshalb
+// wird sie hier auf eine drucktaugliche Breite gerechnet.
+var SIG_MAX_BREITE = 400;
+
+function sigAlsBild(canvas) {
+  try {
+    if (!canvas || !canvas.width) return null;
+    if (canvas.width <= SIG_MAX_BREITE) return canvas.toDataURL('image/png');
+    var h = Math.round(canvas.height * SIG_MAX_BREITE / canvas.width);
+    var klein = document.createElement('canvas');
+    klein.width = SIG_MAX_BREITE;
+    klein.height = h;
+    var kctx = klein.getContext('2d');
+    kctx.imageSmoothingEnabled = true;
+    kctx.imageSmoothingQuality = 'high';
+    kctx.drawImage(canvas, 0, 0, SIG_MAX_BREITE, h);
+    return klein.toDataURL('image/png');
+  } catch(e) {
+    return canvas.toDataURL('image/png');
+  }
+}
+
+/* ═══════════════════════════════════════
    SIGNATURE – Baustellenkontrolle
    ═══════════════════════════════════════ */
 var sigCanvas = document.getElementById('sigCanvas');
@@ -3230,7 +3316,7 @@ function sigMove(e) {
 }
 function sigEnd() {
   sigDrawing = false;
-  sigData = sigCanvas.toDataURL('image/png');
+  sigData = sigAlsBild(sigCanvas);
 }
 function clearSig() {
   sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
@@ -3421,7 +3507,7 @@ function trSig2Move(e) {
 }
 function trSig2End() {
   trSig2Drawing = false;
-  trSig2Data = trSig2Canvas.toDataURL('image/png');
+  trSig2Data = sigAlsBild(trSig2Canvas);
 }
 function clearTrSig2() {
   if (!trSig2Ctx) return;
@@ -3474,7 +3560,7 @@ function rmSigMove(e) {
 }
 function rmSigEnd() {
   rmSigDrawing = false;
-  rmSigData = rmSigCanvas.toDataURL('image/png');
+  rmSigData = sigAlsBild(rmSigCanvas);
 }
 function clearRmSig() {
   rmSigCtx.clearRect(0, 0, rmSigCanvas.width, rmSigCanvas.height);
@@ -3525,7 +3611,7 @@ function fmSigMove(e) {
 }
 function fmSigEnd() {
   fmSigDrawing = false;
-  fmSigData = fmSigCanvas.toDataURL('image/png');
+  fmSigData = sigAlsBild(fmSigCanvas);
 }
 function clearFmSig() {
   fmSigCtx.clearRect(0, 0, fmSigCanvas.width, fmSigCanvas.height);
@@ -4345,8 +4431,8 @@ function createReport() {
   var html = buildReportHtml(data);
   var fileName = 'Kontrolle_' + data.site.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.date || 'undatiert') + '.html';
 
-  saveToHistory({ type: 'kontrolle', site: data.site, date: data.date, inspector: data.inspector, mangelCount: data.maengel.filter(function(m){ return m.text || m.fotos.length; }).length, html: html });
-  saveReportToFirestore('kontrolle', { site: data.site, date: data.date, inspector: data.inspector, baustelle: data.site, datum: data.date }, html);
+  saveToHistory({ type: 'kontrolle', site: data.site, date: data.date, inspector: data.inspector, mangelCount: data.maengel.filter(function(m){ return m.text || m.fotos.length; }).length, daten: data });
+  saveReportToFirestore('kontrolle', { baustelle: data.site, datum: data.date, inspector: data.inspector }, data);
 
   document.getElementById('statusBadge').textContent = 'Erstellt';
   document.getElementById('statusBadge').className = 'status-badge saved';
@@ -4422,10 +4508,10 @@ function createRapport() {
   var btnText = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = 'Wird eingereicht…'; }
 
-  saveToHistory({ type: 'rapport', site: label, date: data.date, workerCount: validW.length, sumStd: sumStd, html: html });
+  saveToHistory({ type: 'rapport', site: label, date: data.date, workerCount: validW.length, sumStd: sumStd, daten: data });
 
   var meta = { baustelle: label, datum: data.date, workerCount: validW.length, sumStd: sumStd };
-  mitZeitlimit(saveReportToFirestore('rapport', meta, html), 5000).then(function(ergebnis) {
+  mitZeitlimit(saveReportToFirestore('rapport', meta, data), 5000).then(function(ergebnis) {
     trSpeichertGerade = false;
     if (btn) { btn.disabled = false; btn.innerHTML = btnText; }
 
@@ -4465,8 +4551,8 @@ function createRohmontage() {
     if (it.val === 'nein') neinCount++;
   });
 
-  saveToHistory({ type: 'rohmontage', site: label, date: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount, html: html });
-  saveReportToFirestore('rohmontage', { baustelle: label, datum: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount }, html);
+  saveToHistory({ type: 'rohmontage', site: label, date: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount, daten: data });
+  saveReportToFirestore('rohmontage', { baustelle: label, datum: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount }, data);
 
   document.getElementById('statusBadge').textContent = 'Erstellt';
   document.getElementById('statusBadge').className = 'status-badge saved';
@@ -4491,8 +4577,8 @@ function createFertigmontage() {
     if (it.val === 'nein') neinCount++;
   });
 
-  saveToHistory({ type: 'fertigmontage', site: label, date: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount, html: html });
-  saveReportToFirestore('fertigmontage', { baustelle: label, datum: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount }, html);
+  saveToHistory({ type: 'fertigmontage', site: label, date: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount, daten: data });
+  saveReportToFirestore('fertigmontage', { baustelle: label, datum: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount }, data);
 
   document.getElementById('statusBadge').textContent = 'Erstellt';
   document.getElementById('statusBadge').className = 'status-badge saved';
@@ -4513,8 +4599,8 @@ function createKabelliste() {
 
   var filledRows = data.rows.filter(function(r){ return r.stromkreis; }).length;
 
-  saveToHistory({ type: 'kabelliste', site: label, date: data.datum, monteur: data.monteur, filledRows: filledRows, html: html });
-  saveReportToFirestore('kabelliste', { baustelle: label, datum: data.datum, monteur: data.monteur, filledRows: filledRows }, html);
+  saveToHistory({ type: 'kabelliste', site: label, date: data.datum, monteur: data.monteur, filledRows: filledRows, daten: data });
+  saveReportToFirestore('kabelliste', { baustelle: label, datum: data.datum, monteur: data.monteur, filledRows: filledRows }, data);
 
   document.getElementById('statusBadge').textContent = 'Erstellt';
   document.getElementById('statusBadge').className = 'status-badge saved';
@@ -4536,8 +4622,8 @@ function createSchalter() {
   var totalItems = 0;
   data.items.forEach(function(it){ totalItems += it.count; });
 
-  saveToHistory({ type: 'schalter', site: label, date: data.datum, monteur: data.monteur, totalItems: totalItems, fabrikat: data.fabrikat, html: html });
-  saveReportToFirestore('schalter', { baustelle: label, datum: data.datum, monteur: data.monteur, totalItems: totalItems, fabrikat: data.fabrikat }, html);
+  saveToHistory({ type: 'schalter', site: label, date: data.datum, monteur: data.monteur, totalItems: totalItems, fabrikat: data.fabrikat, daten: data });
+  saveReportToFirestore('schalter', { baustelle: label, datum: data.datum, monteur: data.monteur, totalItems: totalItems, fabrikat: data.fabrikat }, data);
 
   document.getElementById('statusBadge').textContent = 'Erstellt';
   document.getElementById('statusBadge').className = 'status-badge saved';
@@ -4679,6 +4765,12 @@ function showPreview(html, fileName) {
    HISTORY (localStorage)
    ═══════════════════════════════════════ */
 var historyFilter = 'all';
+var historyLimit = 20;
+
+function historyMehr() {
+  historyLimit += 20;
+  renderHistory();
+}
 
 function saveToHistory(entry) {
   try {
@@ -4692,6 +4784,7 @@ function saveToHistory(entry) {
 
 function filterHistory(type, btn) {
   historyFilter = type;
+  historyLimit = 20;
   document.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   renderHistory();
@@ -4709,17 +4802,26 @@ var HISTORY_TYPE_LABELS = {
 function renderHistory() {
   var el = document.getElementById('historyList');
 
-  // Chef sieht alle Berichte, Mitarbeiter nur die eigenen
+  // Chef sieht alle Berichte, Mitarbeiter nur die eigenen.
+  // Firestore berechnet einen Lesevorgang je Dokument -- deshalb wird hier
+  // nicht mehr die ganze Sammlung geholt: Mitarbeiter fragen serverseitig
+  // nur ihre eigenen Berichte ab, der Chef die neuesten.
   if (db && currentUser) {
     el.innerHTML = '<div class="empty-state"><p>Lade Berichte...</p></div>';
-    db.collection('berichte').get().then(function(snap) {
+    var abfrage;
+    if (isChef) {
+      abfrage = db.collection('berichte').orderBy('createdAt', 'desc').limit(historyLimit);
+    } else {
+      // Einfache Gleichheit auf einem Feld - braucht keinen zusammengesetzten Index
+      abfrage = db.collection('berichte').where('erstellerId', '==', currentUser.id);
+    }
+    abfrage.get().then(function(snap) {
       // Client-side filter and sort to avoid Firestore index requirements
       var docs = [];
       snap.forEach(function(doc) {
         var d = doc.data();
         d._id = doc.id;
         if (historyFilter !== 'all' && d.type !== historyFilter) return;
-        if (!isChef && d.erstellerId !== currentUser.id) return;
         docs.push(d);
       });
       docs.sort(function(a, b) {
@@ -4727,7 +4829,8 @@ function renderHistory() {
         var tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
         return tb - ta;
       });
-      if (docs.length > 100) docs = docs.slice(0, 100);
+      var mehrDa = docs.length > historyLimit;
+      if (docs.length > historyLimit) docs = docs.slice(0, historyLimit);
       snap = { empty: docs.length === 0, forEach: function(fn) { docs.forEach(function(d) { fn({ id: d._id, data: function() { return d; } }); }); } };
       if (snap.empty) {
         el.innerHTML = '<div class="empty-state"><div class="em-icon">&#128203;</div><p>Noch keine Berichte' + (historyFilter !== 'all' ? ' in dieser Kategorie' : '') + '.</p></div>';
@@ -4764,6 +4867,10 @@ function renderHistory() {
           + '<div class="history-actions">' + aktionen + '</div>'
           + '</div>';
       });
+      if (mehrDa || (isChef && docs.length >= historyLimit)) {
+        el.innerHTML += '<div style="padding:16px 20px">'
+          + '<button class="btn btn-secondary" onclick="historyMehr()">Weitere 20 anzeigen</button></div>';
+      }
     }).catch(function(err) {
       console.error('Load reports error:', err);
       el.innerHTML = '<div class="empty-state"><p>Fehler beim Laden: ' + err.message + '</p></div>';
@@ -4848,11 +4955,10 @@ function viewHistoryItem(id) {
   try {
     var history = JSON.parse(localStorage.getItem('eb_history') || '[]');
     var item = history.find(function(h){ return h.id === id; });
-    if (item && item.html) {
-      var prefix = HISTORY_FILE_PREFIXES[item.type] || 'Bericht_';
-      var fn = prefix + (item.site || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (item.date || '') + '.html';
-      showPreview(item.html, fn);
-    }
+    if (!item) return;
+    var html = berichtHtml(item);
+    if (!html) { toast('Bericht konnte nicht aufgebaut werden'); return; }
+    showPreview(html, berichtDateiname(item));
   } catch(e) {}
 }
 
@@ -4860,10 +4966,10 @@ function shareHistoryItem(id) {
   try {
     var history = JSON.parse(localStorage.getItem('eb_history') || '[]');
     var item = history.find(function(h){ return h.id === id; });
-    if (!item || !item.html) return;
-    var prefix = HISTORY_FILE_PREFIXES[item.type] || 'Bericht_';
-    var fn = prefix + (item.site || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (item.date || '');
-    exportPdf(item.html, fn);
+    if (!item) return;
+    var html = berichtHtml(item);
+    if (!html) { toast('Bericht konnte nicht aufgebaut werden'); return; }
+    exportPdf(html, berichtDateiname(item));
   } catch(e) {}
 }
 
@@ -4875,10 +4981,9 @@ function viewFirestoreReport(docId) {
   db.collection('berichte').doc(docId).get().then(function(doc) {
     if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
     var d = doc.data();
-    if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
-    var prefix = HISTORY_FILE_PREFIXES[d.type] || 'Bericht_';
-    var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '') + '.html';
-    showPreview(d.html, fn);
+    var html = berichtHtml(d);
+    if (!html) { toast('Bericht konnte nicht aufgebaut werden'); return; }
+    showPreview(html, berichtDateiname(d));
   }).catch(function(err) {
     toast('Fehler: ' + err.message);
   });
@@ -4889,10 +4994,9 @@ function downloadFirestoreReport(docId) {
   db.collection('berichte').doc(docId).get().then(function(doc) {
     if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
     var d = doc.data();
-    if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
-    var prefix = HISTORY_FILE_PREFIXES[d.type] || 'Bericht_';
-    var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '');
-    exportPdf(d.html, fn);
+    var html = berichtHtml(d);
+    if (!html) { toast('Bericht konnte nicht aufgebaut werden'); return; }
+    exportPdf(html, berichtDateiname(d));
   }).catch(function(err) {
     toast('Fehler: ' + err.message);
   });
@@ -4903,7 +5007,8 @@ function editFirestoreReport(docId) {
   db.collection('berichte').doc(docId).get().then(function(doc) {
     if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
     var d = doc.data();
-    if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
+    var startHtml = berichtHtml(d);
+    if (!startHtml) { toast('Bericht konnte nicht aufgebaut werden'); return; }
     if (!isChef && (!currentUser || d.erstellerId !== currentUser.id)) {
       toast('Nur eigene Berichte koennen bearbeitet werden');
       return;
@@ -4956,7 +5061,7 @@ function editFirestoreReport(docId) {
     // Write HTML into iframe and make it editable
     var iDoc = iframe.contentDocument || iframe.contentWindow.document;
     iDoc.open();
-    iDoc.write(d.html);
+    iDoc.write(startHtml);
     iDoc.close();
 
     // Make the body contentEditable for WYSIWYG editing
@@ -4985,7 +5090,7 @@ function editFirestoreReport(docId) {
       var serializer = new XMLSerializer();
       var newHtml = iDoc.documentElement.outerHTML;
       // Restore doctype if present in original
-      if (d.html.indexOf('<!DOCTYPE') !== -1 || d.html.indexOf('<!doctype') !== -1) {
+      if (startHtml.indexOf('<!DOCTYPE') !== -1 || startHtml.indexOf('<!doctype') !== -1) {
         newHtml = '<!DOCTYPE html>' + newHtml;
       }
       // Remove the edit-style we injected
@@ -4998,14 +5103,15 @@ function editFirestoreReport(docId) {
       // Remove contentEditable attribute
       iDoc.body.removeAttribute('contenteditable');
       newHtml = iDoc.documentElement.outerHTML;
-      if (d.html.indexOf('<!DOCTYPE') !== -1 || d.html.indexOf('<!doctype') !== -1) {
+      if (startHtml.indexOf('<!DOCTYPE') !== -1 || startHtml.indexOf('<!doctype') !== -1) {
         newHtml = '<!DOCTYPE html>' + newHtml;
       }
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Speichere...';
+      // Von Hand bearbeitete Berichte legen ihr HTML ab. Das ist die
+      // Ausnahme - normal gespeicherte Berichte tragen nur ihre Daten.
       var aenderung = { html: newHtml };
-      // Fehlt die Kennung noch (Altbestand), beim ersten Speichern nachtragen
       if (!d.authUid && fbAuth && fbAuth.currentUser) aenderung.authUid = fbAuth.currentUser.uid;
       db.collection('berichte').doc(docId).update(aenderung).then(function() {
         toast('Bericht gespeichert');
