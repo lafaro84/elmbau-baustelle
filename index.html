@@ -11,6 +11,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root {
   --bg: #1E1E1E;
@@ -1421,7 +1423,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.1.1';
+var APP_VERSION = 'v1.2.0';
 
 var db = null;
 var storage = null;
@@ -3396,14 +3398,6 @@ function buildRapportHtml(data) {
   var dateFmt = fmtDate(data.date);
   var validW = data.workers.filter(function(w){ return w.name; });
 
-  var sumFach = 0, sumProbe = 0, sumLehr = 0;
-  validW.forEach(function(w){
-    var s = parseFloat(w.stunden) || 0;
-    if (w.rolle === 'Facharbeiter') sumFach += s;
-    else if (w.rolle === 'Probearbeit') sumProbe += s;
-    else if (w.rolle === 'Lehrling') sumLehr += s;
-  });
-
   var taetKuerzel = '';
   if (data.taetigkeiten && data.taetigkeiten.length) {
     var map = {'Rohbau':'RB','Fertigmontage':'FM','Kundendienst':'KD','Gewährleistung':'GW','Sonstige':'So.'};
@@ -3507,17 +3501,25 @@ function buildRapportHtml(data) {
 
     // Row 3: Address2 + Kostenstelle | Projekt | Fahrer/Hinfahrt
     + '<tr>'
-    + '<td style="font-size:7px;padding:2px 3px">'
+    + '<td rowspan="2" style="font-size:7px;padding:2px 3px;vertical-align:top">'
     +   '<span style="font-size:6px">Am Mart 17 / 01561 Lampertswalde</span><br>'
     +   'Kostenstelle: <b style="color:#c00;font-size:9px">' + escHtml(data.kostenstelle || '') + '</b>'
     + '</td>'
-    + '<td style="padding:2px 4px">'
+    + '<td rowspan="2" style="padding:2px 4px;vertical-align:top">'
     +   'Projekt Nr.: <b style="color:#c00;font-size:9px">' + escHtml(data.projekt || '') + '</b>'
     +   '<span style="margin-left:20px;font-size:7px">' + escHtml(data.kategorie || '') + '</span>'
     + '</td>'
     + '<td style="font-size:7px;padding:2px 4px">'
     +   'Fahrer: <b>' + escHtml(data.fahrer || '') + '</b><br>'
     +   'Hinfahrt: <b>' + escHtml(data.hinfahrt || '') + '</b> &nbsp; Rückfahrt: <b>' + escHtml(data.rueckfahrt || '') + '</b>'
+    + '</td>'
+    + '</tr>'
+
+    // Row 4: leeres Unterschriftenfeld fuer den Chef (wird per Hand ausgefuellt)
+    + '<tr>'
+    + '<td style="padding:2px 4px;vertical-align:bottom;height:34px">'
+    +   '<div style="height:20px"></div>'
+    +   '<div style="font-size:6px;border-top:1px solid #000;padding-top:1px">Datum / Unterschrift Vorgesetzter</div>'
     + '</td>'
     + '</tr>'
     + '</table>'
@@ -4033,6 +4035,60 @@ function shareOrPreview(html, fileName, title, text) {
 /* ═══════════════════════════════════════
    PREVIEW & DOWNLOAD FALLBACK
    ═══════════════════════════════════════ */
+function exportPdf(html, fileName) {
+  if (typeof html2canvas === 'undefined' || !window.jspdf) {
+    toast('PDF-Bibliothek nicht geladen \u2013 Internetverbindung pruefen');
+    return;
+  }
+  var landscape = html.indexOf('A4 landscape') !== -1 || html.indexOf('297mm 210mm') !== -1;
+  var pageW = landscape ? 297 : 210;
+  var pageH = landscape ? 210 : 297;
+  // Querformat-Rapport: body ist 281mm breit bei 8mm Rand.
+  // Hochformat-Berichte: body 190mm + 2x10mm Padding = 210mm.
+  var offX = landscape ? 8 : 0;
+  var offY = landscape ? 8 : 0;
+  var contentW = pageW - 2 * offX;
+  var pxPerMm = 96 / 25.4;
+  var wpx = Math.round(contentW * pxPerMm);
+
+  toast('PDF wird erstellt\u2026');
+
+  var ifr = document.createElement('iframe');
+  ifr.style.cssText = 'position:fixed;left:-10000px;top:0;border:0;width:' + wpx + 'px;height:' + Math.round(pageH * pxPerMm) + 'px';
+  document.body.appendChild(ifr);
+  var idoc = ifr.contentDocument || ifr.contentWindow.document;
+  idoc.open(); idoc.write(html); idoc.close();
+
+  setTimeout(function() {
+    html2canvas(idoc.body, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      width: wpx,
+      windowWidth: wpx,
+      useCORS: true
+    }).then(function(canvas) {
+      var PDF = window.jspdf.jsPDF;
+      var pdf = new PDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+      var img = canvas.toDataURL('image/jpeg', 0.92);
+      var totalH = canvas.height * contentW / canvas.width;
+      var usableH = pageH - 2 * offY;
+      var pos = 0;
+      pdf.addImage(img, 'JPEG', offX, offY, contentW, totalH);
+      while (pos + usableH < totalH - 0.5) {
+        pos += usableH;
+        pdf.addPage();
+        pdf.addImage(img, 'JPEG', offX, offY - pos, contentW, totalH);
+      }
+      pdf.save(fileName.replace(/\.html$/i, '') + '.pdf');
+      document.body.removeChild(ifr);
+      toast('PDF heruntergeladen');
+    }).catch(function(e) {
+      if (ifr.parentNode) document.body.removeChild(ifr);
+      toast('PDF-Fehler: ' + (e && e.message ? e.message : e));
+    });
+  }, 350);
+}
+
 function showPreview(html, fileName) {
   var overlay = document.createElement('div');
   overlay.className = 'preview-overlay';
@@ -4046,8 +4102,8 @@ function showPreview(html, fileName) {
   closeBtn.onclick = function(){ document.body.removeChild(overlay); };
 
   var dlBtn = document.createElement('button');
-  dlBtn.className = 'btn btn-primary';
-  dlBtn.innerHTML = '&#11015; Herunterladen';
+  dlBtn.className = 'btn btn-secondary';
+  dlBtn.innerHTML = '&#11015; HTML';
   dlBtn.onclick = function() {
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([html], {type:'text/html'}));
@@ -4071,8 +4127,14 @@ function showPreview(html, fileName) {
     }
   };
 
+  var pdfBtn = document.createElement('button');
+  pdfBtn.className = 'btn btn-primary';
+  pdfBtn.innerHTML = '\u2193 PDF';
+  pdfBtn.onclick = function() { exportPdf(html, fileName); };
+
   bar.appendChild(closeBtn);
   bar.appendChild(shareBtn);
+  bar.appendChild(pdfBtn);
   bar.appendChild(dlBtn);
 
   var body = document.createElement('div');
