@@ -664,6 +664,34 @@ body {
   font-weight: 600; cursor: pointer;
 }
 
+/* ── Auswahlkaestchen im Sammel-Export ──
+   Die allgemeine Regel .field input setzt -webkit-appearance:none und
+   uebernimmt Polsterung, Rahmen und Hintergrund. Auf einer Checkbox
+   heisst das: kein Haken sichtbar, nur ein gruenes Aufleuchten beim
+   Fokus. Hier die native Darstellung zurueckholen. */
+#dx-nutzer input[type=checkbox] {
+  -webkit-appearance: checkbox;
+  appearance: checkbox;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+#dx-nutzer input[type=checkbox]:focus {
+  box-shadow: none;
+  border: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+#dx-nutzer label:hover { background: var(--surface-alt); border-radius: var(--radius-sm); }
+
 /* ── Chef nav items ── */
 .module-btn.chef-only { border-color: rgba(255,255,255,.35); }
 
@@ -1459,7 +1487,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.10.0';
+var APP_VERSION = 'v1.10.1';
 
 var db = null;
 var storage = null;
@@ -2484,8 +2512,7 @@ function dxFuelleNutzer() {
   dashErsteller.forEach(function(name) {
     var an = (vorher[name] === undefined) ? true : vorher[name];
     html += '<label style="display:flex;align-items:center;gap:10px;padding:6px 2px;font-size:14px;cursor:pointer">'
-      + '<input type="checkbox" value="' + escHtml(name) + '"' + (an ? ' checked' : '')
-      + ' style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent)">'
+      + '<input type="checkbox" value="' + escHtml(name) + '"' + (an ? ' checked' : '') + '>'
       + '<span>' + escHtml(name) + '</span></label>';
   });
   el.innerHTML = html;
