@@ -722,8 +722,12 @@ body {
     <button class="btn btn-secondary" onclick="showAdminLogin()" style="font-size:13px">Chef-Zugang (Ersteinrichtung)</button>
     <div id="admin-login-area" style="display:none;margin-top:12px">
       <div class="field">
-        <label for="admin-pw">Admin-Passwort</label>
-        <input type="password" id="admin-pw" placeholder="Master-Passwort">
+        <label for="admin-mail">E-Mail</label>
+        <input type="email" id="admin-mail" autocomplete="username" placeholder="chef@elmbau.de">
+      </div>
+      <div class="field">
+        <label for="admin-pw">Passwort</label>
+        <input type="password" id="admin-pw" autocomplete="current-password" placeholder="Passwort">
       </div>
       <button class="btn btn-primary" onclick="doAdminLogin()" style="margin-top:8px">Als Chef anmelden</button>
     </div>
@@ -1360,9 +1364,10 @@ body {
     <!-- Einstellungen -->
     <div class="sd-panel" id="sd-einstellungen" style="display:none">
       <div class="sd-form">
-        <div class="section-label" style="margin-bottom:10px">Admin-Passwort &auml;ndern</div>
-        <div class="field"><label>Neues Passwort</label><input type="password" id="sd-admin-pw" placeholder="Neues Master-Passwort"></div>
-        <div class="field"><label>Best&auml;tigen</label><input type="password" id="sd-admin-pw2" placeholder="Passwort wiederholen"></div>
+        <div class="section-label" style="margin-bottom:10px">Chef-Passwort &auml;ndern</div>
+        <div class="field"><label>Angemeldet als</label><input type="text" id="sd-admin-mail" readonly style="opacity:.6"></div>
+        <div class="field"><label>Neues Passwort (mind. 6 Zeichen)</label><input type="password" id="sd-admin-pw" autocomplete="new-password" placeholder="Neues Passwort"></div>
+        <div class="field"><label>Best&auml;tigen</label><input type="password" id="sd-admin-pw2" autocomplete="new-password" placeholder="Passwort wiederholen"></div>
         <button class="btn btn-primary" onclick="sdChangeAdminPw()" style="margin-top:8px">Passwort &auml;ndern</button>
       </div>
       <div class="sd-form" style="margin-top:16px">
@@ -1424,7 +1429,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.8.1';
+var APP_VERSION = 'v1.9.0';
 
 var db = null;
 var storage = null;
@@ -1592,42 +1597,41 @@ function doLogin() {
 }
 
 function doAdminLogin() {
-  var pw = document.getElementById('admin-pw').value.trim();
+  var mail = document.getElementById('admin-mail').value.trim();
+  var pw = document.getElementById('admin-pw').value;
   var errEl = document.getElementById('login-error');
   errEl.textContent = '';
+  if (!mail) { errEl.textContent = 'Bitte E-Mail eingeben'; return; }
   if (!pw) { errEl.textContent = 'Bitte Passwort eingeben'; return; }
 
-  db.collection('config').doc('admin').get().then(function(doc) {
-    if (!doc.exists) {
-      // First-time setup: create admin config with this password
-      return db.collection('config').doc('admin').set({ password: pw }).then(function() {
-        // Also create a chef user entry if none exists
-        return db.collection('mitarbeiter').add({
-          name: 'Chef', rolle: 'chef', pin: '0000', aktiv: true
-        }).then(function(ref) {
-          currentUser = { id: ref.id, name: 'Chef', rolle: 'chef', pin: '0000' };
-          isChef = true;
-          toast('Admin-Zugang eingerichtet! Bitte Stammdaten pflegen.');
-          afterLogin();
-        });
-      });
-    }
-    var d = doc.data();
-    if (d.password !== pw) { errEl.textContent = 'Falsches Passwort'; return; }
-    // Find chef user
-    return db.collection('mitarbeiter').where('rolle', '==', 'chef').limit(1).get().then(function(snap) {
-      if (snap.empty) {
-        currentUser = { id: 'admin', name: 'Chef', rolle: 'chef', pin: '' };
-      } else {
-        var chefDoc = snap.docs[0];
-        var cd = chefDoc.data();
-        currentUser = { id: chefDoc.id, name: cd.name, rolle: 'chef', pin: cd.pin };
+  errEl.textContent = 'Anmeldung läuft…';
+  fbAuth.signInWithEmailAndPassword(mail, pw).then(function(cred) {
+    // Ein Konto allein reicht nicht: die Kennung muss in der Sammlung
+    // 'chefs' hinterlegt sein. Die wird nur ueber die Firebase-Konsole
+    // gepflegt, damit sich niemand selbst zum Chef machen kann.
+    return db.collection('chefs').doc(cred.user.uid).get().then(function(doc) {
+      if (!doc.exists) {
+        errEl.textContent = 'Dieses Konto ist nicht als Chef freigeschaltet';
+        return fbAuth.signInAnonymously().then(function(){ return null; });
       }
+      var d = doc.data() || {};
+      currentUser = { id: cred.user.uid, name: d.name || 'Chef', rolle: 'chef', pin: '' };
       isChef = true;
+      errEl.textContent = '';
+      document.getElementById('admin-pw').value = '';
       afterLogin();
+      return null;
     });
   }).catch(function(err) {
-    errEl.textContent = 'Fehler: ' + err.message;
+    var meldung = 'Anmeldung fehlgeschlagen';
+    if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') meldung = 'E-Mail oder Passwort falsch';
+    else if (err.code === 'auth/user-not-found') meldung = 'Konto nicht gefunden';
+    else if (err.code === 'auth/too-many-requests') meldung = 'Zu viele Versuche – bitte später erneut';
+    else if (err.code === 'auth/invalid-email') meldung = 'E-Mail-Adresse ungültig';
+    else if (err.message) meldung = err.message;
+    errEl.textContent = meldung;
+    // zurueck in die anonyme Sitzung, sonst haengt die App in einem Zwischenzustand
+    fbAuth.signInAnonymously().catch(function(){});
   });
 }
 
@@ -1657,7 +1661,14 @@ function doLogout() {
   currentUser = null;
   isChef = false;
   document.getElementById('login-pin').value = '';
+  var am = document.getElementById('admin-mail'); if (am) am.value = '';
+  var ap = document.getElementById('admin-pw'); if (ap) ap.value = '';
   document.getElementById('login-error').textContent = '';
+  // Chef-Sitzung beenden und wieder anonym anmelden, damit die
+  // Mitarbeiter-Anmeldung danach normal funktioniert
+  if (fbAuth) {
+    fbAuth.signInAnonymously().catch(function(err){ console.warn('Anon-Anmeldung:', err); });
+  }
   showLoginScreen();
 }
 
@@ -2278,17 +2289,31 @@ function sdDeleteKostenstelle(id) {
 function sdLoadSettings() {
   var cfg = getFirebaseConfig();
   document.getElementById('sd-fb-project').value = cfg ? cfg.projectId : '—';
+  var mailEl = document.getElementById('sd-admin-mail');
+  if (mailEl) {
+    mailEl.value = (fbAuth && fbAuth.currentUser && fbAuth.currentUser.email) ? fbAuth.currentUser.email : '—';
+  }
 }
 
 function sdChangeAdminPw() {
   var pw1 = document.getElementById('sd-admin-pw').value;
   var pw2 = document.getElementById('sd-admin-pw2').value;
-  if (!pw1 || pw1.length < 4) { toast('Passwort muss mindestens 4 Zeichen haben'); return; }
+  if (!pw1 || pw1.length < 6) { toast('Passwort muss mindestens 6 Zeichen haben'); return; }
   if (pw1 !== pw2) { toast('Passwörter stimmen nicht überein'); return; }
-  db.collection('config').doc('admin').set({ password: pw1 }, { merge: true }).then(function() {
+  if (!fbAuth || !fbAuth.currentUser || !fbAuth.currentUser.email) {
+    toast('Kein Chef-Konto angemeldet'); return;
+  }
+  // Aendert das Passwort des Firebase-Kontos, nicht mehr einen Eintrag in der Datenbank
+  fbAuth.currentUser.updatePassword(pw1).then(function() {
     toast('Passwort geändert');
     document.getElementById('sd-admin-pw').value = '';
     document.getElementById('sd-admin-pw2').value = '';
+  }).catch(function(err) {
+    if (err.code === 'auth/requires-recent-login') {
+      toast('Bitte neu anmelden und direkt danach ändern');
+    } else {
+      toast('Fehler: ' + (err.message || err.code));
+    }
   });
 }
 
