@@ -1,0 +1,4589 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Elmbau Baustelle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<style>
+:root {
+  --bg: #1E1E1E;
+  --surface: #2A2A2A;
+  --surface-alt: #333333;
+  --text: #F0F0F0;
+  --text-muted: #B0B0B0;
+  --text-faint: #777777;
+  --border: #3D3D3D;
+  --border-strong: #555555;
+  --accent: #009959;
+  --accent-light: #0D3324;
+  --accent-dark: #00B368;
+  --danger: #E05545;
+  --danger-light: #3A1C18;
+  --success: #00B368;
+  --success-light: #0D3324;
+  --info: #60A5FA;
+  --info-light: #1E293B;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.35);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: 'Open Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --header-bg: #009959;
+  --header-text: #FFFFFF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 0 100px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── Header ── */
+.app-header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--header-bg);
+  border-bottom: none;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.app-header .logo {
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,.2);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 18px; flex-shrink: 0;
+}
+.app-header h1 {
+  font-size: 17px; font-weight: 700; margin: 0;
+  letter-spacing: -0.01em;
+  color: var(--header-text);
+}
+.app-header .subtitle {
+  font-size: 12px; color: rgba(255,255,255,.75); font-weight: 400;
+  margin-top: 1px;
+}
+.status-badge {
+  margin-left: auto;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.2);
+  color: #fff;
+  white-space: nowrap;
+}
+.status-badge.saved {
+  background: rgba(255,255,255,.3);
+  color: #fff;
+}
+
+/* ── Module Nav ── */
+.module-nav {
+  display: flex;
+  flex-wrap: wrap;
+  background: #00703A;
+  border-bottom: none;
+  position: sticky; top: 63px; z-index: 99;
+  padding: 8px 10px;
+  gap: 6px;
+}
+.module-nav::-webkit-scrollbar { display: none; }
+.module-btn {
+  flex: 1 0 auto;
+  padding: 8px 10px;
+  font-family: var(--font);
+  font-size: 11px; font-weight: 600;
+  text-align: center;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2);
+  color: rgba(255,255,255,.7);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all .15s;
+  white-space: nowrap;
+}
+.module-btn.active {
+  background: #fff;
+  border-color: #fff;
+  color: #00703A;
+}
+.module-btn:hover:not(.active) { color: #fff; border-color: rgba(255,255,255,.5); }
+.module-panel { display: none; }
+.module-panel.active { display: block; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  flex: 1;
+  padding: 12px;
+  font-family: var(--font);
+  font-size: 13px; font-weight: 600;
+  text-align: center;
+  background: none; border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .15s;
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-btn:hover:not(.active) { color: var(--text); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Form ── */
+.section { padding: 20px; }
+.section + .section { border-top: 6px solid var(--surface-alt); }
+.section-label {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin-bottom: 14px;
+}
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-size: 13px; font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.field input, .field textarea, .field select {
+  width: 100%;
+  font-family: var(--font);
+  font-size: 16px;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color .15s;
+  -webkit-appearance: none;
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+.row { display: flex; gap: 12px; }
+.row > .field { flex: 1; min-width: 0; }
+
+/* ── Toggle Chips ── */
+.chip-group {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.chip-toggle {
+  font-family: var(--font);
+  font-size: 13px; font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.chip-toggle.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chip-toggle:hover:not(.active) { border-color: var(--border-strong); }
+
+/* ── Mangel / Worker Items ── */
+.mangel-item, .worker-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  position: relative;
+}
+.mangel-num, .worker-num {
+  font-family: var(--mono);
+  font-size: 12px; font-weight: 500;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.mangel-remove, .worker-remove {
+  position: absolute; top: 12px; right: 12px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-faint); font-size: 18px;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  transition: all .15s;
+}
+.mangel-remove:hover, .mangel-remove:focus-visible,
+.worker-remove:hover, .worker-remove:focus-visible {
+  background: var(--danger-light); color: var(--danger);
+}
+
+/* ── Worker inline chips ── */
+.worker-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+}
+.worker-chip {
+  font-family: var(--font);
+  font-size: 11px; font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.worker-chip.active {
+  background: var(--info-light);
+  border-color: var(--info);
+  color: var(--info);
+}
+
+/* ── Speech-to-Text Mic Button ── */
+.mic-wrap { position: relative; }
+.mic-wrap textarea { padding-right: 44px; }
+.mic-btn {
+  position: absolute; right: 8px; bottom: 10px;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: var(--surface-alt); color: var(--text-muted);
+  font-size: 18px; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.mic-btn:hover { background: var(--accent); color: #fff; }
+.mic-btn.recording {
+  background: var(--danger); color: #fff;
+  animation: mic-pulse 1s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+/* ── Photos ── */
+.photo-grid {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 8px;
+}
+.photo-wrap {
+  position: relative;
+  width: 72px; height: 72px;
+}
+.photo-thumb {
+  width: 72px; height: 72px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.photo-del {
+  position: absolute; top: -6px; right: -6px;
+  width: 22px; height: 22px;
+  background: var(--danger); color: #fff;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  font-size: 12px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.photo-add {
+  width: 72px; height: 72px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--text-faint);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.photo-add:hover, .photo-add:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+/* ── Signature ── */
+.sig-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+}
+.sig-wrap canvas { display: block; width: 100%; cursor: crosshair; }
+.sig-hint {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-faint); font-size: 14px;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.sig-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+
+/* ── Buttons ── */
+.btn-sm {
+  font-family: var(--font);
+  font-size: 12px; font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-sm:hover { border-color: var(--border-strong); color: var(--text); }
+.btn {
+  font-family: var(--font);
+  font-size: 15px; font-weight: 600;
+  padding: 14px 24px;
+  border-radius: var(--radius);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%;
+  transition: all .15s;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--surface-alt); }
+.btn-danger-outline { background: none; color: var(--danger); border: 1px solid var(--danger); }
+.btn-danger-outline:hover:not(:disabled) { background: var(--danger-light); }
+.action-bar { display: flex; flex-direction: column; gap: 10px; padding: 20px; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  top: 80px; left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  background: var(--text); color: var(--bg);
+  padding: 12px 20px; border-radius: 30px;
+  font-size: 14px; font-weight: 500;
+  box-shadow: var(--shadow-md);
+  opacity: 0; transition: all .3s ease;
+  z-index: 200; white-space: nowrap;
+  max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* ── Lightbox ── */
+.lightbox {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.88);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 300; padding: 20px;
+}
+.lightbox img { max-width: 100%; max-height: 90vh; border-radius: var(--radius); }
+.lightbox-close {
+  position: absolute; top: 16px; right: 16px;
+  background: rgba(255,255,255,.2);
+  border: none; color: #fff;
+  width: 40px; height: 40px; border-radius: 50%;
+  font-size: 20px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── History ── */
+.history-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.history-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.history-dot.kontrolle { background: var(--accent); }
+.history-dot.rapport { background: var(--info); }
+.history-dot.rohmontage { background: var(--success); }
+.history-dot.fertigmontage { background: var(--danger); }
+.history-dot.kabelliste { background: #A78BFA; }
+.history-dot.schalter { background: #F472B6; }
+.history-info { flex: 1; min-width: 0; }
+.history-title { font-size: 15px; font-weight: 500; }
+.history-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.history-type {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 2px 8px; border-radius: 10px;
+  display: inline-block; margin-top: 3px;
+}
+.history-type.kontrolle { background: var(--accent-light); color: var(--accent); }
+.history-type.rapport { background: var(--info-light); color: var(--info); }
+.history-type.rohmontage { background: var(--success-light); color: var(--success); }
+.history-type.fertigmontage { background: var(--danger-light); color: var(--danger); }
+.history-type.kabelliste { background: #2D1F5E; color: #A78BFA; }
+.history-type.schalter { background: #4A1942; color: #F472B6; }
+.history-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.history-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted);
+  cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.history-btn:hover { border-color: var(--accent); color: var(--accent); }
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-faint);
+}
+.empty-state .em-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; line-height: 1.5; max-width: 260px; margin: 0 auto; }
+
+/* ── Preview overlay ── */
+.preview-overlay {
+  position: fixed; inset: 0; z-index: 250;
+  background: var(--bg);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.preview-bar {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.preview-bar .btn { width: auto; padding: 10px 18px; }
+.preview-body { padding: 16px; }
+.preview-body iframe {
+  width: 100%; border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff; min-height: 80vh;
+}
+/* ── Elmbau Green Header Gradient ── */
+.app-header { background: linear-gradient(135deg, #009959 0%, #00703A 100%); }
+
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin .6s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Summary row ── */
+.summary-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  margin-top: 12px;
+}
+.summary-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.summary-value { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--accent); }
+
+/* ── Filter tabs for history ── */
+.filter-tabs {
+  display: flex; gap: 6px; padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto; flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-tabs::-webkit-scrollbar { display: none; }
+.filter-tab {
+  font-family: var(--font);
+  font-size: 12px; font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.filter-tab.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Checklist styles ── */
+.cl-category { font-size:13px; font-weight:700; color:var(--accent); padding:12px 20px 6px; text-transform:uppercase; letter-spacing:0.04em; }
+.cl-item { display:flex; align-items:center; gap:8px; padding:8px 20px; border-bottom:1px solid var(--border); }
+.cl-item .cl-label { flex:1; font-size:14px; min-width:0; }
+.cl-btns { display:flex; gap:4px; flex-shrink:0; }
+.cl-btn { width:36px; height:32px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface); color:var(--text-muted); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); }
+.cl-btn.yes { background:var(--success-light); border-color:var(--success); color:var(--success); }
+.cl-btn.no { background:var(--danger-light); border-color:var(--danger); color:var(--danger); }
+.cl-bem { width:100px; font-size:12px; padding:6px 8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); font-family:var(--font); }
+
+/* ── Schalter counter ── */
+.cnt-wrap { display:flex; align-items:center; gap:0; }
+.cnt-btn { width:36px; height:36px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); font-size:18px; font-weight:700; cursor:pointer; font-family:var(--font); }
+.cnt-btn:first-child { border-radius:var(--radius-sm) 0 0 var(--radius-sm); }
+.cnt-btn:last-child { border-radius:0 var(--radius-sm) var(--radius-sm) 0; }
+.cnt-val { width:44px; height:36px; text-align:center; border:1px solid var(--border); border-left:none; border-right:none; background:var(--surface); font-family:var(--mono); font-size:15px; font-weight:600; color:var(--text); }
+
+/* ── Kabelliste table ── */
+.kl-table { width:100%; border-collapse:collapse; font-size:13px; }
+.kl-table th { background:var(--surface-alt); padding:8px 6px; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; border:1px solid var(--border); }
+.kl-table td { padding:4px 6px; border:1px solid var(--border); }
+.kl-table input { width:100%; border:none; background:transparent; font-family:var(--font); font-size:14px; padding:4px 0; color:var(--text); outline:none; }
+.kl-nr { text-align:center; font-family:var(--mono); font-size:12px; color:var(--text-muted); width:35px; }
+
+/* ── Schalter table ── */
+.sc-table { width:100%; border-collapse:collapse; font-size:13px; }
+.sc-table th { background:var(--surface-alt); padding:8px 6px; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; border:1px solid var(--border); }
+.sc-table td { padding:6px 8px; border:1px solid var(--border); vertical-align:middle; }
+.sc-nr { text-align:center; font-family:var(--mono); font-size:12px; color:var(--text-muted); width:35px; }
+.sc-label { font-size:13px; }
+
+/* ── Fabrikat radio ── */
+.fab-group { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+/* ── Firebase Setup & Login Screens ── */
+.fb-screen {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+.fb-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  width: 100%; max-width: 420px;
+  box-shadow: var(--shadow-md);
+}
+.fb-card h2 {
+  font-size: 20px; font-weight: 700; text-align: center;
+  margin-bottom: 4px; color: var(--text);
+}
+.fb-card .fb-sub {
+  font-size: 13px; color: var(--text-muted); text-align: center;
+  margin-bottom: 24px;
+}
+.fb-card .field { margin-bottom: 14px; }
+.fb-card .field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
+.fb-card .field input, .fb-card .field select, .fb-card .field textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface-alt);
+  color: var(--text); font-family: var(--font); font-size: 14px;
+}
+.fb-card .field textarea { min-height: 100px; font-family: var(--mono); font-size: 12px; resize: vertical; }
+.fb-card .field select { appearance: auto; }
+.fb-logo {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: linear-gradient(135deg, #009959 0%, #00703A 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 16px; color: #fff;
+}
+.fb-error { color: var(--danger); font-size: 13px; margin-top: 8px; text-align: center; }
+.fb-info { color: var(--info); font-size: 13px; margin-top: 8px; text-align: center; }
+.fb-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ── Stammdaten Admin ── */
+.sd-tabs {
+  display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 16px;
+}
+.sd-tab {
+  flex: 1; padding: 10px; text-align: center; font-size: 13px; font-weight: 600;
+  color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; background: none; border-left: none; border-right: none; border-top: none;
+  font-family: var(--font);
+}
+.sd-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sd-list { display: flex; flex-direction: column; gap: 8px; }
+.sd-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; background: var(--surface-alt);
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+}
+.sd-item-info { flex: 1; min-width: 0; }
+.sd-item-name { font-size: 14px; font-weight: 600; }
+.sd-item-meta { font-size: 12px; color: var(--text-muted); }
+.sd-item-actions { display: flex; gap: 6px; }
+.sd-item-actions button {
+  width: 34px; height: 34px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-muted); font-size: 14px; cursor: pointer;
+  font-family: var(--font);
+}
+.sd-item-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.sd-item-actions button.sd-del:hover { border-color: var(--danger); color: var(--danger); }
+.sd-form {
+  background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
+}
+.sd-form .row { display: flex; gap: 12px; }
+.sd-form .row .field { flex: 1; }
+
+/* ── Dashboard ── */
+.dash-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;
+}
+.dash-stat {
+  background: var(--surface-alt); border-radius: var(--radius-sm);
+  padding: 14px 12px; text-align: center; border: 1px solid var(--border);
+}
+.dash-stat-val { font-size: 22px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+.dash-stat-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+.dash-filters {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.dash-filters select, .dash-filters input {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-alt); color: var(--text); font-family: var(--font); font-size: 13px;
+  flex: 1; min-width: 120px;
+}
+.dash-report {
+  background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 8px;
+  cursor: pointer; transition: border-color .15s;
+}
+.dash-report:hover { border-color: var(--accent); }
+.dash-report-head { display: flex; justify-content: space-between; align-items: center; }
+.dash-report-title { font-size: 14px; font-weight: 600; }
+.dash-report-meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.dash-report-type {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 12px; text-transform: uppercase;
+}
+.dash-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.dash-empty .em-icon { font-size: 40px; margin-bottom: 8px; }
+.user-badge {
+  font-size: 11px; padding: 3px 10px; border-radius: 12px;
+  background: var(--accent-light); color: var(--accent);
+  font-weight: 600; cursor: pointer;
+}
+
+/* ── Chef nav items ── */
+.module-btn.chef-only { border-color: rgba(255,255,255,.35); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     FIREBASE SETUP SCREEN
+     ═══════════════════════════════════════ -->
+<div class="fb-screen" id="screen-setup" style="display:none">
+  <div class="fb-card">
+    <div class="fb-logo">&#9874;</div>
+    <h2>Firebase einrichten</h2>
+    <p class="fb-sub">Einmalige Einrichtung &ndash; Daten aus der Firebase-Konsole eintragen</p>
+    <div class="field">
+      <label for="cfg-json">Firebase Config (JSON)</label>
+      <textarea id="cfg-json" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+    </div>
+    <div class="fb-error" id="cfg-error"></div>
+    <button class="btn btn-primary" onclick="saveFirebaseConfig()" style="margin-top:12px">Speichern &amp; weiter</button>
+    <div class="fb-info" style="margin-top:16px">
+      Anleitung: Firebase-Konsole &rarr; Projekt erstellen &rarr; Web-App hinzuf&uuml;gen &rarr; Config-JSON hier einf&uuml;gen.<br>
+      Unter Authentication &rarr; Anonymous aktivieren.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     LOGIN SCREEN
+     ═══════════════════════════════════════ -->
+<div class="fb-screen" id="screen-login" style="display:none">
+  <div class="fb-card">
+    <div class="fb-logo">&#9874;</div>
+    <h2>Elmbau Baustelle</h2>
+    <p class="fb-sub">Anmeldung</p>
+    <div class="field">
+      <label for="login-user">Mitarbeiter</label>
+      <select id="login-user">
+        <option value="">Bitte w&auml;hlen&hellip;</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="login-pin">PIN</label>
+      <input type="password" id="login-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="4-6 stellige PIN">
+    </div>
+    <div class="fb-error" id="login-error"></div>
+    <button class="btn btn-primary" onclick="doLogin()" style="margin-top:12px">Anmelden</button>
+    <hr class="fb-divider">
+    <button class="btn btn-secondary" onclick="showAdminLogin()" style="font-size:13px">Chef-Zugang (Ersteinrichtung)</button>
+    <div id="admin-login-area" style="display:none;margin-top:12px">
+      <div class="field">
+        <label for="admin-pw">Admin-Passwort</label>
+        <input type="password" id="admin-pw" placeholder="Master-Passwort">
+      </div>
+      <button class="btn btn-primary" onclick="doAdminLogin()" style="margin-top:8px">Als Chef anmelden</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MAIN APP (hidden until logged in)
+     ═══════════════════════════════════════ -->
+<div id="app-main" style="display:none">
+
+<!-- ── HEADER ── -->
+<div class="app-header">
+  <div class="logo">&#9874;</div>
+  <div>
+    <h1>Elmbau Baustelle</h1>
+    <div class="subtitle" id="headerSubtitle">Digitale Baustellenformulare</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="user-badge" id="currentUserBadge" onclick="doLogout()" title="Abmelden"></span>
+    <div class="status-badge" id="statusBadge"></div>
+  </div>
+</div>
+
+<!-- ── MODULE NAV ── -->
+<div class="module-nav">
+  <button class="module-btn active" onclick="switchModule('kontrolle',this)">Kontrolle</button>
+  <button class="module-btn" onclick="switchModule('rapport',this)">Rapport</button>
+  <button class="module-btn" onclick="switchModule('rohmontage',this)">Rohmontage</button>
+  <button class="module-btn" onclick="switchModule('fertigmontage',this)">Fertigm.</button>
+  <button class="module-btn" onclick="switchModule('kabelliste',this)">Kabelliste</button>
+  <button class="module-btn" onclick="switchModule('schalter',this)">Schalter</button>
+  <button class="module-btn" onclick="switchModule('history',this)">Berichte</button>
+  <button class="module-btn chef-only" id="nav-stammdaten" onclick="switchModule('stammdaten',this)" style="display:none">Stammdaten</button>
+  <button class="module-btn chef-only" id="nav-dashboard" onclick="switchModule('dashboard',this)" style="display:none">Dashboard</button>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: BAUSTELLENKONTROLLE
+     ═══════════════════════════════════════ -->
+<div class="module-panel active" id="mod-kontrolle">
+
+  <div class="section">
+    <div class="section-label">Stammdaten</div>
+    <div class="field">
+      <label for="f-site">Baustelle</label>
+      <select id="f-site" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="f-date">Datum</label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="field">
+        <label for="f-inspector">Prüfer</label>
+        <input type="text" id="f-inspector" placeholder="Ihr Name">
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Mängelliste</div>
+    <div id="maengelList"></div>
+    <button class="btn btn-secondary" onclick="addMangel()" style="margin-top:8px">
+      + Mangel hinzufügen
+    </button>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Unterschrift Prüfer</div>
+    <div class="sig-wrap" id="sigWrap">
+      <canvas id="sigCanvas" height="160"></canvas>
+      <div class="sig-hint" id="sigHint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn-sm" onclick="clearSig()">Löschen</button>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="createReport()">
+      Bericht erstellen &amp; teilen
+    </button>
+    <button class="btn btn-danger-outline" onclick="resetForm()">
+      Formular zurücksetzen
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: TAGESRAPPORT
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-rapport">
+
+  <div class="section">
+    <div class="section-label">Projektdaten</div>
+    <div class="field">
+      <label for="tr-date">Datum</label>
+      <input type="date" id="tr-date">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="tr-kostenstelle">Kostenstelle</label>
+        <input type="text" id="tr-kostenstelle" placeholder="Kostenstelle" readonly style="cursor:default">
+      </div>
+      <div class="field">
+        <label for="tr-projekt">Projekt Nr.</label>
+        <input type="text" id="tr-projekt" placeholder="el-Nr." readonly style="cursor:default">
+      </div>
+    </div>
+    <div class="field">
+      <label for="tr-baustelle">Bauvorhaben</label>
+      <select id="tr-baustelle" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+    </div>
+    <div class="field">
+      <label>Kategorie</label>
+      <div class="chip-group" id="tr-kategorie">
+        <button class="chip-toggle active" data-val="Elektro" onclick="setKategorie(this)">Elektro</button>
+        <button class="chip-toggle" data-val="Elmbau" onclick="setKategorie(this)">Elmbau</button>
+        <button class="chip-toggle" data-val="Lager" onclick="setKategorie(this)">Lager</button>
+        <button class="chip-toggle" data-val="Sonstiges" onclick="setKategorie(this)">Sonstiges</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Arbeitszeit</div>
+    <div class="row">
+      <div class="field">
+        <label for="tr-beginn">Beginn</label>
+        <input type="time" id="tr-beginn" value="07:00" onchange="calcArbeitszeit()">
+      </div>
+      <div class="field">
+        <label for="tr-ende">Ende</label>
+        <input type="time" id="tr-ende" value="16:00" onchange="calcArbeitszeit()">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="tr-pause1-von">Pause 1 von</label>
+        <input type="time" id="tr-pause1-von" value="09:30" onchange="calcArbeitszeit()">
+      </div>
+      <div class="field">
+        <label for="tr-pause1-bis">Pause 1 bis</label>
+        <input type="time" id="tr-pause1-bis" value="09:45" onchange="calcArbeitszeit()">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="tr-pause2-von">Pause 2 von</label>
+        <input type="time" id="tr-pause2-von" value="12:00" onchange="calcArbeitszeit()">
+      </div>
+      <div class="field">
+        <label for="tr-pause2-bis">Pause 2 bis</label>
+        <input type="time" id="tr-pause2-bis" value="12:30" onchange="calcArbeitszeit()">
+      </div>
+    </div>
+    <div class="row" style="align-items:center;margin-top:8px">
+      <div class="field" style="flex:0 0 auto">
+        <label class="toggle-wrap" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-muted)">
+          <input type="checkbox" id="tr-az-auto" checked onchange="calcArbeitszeit()" style="width:18px;height:18px;accent-color:var(--accent)">
+          Auto-Berechnung
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Personal &amp; Stunden</div>
+    <div id="workerList"></div>
+    <button class="btn btn-secondary" onclick="addWorker()" style="margin-top:8px">
+      + Mitarbeiter hinzufügen
+    </button>
+    <div class="summary-row" id="tr-stunden-summe" hidden>
+      <span class="summary-label">Summe Stunden</span>
+      <span class="summary-value" id="tr-summe-val">0</span>
+    </div>
+    <div style="margin-top:12px;padding:12px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:600;color:var(--accent-dark)">Netto-Arbeitszeit</span>
+      <span id="tr-az-display" style="font-size:18px;font-weight:700;color:var(--accent-dark);letter-spacing:0.02em">—</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Fahrt</div>
+    <div class="row">
+      <div class="field">
+        <label for="tr-fahrzeug">Fahrzeug</label>
+        <select id="tr-fahrzeug">
+          <option value="">— Auswählen —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tr-km">Entfernung km</label>
+        <input type="number" id="tr-km" placeholder="ab 50 km" min="0">
+      </div>
+    </div>
+    <div class="field">
+      <label for="tr-fahrer">Fahrer</label>
+      <select id="tr-fahrer">
+        <option value="">— Auswählen —</option>
+      </select>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="tr-hinfahrt">Hinfahrt</label>
+        <input type="time" id="tr-hinfahrt">
+      </div>
+      <div class="field">
+        <label for="tr-rueckfahrt">Rückfahrt</label>
+        <input type="time" id="tr-rueckfahrt">
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Ausgeführte Arbeiten</div>
+    <div class="field">
+      <label>Tätigkeit</label>
+      <div class="chip-group" id="tr-taetigkeit">
+        <button class="chip-toggle" data-val="RB" onclick="toggleTaetigkeit(this)">RB – Rohbau</button>
+        <button class="chip-toggle" data-val="FM" onclick="toggleTaetigkeit(this)">FM – Fertigm.</button>
+        <button class="chip-toggle" data-val="KD" onclick="toggleTaetigkeit(this)">KD – Kundend.</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="tr-arbeiten">Beschreibung</label>
+      <div class="mic-wrap"><textarea id="tr-arbeiten" placeholder="Was wurde heute gemacht?"></textarea><button type="button" class="mic-btn" onclick="startDictation('tr-arbeiten',this)" title="Spracheingabe">&#127908;</button></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Bemerkungen</div>
+    <div class="field">
+      <label for="tr-bemerkungen">Anmerkungen / Urlaubswünsche</label>
+      <div class="mic-wrap"><textarea id="tr-bemerkungen" placeholder="Besondere Vorkommnisse, Urlaubswünsche etc."></textarea><button type="button" class="mic-btn" onclick="startDictation('tr-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Unterschrift Vorgesetzter</div>
+    <div class="sig-wrap" id="trSigWrap">
+      <canvas id="trSigCanvas" height="160"></canvas>
+      <div class="sig-hint" id="trSigHint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn-sm" onclick="clearTrSig()">Löschen</button>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="createRapport()">
+      Tagesrapport erstellen &amp; teilen
+    </button>
+    <button class="btn btn-danger-outline" onclick="resetRapport()">
+      Formular zurücksetzen
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: ROHMONTAGE
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-rohmontage">
+
+  <div class="section">
+    <div class="section-label">Projektdaten</div>
+    <div class="row">
+      <div class="field">
+        <label for="rm-bv">BV</label>
+        <select id="rm-bv" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+      </div>
+      <div class="field">
+        <label for="rm-projekt">Projekt</label>
+        <input type="text" id="rm-projekt" placeholder="Projektnr.">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="rm-monteur">Monteur</label>
+        <select id="rm-monteur">
+          <option value="">— Auswählen —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="rm-datum">Datum</label>
+        <input type="date" id="rm-datum">
+      </div>
+    </div>
+  </div>
+
+  <div id="rmChecklistArea"></div>
+
+  <div class="section">
+    <div class="section-label">Sonstiges / Bemerkungen</div>
+    <div class="field">
+      <div class="mic-wrap"><textarea id="rm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea><button type="button" class="mic-btn" onclick="startDictation('rm-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Unterschrift</div>
+    <div class="sig-wrap" id="rmSigWrap">
+      <canvas id="rmSigCanvas" height="160"></canvas>
+      <div class="sig-hint" id="rmSigHint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn-sm" onclick="clearRmSig()">Löschen</button>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="createRohmontage()">
+      Checkliste erstellen &amp; teilen
+    </button>
+    <button class="btn btn-danger-outline" onclick="resetRohmontage()">
+      Formular zurücksetzen
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: FERTIGMONTAGE
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-fertigmontage">
+
+  <div class="section">
+    <div class="section-label">Projektdaten</div>
+    <div class="row">
+      <div class="field">
+        <label for="fm-bv">BV</label>
+        <select id="fm-bv" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+      </div>
+      <div class="field">
+        <label for="fm-projekt">Projekt</label>
+        <input type="text" id="fm-projekt" placeholder="Projektnr.">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="fm-monteur">Monteur</label>
+        <select id="fm-monteur">
+          <option value="">— Auswählen —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fm-datum">Datum</label>
+        <input type="date" id="fm-datum">
+      </div>
+    </div>
+  </div>
+
+  <div id="fmChecklistArea"></div>
+
+  <div class="section">
+    <div class="section-label">Zusatz</div>
+    <div class="cl-item" style="border-bottom:none;padding:8px 0;">
+      <span class="cl-label">Fertigmontage war durch Kollegen bereits begonnen</span>
+      <div class="cl-btns">
+        <button class="cl-btn" onclick="setFmBegonnen(true,this)">Ja</button>
+        <button class="cl-btn" onclick="setFmBegonnen(false,this)">Nein</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Sonstiges / Bemerkungen</div>
+    <div class="field">
+      <div class="mic-wrap"><textarea id="fm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea><button type="button" class="mic-btn" onclick="startDictation('fm-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Unterschrift</div>
+    <div class="sig-wrap" id="fmSigWrap">
+      <canvas id="fmSigCanvas" height="160"></canvas>
+      <div class="sig-hint" id="fmSigHint">Mit dem Finger unterschreiben</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn-sm" onclick="clearFmSig()">Löschen</button>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="createFertigmontage()">
+      Checkliste erstellen &amp; teilen
+    </button>
+    <button class="btn btn-danger-outline" onclick="resetFertigmontage()">
+      Formular zurücksetzen
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: KABELLISTE LWWP
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-kabelliste">
+
+  <div class="section">
+    <div class="section-label">Projektdaten</div>
+    <div class="row">
+      <div class="field">
+        <label for="kl-bv">BV</label>
+        <select id="kl-bv" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+      </div>
+      <div class="field">
+        <label for="kl-elnr">el-Nr.</label>
+        <input type="text" id="kl-elnr" placeholder="el-Nr.">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="kl-monteur">Name / Monteur</label>
+        <select id="kl-monteur">
+          <option value="">— Auswählen —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="kl-datum">Datum</label>
+        <input type="date" id="kl-datum">
+      </div>
+    </div>
+  </div>
+
+  <div class="section" style="padding:12px 0;">
+    <div style="overflow-x:auto;">
+      <table class="kl-table" id="klTableBody">
+        <thead>
+          <tr>
+            <th>Nr.</th>
+            <th>Stromkreis</th>
+            <th>Kabel Art</th>
+            <th>Leiter/qmm</th>
+            <th>Sicherung</th>
+          </tr>
+        </thead>
+        <tbody id="klRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">EVU / Anschluss</div>
+    <div class="row">
+      <div class="field">
+        <label for="kl-evu">EVU</label>
+        <input type="text" id="kl-evu" placeholder="EVU">
+      </div>
+      <div class="field">
+        <label for="kl-tuer">Türanschlag</label>
+        <select id="kl-tuer">
+          <option value="">— Auswählen —</option>
+          <option value="links">links</option>
+          <option value="rechts">rechts</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">von Oben gesehen</div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="createKabelliste()">
+      Kabelliste erstellen &amp; teilen
+    </button>
+    <button class="btn btn-danger-outline" onclick="resetKabelliste()">
+      Formular zurücksetzen
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: SCHALTER
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-schalter">
+
+  <div class="section">
+    <div class="section-label">Projektdaten</div>
+    <div class="row">
+      <div class="field">
+        <label for="sc-bv">BV</label>
+        <select id="sc-bv" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+      </div>
+      <div class="field">
+        <label for="sc-elnr">el-Nr.</label>
+        <input type="text" id="sc-elnr" placeholder="el-Nr.">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="sc-monteur">Monteur</label>
+        <select id="sc-monteur">
+          <option value="">— Auswählen —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="sc-datum">Datum</label>
+        <input type="date" id="sc-datum">
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Fabrikat</div>
+    <div class="fab-group">
+      <button class="chip-toggle active" id="sc-fab-balance" onclick="setScFabrikat('Balance SI',this)">Balance SI</button>
+      <button class="chip-toggle" id="sc-fab-andere" onclick="setScFabrikat('andere',this)">andere</button>
+      <input type="text" id="sc-fab-custom" placeholder="Fabrikat eingeben" style="display:none;flex:1;font-family:var(--font);font-size:14px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);min-width:120px;">
+    </div>
+  </div>
+
+  <div class="section" style="padding:12px 0;">
+    <div style="overflow-x:auto;">
+      <table class="sc-table" id="scTableBody">
+        <thead>
+          <tr>
+            <th style="width:35px">Nr.</th>
+            <th>Bezeichnung</th>
+            <th style="width:130px">Stück</th>
+          </tr>
+        </thead>
+        <tbody id="scRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="createSchalter()">
+      Schalteraufmaß erstellen &amp; teilen
+    </button>
+    <button class="btn btn-danger-outline" onclick="resetSchalter()">
+      Formular zurücksetzen
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: BERICHTE (History)
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-history">
+  <div class="filter-tabs" id="historyFilters">
+    <button class="filter-tab active" onclick="filterHistory('all',this)">Alle</button>
+    <button class="filter-tab" onclick="filterHistory('kontrolle',this)">Kontrolle</button>
+    <button class="filter-tab" onclick="filterHistory('rapport',this)">Rapport</button>
+    <button class="filter-tab" onclick="filterHistory('rohmontage',this)">Rohmont.</button>
+    <button class="filter-tab" onclick="filterHistory('fertigmontage',this)">Fertigm.</button>
+    <button class="filter-tab" onclick="filterHistory('kabelliste',this)">Kabelliste</button>
+    <button class="filter-tab" onclick="filterHistory('schalter',this)">Schalter</button>
+  </div>
+  <div id="historyList"></div>
+</div>
+
+<!-- ── Hidden file input for camera ── -->
+<input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+
+<!-- ═══════════════════════════════════════
+     MODULE: STAMMDATEN (Chef only)
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-stammdaten">
+  <div class="section">
+    <div class="sd-tabs">
+      <button class="sd-tab active" onclick="sdSwitchTab('mitarbeiter',this)">Mitarbeiter</button>
+      <button class="sd-tab" onclick="sdSwitchTab('baustellen',this)">Baustellen</button>
+      <button class="sd-tab" onclick="sdSwitchTab('kostenstellen',this)">Kostenstellen</button>
+      <button class="sd-tab" onclick="sdSwitchTab('fahrzeuge',this)">Fahrzeuge</button>
+      <button class="sd-tab" onclick="sdSwitchTab('einstellungen',this)">Einstellungen</button>
+    </div>
+
+    <!-- Mitarbeiter -->
+    <div class="sd-panel" id="sd-mitarbeiter">
+      <div class="sd-form" id="sd-ma-form">
+        <div class="section-label" style="margin-bottom:10px">Neuer Mitarbeiter</div>
+        <div class="row">
+          <div class="field"><label>Name</label><input type="text" id="sd-ma-name" placeholder="Nachname"></div>
+          <div class="field"><label>Abteilung</label>
+            <select id="sd-ma-rolle"><option value="elektriker">Elektriker</option><option value="azubi">Azubi</option><option value="chef">Chef</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Rapport-Rolle</label>
+            <select id="sd-ma-tr-rolle"><option value="Facharbeiter">Facharbeiter</option><option value="Lehrling">Lehrling</option><option value="Probearbeit">Probearbeit</option></select>
+          </div>
+          <div class="field"><label>PIN (4-6 Stellen)</label><input type="text" id="sd-ma-pin" inputmode="numeric" maxlength="6" placeholder="z.B. 1234"></div>
+        </div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveMitarbeiter()">Speichern</button></div>
+        <input type="hidden" id="sd-ma-id">
+      </div>
+      <div class="sd-list" id="sd-ma-list"></div>
+    </div>
+
+    <!-- Baustellen -->
+    <div class="sd-panel" id="sd-baustellen" style="display:none">
+      <div class="sd-form" id="sd-bv-form">
+        <div class="section-label" style="margin-bottom:10px">Neue Baustelle</div>
+        <div class="field"><label>Bauvorhaben</label><input type="text" id="sd-bv-name" placeholder="z.B. Neubau Schule Am Berg"></div>
+        <div class="row">
+          <div class="field"><label>Kostenstelle</label><input type="text" id="sd-bv-kst" placeholder="z.B. 12345"></div>
+          <div class="field"><label>Projekt-Nr.</label><input type="text" id="sd-bv-pnr" placeholder="el-Nr."></div>
+        </div>
+        <div class="field"><label>Adresse</label><input type="text" id="sd-bv-adresse" placeholder="Stra&szlig;e, PLZ Ort"></div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveBaustelle()">Speichern</button></div>
+        <input type="hidden" id="sd-bv-id">
+      </div>
+      <div class="sd-list" id="sd-bv-list"></div>
+    </div>
+
+    <!-- Kostenstellen -->
+    <div class="sd-panel" id="sd-kostenstellen" style="display:none">
+      <div class="sd-form" id="sd-kst-form">
+        <div class="section-label" style="margin-bottom:10px">Neue Kostenstelle</div>
+        <div class="row">
+          <div class="field"><label>Nummer</label><input type="text" id="sd-kst-nr" placeholder="z.B. 50100"></div>
+          <div class="field"><label>Bezeichnung</label><input type="text" id="sd-kst-bez" placeholder="z.B. Werkstatt"></div>
+        </div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveKostenstelle()">Speichern</button></div>
+        <input type="hidden" id="sd-kst-id">
+      </div>
+      <div class="sd-list" id="sd-kst-list"></div>
+    </div>
+
+    <!-- Fahrzeuge -->
+    <div class="sd-panel" id="sd-fahrzeuge" style="display:none">
+      <div class="sd-form" id="sd-fz-form">
+        <div class="section-label" style="margin-bottom:10px">Neues Fahrzeug</div>
+        <div class="field"><label>Kennzeichen</label><input type="text" id="sd-fz-kennzeichen" placeholder="z.B. WF-EB 123" style="text-transform:uppercase"></div>
+        <div class="row">
+          <div class="field"><label>TÜV-Termin</label><input type="month" id="sd-fz-tuev" placeholder="JJJJ-MM"></div>
+          <div class="field"><label>UTA-Karte gültig bis</label><input type="month" id="sd-fz-uta" placeholder="JJJJ-MM"></div>
+        </div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveFahrzeug()">Speichern</button></div>
+        <input type="hidden" id="sd-fz-id">
+      </div>
+      <div class="sd-list" id="sd-fz-list"></div>
+    </div>
+
+    <!-- Einstellungen -->
+    <div class="sd-panel" id="sd-einstellungen" style="display:none">
+      <div class="sd-form">
+        <div class="section-label" style="margin-bottom:10px">Admin-Passwort &auml;ndern</div>
+        <div class="field"><label>Neues Passwort</label><input type="password" id="sd-admin-pw" placeholder="Neues Master-Passwort"></div>
+        <div class="field"><label>Best&auml;tigen</label><input type="password" id="sd-admin-pw2" placeholder="Passwort wiederholen"></div>
+        <button class="btn btn-primary" onclick="sdChangeAdminPw()" style="margin-top:8px">Passwort &auml;ndern</button>
+      </div>
+      <div class="sd-form" style="margin-top:16px">
+        <div class="section-label" style="margin-bottom:10px">Firebase-Config</div>
+        <div class="field"><label>Aktuelle Projekt-ID</label><input type="text" id="sd-fb-project" readonly style="opacity:.6"></div>
+        <button class="btn btn-danger-outline" onclick="sdResetConfig()" style="margin-top:8px">Firebase-Config zur&uuml;cksetzen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODULE: DASHBOARD (Chef only)
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-dashboard">
+  <div class="section">
+    <div class="section-label">&#220;bersicht</div>
+    <div class="dash-stats">
+      <div class="dash-stat"><div class="dash-stat-val" id="dash-count-today">0</div><div class="dash-stat-label">Heute</div></div>
+      <div class="dash-stat"><div class="dash-stat-val" id="dash-count-week">0</div><div class="dash-stat-label">Diese Woche</div></div>
+      <div class="dash-stat"><div class="dash-stat-val" id="dash-count-total">0</div><div class="dash-stat-label">Gesamt</div></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Eingereichte Berichte</div>
+    <div class="dash-filters">
+      <select id="dash-filter-type" onchange="dashLoadReports()">
+        <option value="">Alle Typen</option>
+        <option value="kontrolle">Kontrolle</option>
+        <option value="rapport">Tagesrapport</option>
+        <option value="rohmontage">Rohmontage</option>
+        <option value="fertigmontage">Fertigmontage</option>
+        <option value="kabelliste">Kabelliste</option>
+        <option value="schalter">Schalter</option>
+      </select>
+      <select id="dash-filter-site" onchange="dashLoadReports()">
+        <option value="">Alle Baustellen</option>
+      </select>
+      <input type="date" id="dash-filter-from" onchange="dashLoadReports()" title="Von">
+    </div>
+    <div id="dash-report-list">
+      <div class="dash-empty"><div class="em-icon">&#128202;</div><p>Berichte werden geladen&hellip;</p></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- END #app-main -->
+
+<!-- ── Lightbox ── -->
+<div class="lightbox" id="lightbox" hidden onclick="closeLB()">
+  <button class="lightbox-close" onclick="closeLB()">&#10005;</button>
+  <img id="lbImg" src="" alt="Foto Vollansicht">
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════
+   FIREBASE – Initialization & Auth
+   ═══════════════════════════════════════ */
+var APP_VERSION = 'v1.0.0';
+
+var db = null;
+var storage = null;
+var fbAuth = null;
+var currentUser = null;  // {id, name, rolle, pin}
+var isChef = false;
+
+// Fallback PERSONAL data (replaced by Firestore after login)
+var PERSONAL = {
+  elektriker: [],
+  azubi: [],
+  alle: [],
+  rollen: {} // name -> tagesrapportRolle mapping
+};
+
+var FAHRZEUGE = []; // [{id, kennzeichen, tuev, utaGueltig}]
+
+var BAUSTELLEN = [];   // [{id, name, kostenstelle, projektNr, adresse}]
+var KOSTENSTELLEN = []; // [{id, nummer, bezeichnung}]
+
+// Default config (hardcoded for hosted version)
+var DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCh45AS8pSS8VOicYRueP0J-Cf0xWpFCt4",
+  authDomain: "eb-baustelle.firebaseapp.com",
+  projectId: "eb-baustelle",
+  storageBucket: "eb-baustelle.firebasestorage.app",
+  messagingSenderId: "933401008899",
+  appId: "1:933401008899:web:d7f41c7bdf5a9fc84c2736"
+};
+
+function getFirebaseConfig() {
+  try {
+    var saved = JSON.parse(localStorage.getItem('eb_firebase_config'));
+    if (saved) return saved;
+  } catch(e) {}
+  // Use hardcoded default
+  if (DEFAULT_FIREBASE_CONFIG && DEFAULT_FIREBASE_CONFIG.apiKey) return DEFAULT_FIREBASE_CONFIG;
+  return null;
+}
+
+function saveFirebaseConfig() {
+  var raw = document.getElementById('cfg-json').value.trim();
+  var errEl = document.getElementById('cfg-error');
+  errEl.textContent = '';
+  try {
+    var cfg = JSON.parse(raw);
+    if (!cfg.apiKey || !cfg.projectId) throw new Error('apiKey und projectId fehlen');
+    localStorage.setItem('eb_firebase_config', JSON.stringify(cfg));
+    errEl.textContent = '';
+    initFirebase(cfg);
+  } catch(e) {
+    errEl.textContent = 'Ungültiges JSON: ' + e.message;
+  }
+}
+
+function initFirebase(cfg) {
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(cfg);
+    }
+    db = firebase.firestore();
+    storage = firebase.storage();
+    fbAuth = firebase.auth();
+
+    // Sign in anonymously
+    fbAuth.signInAnonymously().then(function() {
+      showLoginScreen();
+    }).catch(function(err) {
+      console.error('Auth error:', err);
+      toast('Firebase Auth Fehler: ' + err.message);
+      showLoginScreen();
+    });
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    toast('Firebase Fehler: ' + e.message);
+  }
+}
+
+function appBoot() {
+  // Check if Firebase SDK loaded
+  if (typeof firebase === 'undefined') {
+    document.getElementById('screen-setup').style.display = '';
+    document.getElementById('screen-login').style.display = 'none';
+    document.getElementById('app-main').style.display = 'none';
+    document.getElementById('cfg-error').textContent = 'Firebase SDK konnte nicht geladen werden. Die App braucht eine Internetverbindung und muss in einem Browser (Chrome/Safari) geoeffnet werden — nicht in WhatsApp oder einem Datei-Viewer.';
+    return;
+  }
+  var cfg = getFirebaseConfig();
+  if (!cfg) {
+    document.getElementById('screen-setup').style.display = '';
+    document.getElementById('screen-login').style.display = 'none';
+    document.getElementById('app-main').style.display = 'none';
+    return;
+  }
+  initFirebase(cfg);
+}
+
+function showLoginScreen() {
+  document.getElementById('screen-setup').style.display = 'none';
+  document.getElementById('screen-login').style.display = '';
+  document.getElementById('app-main').style.display = 'none';
+  loadLoginUsers();
+}
+
+function loadLoginUsers() {
+  if (!db) return;
+  db.collection('mitarbeiter').get().then(function(snap) {
+    var sel = document.getElementById('login-user');
+    // Clear existing options except first
+    while (sel.options.length > 1) sel.remove(1);
+    var users = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if (d.aktiv === false) return;
+      users.push({ id: doc.id, name: d.name, rolle: d.rolle || 'mitarbeiter' });
+    });
+    users.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    users.forEach(function(u) {
+      var o = document.createElement('option');
+      o.value = u.id;
+      o.textContent = u.name + ' (' + u.rolle + ')';
+      o.setAttribute('data-rolle', u.rolle);
+      sel.appendChild(o);
+    });
+    if (users.length === 0) {
+      document.getElementById('login-error').textContent = 'Keine Mitarbeiter gefunden. Bitte zuerst als Chef anmelden und Mitarbeiter anlegen.';
+    }
+  }).catch(function(err) {
+    console.error('Load users error:', err);
+    document.getElementById('login-error').textContent = 'Mitarbeiter konnten nicht geladen werden: ' + err.message;
+  });
+}
+
+function showAdminLogin() {
+  var area = document.getElementById('admin-login-area');
+  area.style.display = area.style.display === 'none' ? '' : 'none';
+}
+
+function doLogin() {
+  var sel = document.getElementById('login-user');
+  var pin = document.getElementById('login-pin').value.trim();
+  var errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+
+  if (!sel.value) { errEl.textContent = 'Bitte Mitarbeiter auswählen'; return; }
+  if (!pin) { errEl.textContent = 'Bitte PIN eingeben'; return; }
+
+  db.collection('mitarbeiter').doc(sel.value).get().then(function(doc) {
+    if (!doc.exists) { errEl.textContent = 'Mitarbeiter nicht gefunden'; return; }
+    var d = doc.data();
+    if (d.pin !== pin) { errEl.textContent = 'Falsche PIN'; return; }
+    currentUser = { id: doc.id, name: d.name, rolle: d.rolle || 'mitarbeiter', pin: d.pin };
+    isChef = (d.rolle === 'chef');
+    afterLogin();
+  }).catch(function(err) {
+    errEl.textContent = 'Fehler: ' + err.message;
+  });
+}
+
+function doAdminLogin() {
+  var pw = document.getElementById('admin-pw').value.trim();
+  var errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!pw) { errEl.textContent = 'Bitte Passwort eingeben'; return; }
+
+  db.collection('config').doc('admin').get().then(function(doc) {
+    if (!doc.exists) {
+      // First-time setup: create admin config with this password
+      return db.collection('config').doc('admin').set({ password: pw }).then(function() {
+        // Also create a chef user entry if none exists
+        return db.collection('mitarbeiter').add({
+          name: 'Chef', rolle: 'chef', pin: '0000', aktiv: true
+        }).then(function(ref) {
+          currentUser = { id: ref.id, name: 'Chef', rolle: 'chef', pin: '0000' };
+          isChef = true;
+          toast('Admin-Zugang eingerichtet! Bitte Stammdaten pflegen.');
+          afterLogin();
+        });
+      });
+    }
+    var d = doc.data();
+    if (d.password !== pw) { errEl.textContent = 'Falsches Passwort'; return; }
+    // Find chef user
+    return db.collection('mitarbeiter').where('rolle', '==', 'chef').limit(1).get().then(function(snap) {
+      if (snap.empty) {
+        currentUser = { id: 'admin', name: 'Chef', rolle: 'chef', pin: '' };
+      } else {
+        var chefDoc = snap.docs[0];
+        var cd = chefDoc.data();
+        currentUser = { id: chefDoc.id, name: cd.name, rolle: 'chef', pin: cd.pin };
+      }
+      isChef = true;
+      afterLogin();
+    });
+  }).catch(function(err) {
+    errEl.textContent = 'Fehler: ' + err.message;
+  });
+}
+
+function afterLogin() {
+  document.getElementById('screen-setup').style.display = 'none';
+  document.getElementById('screen-login').style.display = 'none';
+  document.getElementById('app-main').style.display = '';
+
+  // Show user badge and version
+  document.getElementById('currentUserBadge').textContent = currentUser.name;
+  document.getElementById('statusBadge').textContent = APP_VERSION;
+
+  // Show/hide chef modules
+  document.getElementById('nav-stammdaten').style.display = isChef ? '' : 'none';
+  document.getElementById('nav-dashboard').style.display = isChef ? '' : 'none';
+
+  // Set inspector name if on Kontrolle
+  var insp = document.getElementById('f-inspector');
+  if (insp && !insp.value) insp.value = currentUser.name;
+
+  // Load master data from Firestore
+  loadMasterData();
+}
+
+function doLogout() {
+  if (!confirm('Abmelden?')) return;
+  currentUser = null;
+  isChef = false;
+  document.getElementById('login-pin').value = '';
+  document.getElementById('login-error').textContent = '';
+  showLoginScreen();
+}
+
+function loadMasterData() {
+  if (!db) return;
+
+  // Load Mitarbeiter (no compound query — filter + sort client-side)
+  db.collection('mitarbeiter').get().then(function(snap) {
+    PERSONAL.elektriker = [];
+    PERSONAL.azubi = [];
+    PERSONAL.alle = [];
+    PERSONAL.rollen = {};
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if (d.aktiv === false) return;
+      if (d.rolle === 'elektriker') PERSONAL.elektriker.push(d.name);
+      else if (d.rolle === 'azubi') PERSONAL.azubi.push(d.name);
+      PERSONAL.alle.push(d.name);
+      PERSONAL.rollen[d.name] = d.tagesrapportRolle || 'Facharbeiter';
+    });
+    PERSONAL.alle.sort();
+    PERSONAL.elektriker.sort();
+    PERSONAL.azubi.sort();
+    populatePersonalDropdowns();
+    // Auto-fill first worker with logged-in user
+    if (currentUser && trWorkers.length > 0 && !trWorkers[0].name) {
+      trWorkers[0].name = currentUser.name;
+      trWorkers[0].rolle = PERSONAL.rollen[currentUser.name] || 'Facharbeiter';
+      renderWorkers();
+    }
+  }).catch(function(err) {
+    console.error('Load Mitarbeiter error:', err);
+  });
+
+  // Load Fahrzeuge
+  db.collection('fahrzeuge').get().then(function(snap) {
+    FAHRZEUGE = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      d.id = doc.id;
+      FAHRZEUGE.push(d);
+    });
+    FAHRZEUGE.sort(function(a, b) { return (a.kennzeichen || '').localeCompare(b.kennzeichen || ''); });
+    populateFahrzeugDropdowns();
+    checkTuevWarnungen();
+  }).catch(function(err) {
+    console.error('Load Fahrzeuge error:', err);
+  });
+
+  // Load Baustellen (no compound query — filter + sort client-side)
+  db.collection('baustellen').get().then(function(snap) {
+    BAUSTELLEN = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if (d.aktiv === false) return;
+      d.id = doc.id;
+      BAUSTELLEN.push(d);
+    });
+    BAUSTELLEN.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    populateBaustellenDropdowns();
+  }).catch(function(err) {
+    console.error('Load Baustellen error:', err);
+  });
+
+  // Load Kostenstellen
+  db.collection('kostenstellen').get().then(function(snap) {
+    KOSTENSTELLEN = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      d.id = doc.id;
+      KOSTENSTELLEN.push(d);
+    });
+    KOSTENSTELLEN.sort(function(a, b) { return (a.nummer || '').localeCompare(b.nummer || ''); });
+    populateKostenstellenDropdowns();
+  }).catch(function(err) {
+    console.error('Load Kostenstellen error:', err);
+  });
+}
+
+function populatePersonalDropdowns() {
+  var selIds = ['tr-fahrer','rm-monteur','fm-monteur','kl-monteur','sc-monteur'];
+  selIds.forEach(function(sid) {
+    var sel = document.getElementById(sid);
+    if (!sel) return;
+    var val = sel.value;
+    // Clear options except first empty one
+    while (sel.options.length > 1) sel.remove(1);
+    PERSONAL.alle.forEach(function(name) {
+      var o = document.createElement('option');
+      o.value = name; o.textContent = name;
+      sel.appendChild(o);
+    });
+    if (val) sel.value = val;
+  });
+}
+
+function populateBaustellenDropdowns() {
+  var selectIds = ['f-site','tr-baustelle','rm-bv','fm-bv','kl-bv','sc-bv','dash-filter-site'];
+  selectIds.forEach(function(sid) {
+    var sel = document.getElementById(sid);
+    if (!sel) return;
+    var val = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    BAUSTELLEN.forEach(function(bv) {
+      var o = document.createElement('option');
+      o.value = bv.name;
+      o.textContent = bv.name;
+      sel.appendChild(o);
+    });
+    // Add quick-create option (not for dashboard filter)
+    if (sid !== 'dash-filter-site') {
+      var addOpt = document.createElement('option');
+      addOpt.value = '__neu__';
+      addOpt.textContent = '+ Neue Baustelle anlegen...';
+      sel.appendChild(addOpt);
+    }
+    if (val && val !== '__neu__') sel.value = val;
+  });
+}
+
+function handleBaustelleChange(sel) {
+  // Auto-fill Kostenstelle + Projekt-Nr. from Stammdaten
+  autofillFromBaustelle(sel);
+
+  if (sel.value !== '__neu__') return;
+  sel.value = '';
+  var name = prompt('Name der neuen Baustelle:');
+  if (!name || !name.trim()) return;
+  name = name.trim();
+  // Check if already exists
+  for (var i = 0; i < BAUSTELLEN.length; i++) {
+    if (BAUSTELLEN[i].name === name) {
+      sel.value = name;
+      autofillFromBaustelle(sel);
+      toast('Baustelle existiert bereits');
+      return;
+    }
+  }
+  if (!db) { toast('Keine Datenbankverbindung'); return; }
+  db.collection('baustellen').add({ name: name, kostenstelle: '', projektNr: '', adresse: '', aktiv: true }).then(function(docRef) {
+    BAUSTELLEN.push({ id: docRef.id, name: name, kostenstelle: '', projektNr: '', adresse: '', aktiv: true });
+    BAUSTELLEN.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    populateBaustellenDropdowns();
+    sel.value = name;
+    toast('Baustelle "' + name + '" angelegt');
+  }).catch(function(err) {
+    toast('Fehler: ' + err.message);
+  });
+}
+
+function autofillFromBaustelle(sel) {
+  // Find the selected Baustelle in BAUSTELLEN array
+  var selName = sel.value;
+  var found = null;
+  for (var i = 0; i < BAUSTELLEN.length; i++) {
+    if (BAUSTELLEN[i].name === selName) { found = BAUSTELLEN[i]; break; }
+  }
+
+  // Determine which form this select belongs to by its ID
+  var selId = sel.id;
+  if (selId === 'tr-baustelle') {
+    // Tagesrapport: fill Kostenstelle + Projekt-Nr.
+    document.getElementById('tr-kostenstelle').value = found ? (found.kostenstelle || '') : '';
+    document.getElementById('tr-projekt').value = found ? (found.projektNr || '') : '';
+  } else if (selId === 'kl-bv') {
+    // Kabelliste: fill el-Nr.
+    var elnr = document.getElementById('kl-elnr');
+    if (elnr && found) elnr.value = found.projektNr || '';
+    else if (elnr) elnr.value = '';
+  } else if (selId === 'sc-bv') {
+    // Schalter: fill el-Nr.
+    var elnr2 = document.getElementById('sc-elnr');
+    if (elnr2 && found) elnr2.value = found.projektNr || '';
+    else if (elnr2) elnr2.value = '';
+  }
+}
+
+function populateKostenstellenDropdowns() {
+  var selectIds = ['tr-kostenstelle'];
+  selectIds.forEach(function(sid) {
+    var sel = document.getElementById(sid);
+    if (!sel) return;
+    var val = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    KOSTENSTELLEN.forEach(function(kst) {
+      var o = document.createElement('option');
+      o.value = kst.nummer;
+      o.textContent = kst.nummer + (kst.bezeichnung ? ' – ' + kst.bezeichnung : '');
+      sel.appendChild(o);
+    });
+    if (val) sel.value = val;
+  });
+}
+
+/* ═══════════════════════════════════════
+   STAMMDATEN CRUD
+   ═══════════════════════════════════════ */
+function sdSwitchTab(tab, btn) {
+  document.querySelectorAll('.sd-tab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.sd-panel').forEach(function(p){ p.style.display = 'none'; });
+  document.getElementById('sd-' + tab).style.display = '';
+  if (tab === 'mitarbeiter') sdLoadMitarbeiter();
+  else if (tab === 'baustellen') sdLoadBaustellen();
+  else if (tab === 'kostenstellen') sdLoadKostenstellen();
+  else if (tab === 'fahrzeuge') sdLoadFahrzeuge();
+  else if (tab === 'einstellungen') sdLoadSettings();
+}
+
+function sdLoadMitarbeiter() {
+  if (!db) return;
+  db.collection('mitarbeiter').orderBy('name').get().then(function(snap) {
+    var list = document.getElementById('sd-ma-list');
+    if (snap.empty) { list.innerHTML = '<div class="dash-empty"><p>Noch keine Mitarbeiter angelegt.</p></div>'; return; }
+    list.innerHTML = '';
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var item = document.createElement('div');
+      item.className = 'sd-item';
+      var statusDot = d.aktiv !== false ? '&#9679; ' : '&#9675; ';
+      item.innerHTML = '<div class="sd-item-info">'
+        + '<div class="sd-item-name">' + statusDot + escHtml(d.name) + '</div>'
+        + '<div class="sd-item-meta">' + escHtml(d.rolle || 'mitarbeiter') + ' &middot; ' + escHtml(d.tagesrapportRolle || 'Facharbeiter') + ' &middot; PIN: ' + escHtml(d.pin || '—') + '</div>'
+        + '</div>'
+        + '<div class="sd-item-actions">'
+        + '<button onclick="sdEditMitarbeiter(\'' + doc.id + '\')" title="Bearbeiten">&#9998;</button>'
+        + '<button class="sd-del" onclick="sdToggleMitarbeiter(\'' + doc.id + '\',' + (d.aktiv !== false ? 'false' : 'true') + ')" title="' + (d.aktiv !== false ? 'Deaktivieren' : 'Aktivieren') + '">' + (d.aktiv !== false ? '&#10005;' : '&#10003;') + '</button>'
+        + '</div>';
+      list.appendChild(item);
+    });
+  });
+}
+
+function sdSaveMitarbeiter() {
+  var name = document.getElementById('sd-ma-name').value.trim();
+  var rolle = document.getElementById('sd-ma-rolle').value;
+  var trRolle = document.getElementById('sd-ma-tr-rolle').value;
+  var pin = document.getElementById('sd-ma-pin').value.trim();
+  var editId = document.getElementById('sd-ma-id').value;
+  if (!name) { toast('Name eingeben'); return; }
+  if (!pin || pin.length < 4) { toast('PIN muss mindestens 4 Stellen haben'); return; }
+
+  var data = { name: name, rolle: rolle, tagesrapportRolle: trRolle, pin: pin, aktiv: true };
+  var promise;
+  if (editId) {
+    promise = db.collection('mitarbeiter').doc(editId).update(data);
+  } else {
+    promise = db.collection('mitarbeiter').add(data);
+  }
+  promise.then(function() {
+    toast(editId ? 'Mitarbeiter aktualisiert' : 'Mitarbeiter angelegt');
+    document.getElementById('sd-ma-name').value = '';
+    document.getElementById('sd-ma-pin').value = '';
+    document.getElementById('sd-ma-id').value = '';
+    document.getElementById('sd-ma-rolle').value = 'elektriker';
+    document.getElementById('sd-ma-tr-rolle').value = 'Facharbeiter';
+    sdLoadMitarbeiter();
+    loadMasterData();
+  }).catch(function(err) { toast('Fehler: ' + err.message); });
+}
+
+function sdEditMitarbeiter(id) {
+  db.collection('mitarbeiter').doc(id).get().then(function(doc) {
+    if (!doc.exists) return;
+    var d = doc.data();
+    document.getElementById('sd-ma-name').value = d.name || '';
+    document.getElementById('sd-ma-rolle').value = d.rolle || 'elektriker';
+    document.getElementById('sd-ma-tr-rolle').value = d.tagesrapportRolle || 'Facharbeiter';
+    document.getElementById('sd-ma-pin').value = d.pin || '';
+    document.getElementById('sd-ma-id').value = id;
+    document.getElementById('sd-ma-name').focus();
+  });
+}
+
+function sdToggleMitarbeiter(id, activate) {
+  var msg = activate ? 'Mitarbeiter wieder aktivieren?' : 'Mitarbeiter deaktivieren?';
+  if (!confirm(msg)) return;
+  db.collection('mitarbeiter').doc(id).update({ aktiv: activate }).then(function() {
+    toast(activate ? 'Aktiviert' : 'Deaktiviert');
+    sdLoadMitarbeiter();
+    loadMasterData();
+  });
+}
+
+// ── Fahrzeuge Stammdaten ──
+function sdLoadFahrzeuge() {
+  if (!db) return;
+  db.collection('fahrzeuge').get().then(function(snap) {
+    var list = document.getElementById('sd-fz-list');
+    var docs = [];
+    snap.forEach(function(doc) { var d = doc.data(); d.id = doc.id; docs.push(d); });
+    docs.sort(function(a, b) { return (a.kennzeichen || '').localeCompare(b.kennzeichen || ''); });
+    if (docs.length === 0) { list.innerHTML = '<div class="dash-empty"><p>Noch keine Fahrzeuge angelegt.</p></div>'; return; }
+    list.innerHTML = '';
+    docs.forEach(function(d) {
+      var item = document.createElement('div');
+      item.className = 'sd-item';
+      var tuevStr = d.tuev ? formatMonat(d.tuev) : '—';
+      var utaStr = d.utaGueltig ? formatMonat(d.utaGueltig) : '—';
+      var tuevWarn = isTuevFaellig(d.tuev) ? ' style="color:var(--danger);font-weight:700"' : '';
+      var utaWarn = isUtaFaellig(d.utaGueltig) ? ' style="color:var(--danger);font-weight:700"' : '';
+      item.innerHTML = '<div class="sd-item-info">'
+        + '<div class="sd-item-name">' + escHtml(d.kennzeichen || '') + '</div>'
+        + '<div class="sd-item-meta"><span' + tuevWarn + '>TÜV: ' + tuevStr + '</span> &middot; <span' + utaWarn + '>UTA: ' + utaStr + '</span></div>'
+        + '</div>'
+        + '<div class="sd-item-actions">'
+        + '<button onclick="sdEditFahrzeug(\'' + d.id + '\')" title="Bearbeiten">&#9998;</button>'
+        + '<button class="sd-del" onclick="sdDeleteFahrzeug(\'' + d.id + '\')" title="Löschen">&#10005;</button>'
+        + '</div>';
+      list.appendChild(item);
+    });
+  });
+}
+
+function formatMonat(m) {
+  if (!m) return '—';
+  var parts = m.split('-');
+  if (parts.length === 2) return parts[1] + '/' + parts[0];
+  return m;
+}
+
+function isTuevFaellig(tuev) {
+  if (!tuev) return false;
+  var now = new Date();
+  var currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  return tuev <= currentMonth;
+}
+
+function isUtaFaellig(uta) {
+  if (!uta) return false;
+  var now = new Date();
+  var currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  return uta <= currentMonth;
+}
+
+function sdSaveFahrzeug() {
+  var kennzeichen = document.getElementById('sd-fz-kennzeichen').value.trim().toUpperCase();
+  var tuev = document.getElementById('sd-fz-tuev').value;
+  var uta = document.getElementById('sd-fz-uta').value;
+  var editId = document.getElementById('sd-fz-id').value;
+  if (!kennzeichen) { toast('Kennzeichen eingeben'); return; }
+
+  var data = { kennzeichen: kennzeichen, tuev: tuev, utaGueltig: uta };
+  var promise;
+  if (editId) {
+    promise = db.collection('fahrzeuge').doc(editId).update(data);
+  } else {
+    promise = db.collection('fahrzeuge').add(data);
+  }
+  promise.then(function() {
+    toast(editId ? 'Fahrzeug aktualisiert' : 'Fahrzeug angelegt');
+    document.getElementById('sd-fz-kennzeichen').value = '';
+    document.getElementById('sd-fz-tuev').value = '';
+    document.getElementById('sd-fz-uta').value = '';
+    document.getElementById('sd-fz-id').value = '';
+    sdLoadFahrzeuge();
+    loadMasterData();
+  }).catch(function(err) { toast('Fehler: ' + err.message); });
+}
+
+function sdEditFahrzeug(id) {
+  db.collection('fahrzeuge').doc(id).get().then(function(doc) {
+    if (!doc.exists) return;
+    var d = doc.data();
+    document.getElementById('sd-fz-kennzeichen').value = d.kennzeichen || '';
+    document.getElementById('sd-fz-tuev').value = d.tuev || '';
+    document.getElementById('sd-fz-uta').value = d.utaGueltig || '';
+    document.getElementById('sd-fz-id').value = id;
+    document.getElementById('sd-fz-kennzeichen').focus();
+  });
+}
+
+function sdDeleteFahrzeug(id) {
+  if (!confirm('Fahrzeug wirklich löschen?')) return;
+  db.collection('fahrzeuge').doc(id).delete().then(function() {
+    toast('Fahrzeug gelöscht');
+    sdLoadFahrzeuge();
+    loadMasterData();
+  });
+}
+
+function populateFahrzeugDropdowns() {
+  var sel = document.getElementById('tr-fahrzeug');
+  if (!sel) return;
+  var val = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  FAHRZEUGE.forEach(function(fz) {
+    var o = document.createElement('option');
+    o.value = fz.kennzeichen;
+    o.textContent = fz.kennzeichen;
+    sel.appendChild(o);
+  });
+  if (val) sel.value = val;
+}
+
+function checkTuevWarnungen() {
+  var now = new Date();
+  var currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var warnings = [];
+  FAHRZEUGE.forEach(function(fz) {
+    if (fz.tuev && fz.tuev <= currentMonth) {
+      warnings.push('TÜV fällig: ' + fz.kennzeichen + ' (' + formatMonat(fz.tuev) + ')');
+    }
+    if (fz.utaGueltig && fz.utaGueltig <= currentMonth) {
+      warnings.push('UTA-Karte abgelaufen: ' + fz.kennzeichen + ' (' + formatMonat(fz.utaGueltig) + ')');
+    }
+  });
+  if (warnings.length > 0) {
+    // Show warning banner
+    var banner = document.getElementById('tuev-warn-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'tuev-warn-banner';
+      banner.style.cssText = 'background:var(--danger-light);border:1px solid var(--danger);border-radius:var(--radius-sm);padding:10px 14px;margin:8px 16px;font-size:13px;color:var(--danger)';
+      var mainEl = document.getElementById('app-main');
+      if (mainEl) mainEl.insertBefore(banner, mainEl.firstChild);
+    }
+    banner.innerHTML = '<b>&#9888; Fahrzeug-Warnungen:</b><br>' + warnings.join('<br>');
+  } else {
+    var existingBanner = document.getElementById('tuev-warn-banner');
+    if (existingBanner) existingBanner.remove();
+  }
+}
+
+function sdLoadBaustellen() {
+  if (!db) return;
+  db.collection('baustellen').orderBy('name').get().then(function(snap) {
+    var list = document.getElementById('sd-bv-list');
+    if (snap.empty) { list.innerHTML = '<div class="dash-empty"><p>Noch keine Baustellen angelegt.</p></div>'; return; }
+    list.innerHTML = '';
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var statusDot = d.aktiv !== false ? '&#9679; ' : '&#9675; ';
+      var item = document.createElement('div');
+      item.className = 'sd-item';
+      item.innerHTML = '<div class="sd-item-info">'
+        + '<div class="sd-item-name">' + statusDot + escHtml(d.name) + '</div>'
+        + '<div class="sd-item-meta">KST: ' + escHtml(d.kostenstelle || '—') + ' &middot; PNr: ' + escHtml(d.projektNr || '—') + (d.adresse ? ' &middot; ' + escHtml(d.adresse) : '') + '</div>'
+        + '</div>'
+        + '<div class="sd-item-actions">'
+        + '<button onclick="sdEditBaustelle(\'' + doc.id + '\')" title="Bearbeiten">&#9998;</button>'
+        + '<button class="sd-del" onclick="sdToggleBaustelle(\'' + doc.id + '\',' + (d.aktiv !== false ? 'false' : 'true') + ')" title="' + (d.aktiv !== false ? 'Deaktivieren' : 'Aktivieren') + '">' + (d.aktiv !== false ? '&#10005;' : '&#10003;') + '</button>'
+        + '</div>';
+      list.appendChild(item);
+    });
+  });
+}
+
+function sdSaveBaustelle() {
+  var name = document.getElementById('sd-bv-name').value.trim();
+  var kst = document.getElementById('sd-bv-kst').value.trim();
+  var pnr = document.getElementById('sd-bv-pnr').value.trim();
+  var adresse = document.getElementById('sd-bv-adresse').value.trim();
+  var editId = document.getElementById('sd-bv-id').value;
+  if (!name) { toast('Bauvorhaben eingeben'); return; }
+
+  var data = { name: name, kostenstelle: kst, projektNr: pnr, adresse: adresse, aktiv: true };
+  var promise;
+  if (editId) {
+    promise = db.collection('baustellen').doc(editId).update(data);
+  } else {
+    promise = db.collection('baustellen').add(data);
+  }
+  promise.then(function() {
+    toast(editId ? 'Baustelle aktualisiert' : 'Baustelle angelegt');
+    document.getElementById('sd-bv-name').value = '';
+    document.getElementById('sd-bv-kst').value = '';
+    document.getElementById('sd-bv-pnr').value = '';
+    document.getElementById('sd-bv-adresse').value = '';
+    document.getElementById('sd-bv-id').value = '';
+    sdLoadBaustellen();
+    loadMasterData();
+  }).catch(function(err) { toast('Fehler: ' + err.message); });
+}
+
+function sdEditBaustelle(id) {
+  db.collection('baustellen').doc(id).get().then(function(doc) {
+    if (!doc.exists) return;
+    var d = doc.data();
+    document.getElementById('sd-bv-name').value = d.name || '';
+    document.getElementById('sd-bv-kst').value = d.kostenstelle || '';
+    document.getElementById('sd-bv-pnr').value = d.projektNr || '';
+    document.getElementById('sd-bv-adresse').value = d.adresse || '';
+    document.getElementById('sd-bv-id').value = id;
+    document.getElementById('sd-bv-name').focus();
+  });
+}
+
+function sdToggleBaustelle(id, activate) {
+  if (!confirm(activate ? 'Baustelle aktivieren?' : 'Baustelle deaktivieren?')) return;
+  db.collection('baustellen').doc(id).update({ aktiv: activate }).then(function() {
+    toast(activate ? 'Aktiviert' : 'Deaktiviert');
+    sdLoadBaustellen();
+    loadMasterData();
+  });
+}
+
+function sdLoadKostenstellen() {
+  if (!db) return;
+  db.collection('kostenstellen').orderBy('nummer').get().then(function(snap) {
+    var list = document.getElementById('sd-kst-list');
+    if (snap.empty) { list.innerHTML = '<div class="dash-empty"><p>Noch keine Kostenstellen angelegt.</p></div>'; return; }
+    list.innerHTML = '';
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var item = document.createElement('div');
+      item.className = 'sd-item';
+      item.innerHTML = '<div class="sd-item-info">'
+        + '<div class="sd-item-name">' + escHtml(d.nummer) + '</div>'
+        + '<div class="sd-item-meta">' + escHtml(d.bezeichnung || '—') + '</div>'
+        + '</div>'
+        + '<div class="sd-item-actions">'
+        + '<button onclick="sdEditKostenstelle(\'' + doc.id + '\')" title="Bearbeiten">&#9998;</button>'
+        + '<button class="sd-del" onclick="sdDeleteKostenstelle(\'' + doc.id + '\')" title="Löschen">&#10005;</button>'
+        + '</div>';
+      list.appendChild(item);
+    });
+  });
+}
+
+function sdSaveKostenstelle() {
+  var nr = document.getElementById('sd-kst-nr').value.trim();
+  var bez = document.getElementById('sd-kst-bez').value.trim();
+  var editId = document.getElementById('sd-kst-id').value;
+  if (!nr) { toast('Nummer eingeben'); return; }
+
+  var data = { nummer: nr, bezeichnung: bez };
+  var promise;
+  if (editId) {
+    promise = db.collection('kostenstellen').doc(editId).update(data);
+  } else {
+    promise = db.collection('kostenstellen').add(data);
+  }
+  promise.then(function() {
+    toast(editId ? 'Kostenstelle aktualisiert' : 'Kostenstelle angelegt');
+    document.getElementById('sd-kst-nr').value = '';
+    document.getElementById('sd-kst-bez').value = '';
+    document.getElementById('sd-kst-id').value = '';
+    sdLoadKostenstellen();
+    loadMasterData();
+  }).catch(function(err) { toast('Fehler: ' + err.message); });
+}
+
+function sdEditKostenstelle(id) {
+  db.collection('kostenstellen').doc(id).get().then(function(doc) {
+    if (!doc.exists) return;
+    var d = doc.data();
+    document.getElementById('sd-kst-nr').value = d.nummer || '';
+    document.getElementById('sd-kst-bez').value = d.bezeichnung || '';
+    document.getElementById('sd-kst-id').value = id;
+    document.getElementById('sd-kst-nr').focus();
+  });
+}
+
+function sdDeleteKostenstelle(id) {
+  if (!confirm('Kostenstelle löschen?')) return;
+  db.collection('kostenstellen').doc(id).delete().then(function() {
+    toast('Gelöscht');
+    sdLoadKostenstellen();
+    loadMasterData();
+  });
+}
+
+function sdLoadSettings() {
+  var cfg = getFirebaseConfig();
+  document.getElementById('sd-fb-project').value = cfg ? cfg.projectId : '—';
+}
+
+function sdChangeAdminPw() {
+  var pw1 = document.getElementById('sd-admin-pw').value;
+  var pw2 = document.getElementById('sd-admin-pw2').value;
+  if (!pw1 || pw1.length < 4) { toast('Passwort muss mindestens 4 Zeichen haben'); return; }
+  if (pw1 !== pw2) { toast('Passwörter stimmen nicht überein'); return; }
+  db.collection('config').doc('admin').set({ password: pw1 }, { merge: true }).then(function() {
+    toast('Passwort geändert');
+    document.getElementById('sd-admin-pw').value = '';
+    document.getElementById('sd-admin-pw2').value = '';
+  });
+}
+
+function sdResetConfig() {
+  if (!confirm('Firebase-Config wirklich zurücksetzen? Die App muss neu eingerichtet werden.')) return;
+  localStorage.removeItem('eb_firebase_config');
+  location.reload();
+}
+
+/* ═══════════════════════════════════════
+   DASHBOARD
+   ═══════════════════════════════════════ */
+function dashLoadReports() {
+  if (!db) return;
+  var typeFilter = document.getElementById('dash-filter-type').value;
+  var siteFilter = document.getElementById('dash-filter-site').value;
+  var fromFilter = document.getElementById('dash-filter-from').value;
+
+  db.collection('berichte').get().then(function(snap) {
+    var reports = [];
+    var today = new Date(); today.setHours(0,0,0,0);
+    var weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+    var countToday = 0, countWeek = 0, countTotal = 0;
+
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      d.id = doc.id;
+
+      // Client-side filters
+      if (typeFilter && d.type !== typeFilter) return;
+      if (siteFilter && d.baustelle !== siteFilter) return;
+      if (fromFilter && d.datum < fromFilter) return;
+
+      reports.push(d);
+      countTotal++;
+      if (d.createdAt && d.createdAt.toDate) {
+        var dt = d.createdAt.toDate();
+        if (dt >= today) countToday++;
+        if (dt >= weekAgo) countWeek++;
+      }
+    });
+
+    // Client-side sort to avoid Firestore index requirements
+    reports.sort(function(a, b) {
+      var ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+      var tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+      return tb - ta;
+    });
+    if (reports.length > 100) reports = reports.slice(0, 100);
+
+    document.getElementById('dash-count-today').textContent = countToday;
+    document.getElementById('dash-count-week').textContent = countWeek;
+    document.getElementById('dash-count-total').textContent = countTotal;
+
+    var listEl = document.getElementById('dash-report-list');
+    if (!reports.length) {
+      listEl.innerHTML = '<div class="dash-empty"><div class="em-icon">&#128202;</div><p>Keine Berichte gefunden.</p></div>';
+      return;
+    }
+
+    var typeLabels = { kontrolle:'Kontrolle', rapport:'Tagesrapport', rohmontage:'Rohmontage', fertigmontage:'Fertigmontage', kabelliste:'Kabelliste', schalter:'Schalter' };
+    var typeColors = { kontrolle:'#009959', rapport:'#60A5FA', rohmontage:'#F59E0B', fertigmontage:'#EC4899', kabelliste:'#A78BFA', schalter:'#F472B6' };
+
+    listEl.innerHTML = reports.map(function(r) {
+      var typeLabel = typeLabels[r.type] || r.type;
+      var typeColor = typeColors[r.type] || '#009959';
+      var dateStr = r.datum || '—';
+      var meta = escHtml(r.ersteller || '—') + ' &middot; ' + fmtDate(dateStr);
+
+      return '<div class="dash-report">'
+        + '<div class="dash-report-head" onclick="dashViewReport(\'' + r.id + '\')">'
+        + '<div><div class="dash-report-title">' + escHtml(r.baustelle || '—') + '</div>'
+        + '<div class="dash-report-meta">' + meta + '</div></div>'
+        + '<span class="dash-report-type" style="background:' + typeColor + '22;color:' + typeColor + '">' + typeLabel + '</span>'
+        + '</div>'
+        + '<div class="history-actions">'
+        + '<button class="history-btn" onclick="viewFirestoreReport(\'' + r.id + '\')" title="Ansehen">&#128065;</button>'
+        + '<button class="history-btn" onclick="downloadFirestoreReport(\'' + r.id + '\')" title="Herunterladen">&#11015;</button>'
+        + '<button class="history-btn" onclick="editFirestoreReport(\'' + r.id + '\')" title="Editieren">&#9998;</button>'
+        + '<button class="history-btn" onclick="deleteFirestoreReport(\'' + r.id + '\');dashLoadReports()" title="L&ouml;schen" style="color:#e74c3c">&#10005;</button>'
+        + '</div></div>';
+    }).join('');
+  }).catch(function(err) {
+    console.error('Dashboard error:', err);
+    document.getElementById('dash-report-list').innerHTML = '<div class="dash-empty"><p>Fehler beim Laden: ' + escHtml(err.message) + '</p></div>';
+  });
+}
+
+function dashViewReport(id) {
+  db.collection('berichte').doc(id).get().then(function(doc) {
+    if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
+    var d = doc.data();
+    if (d.html) {
+      var prefix = (HISTORY_FILE_PREFIXES[d.type] || 'Bericht_');
+      var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '') + '.html';
+      showPreview(d.html, fn);
+    } else {
+      toast('Kein HTML-Bericht vorhanden');
+    }
+  });
+}
+
+/* ═══════════════════════════════════════
+   SAVE REPORT TO FIRESTORE
+   ═══════════════════════════════════════ */
+function saveReportToFirestore(type, data, html) {
+  if (!db || !currentUser) return;
+  var entry = {
+    type: type,
+    baustelle: data.baustelle || data.site || '',
+    datum: data.datum || data.date || '',
+    ersteller: currentUser.name,
+    erstellerId: currentUser.id,
+    html: html,
+    data: data,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  db.collection('berichte').add(entry).then(function() {
+    // silent success
+  }).catch(function(err) {
+    console.error('Save report error:', err);
+    toast('Bericht lokal gespeichert, Cloud-Sync fehlgeschlagen');
+  });
+}
+
+/* ═══════════════════════════════════════
+   UPLOAD PHOTOS TO FIREBASE STORAGE
+   ═══════════════════════════════════════ */
+function uploadPhotoToStorage(dataUrl, path) {
+  if (!storage) return Promise.resolve(dataUrl);
+  try {
+    var ref = storage.ref().child(path);
+    // Convert data URL to blob
+    var parts = dataUrl.split(',');
+    var mime = parts[0].match(/:(.*?);/)[1];
+    var binary = atob(parts[1]);
+    var arr = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+    var blob = new Blob([arr], { type: mime });
+    return ref.put(blob).then(function(snap) {
+      return snap.ref.getDownloadURL();
+    });
+  } catch(e) {
+    return Promise.resolve(dataUrl);
+  }
+}
+
+/* ═══════════════════════════════════════
+   STATE – Baustellenkontrolle
+   ═══════════════════════════════════════ */
+var maengel = [];
+var mangelSeq = 0;
+var sigData = null;
+var hasSigned = false;
+var activePhotoMId = null;
+
+// Restore saved inspector name
+try { document.getElementById('f-inspector').value = localStorage.getItem('bk_inspector') || ''; } catch(e) {}
+
+// Today's date
+document.getElementById('f-date').valueAsDate = new Date();
+
+// First mangel
+addMangel();
+
+/* ═══════════════════════════════════════
+   STATE – Tagesrapport
+   ═══════════════════════════════════════ */
+var trWorkers = [];
+var trWorkerSeq = 0;
+var trKategorie = 'Elektro';
+var trTaetigkeiten = [];
+var trSigData = null;
+var trHasSigned = false;
+
+document.getElementById('tr-date').valueAsDate = new Date();
+
+// Add first worker
+addWorker();
+
+/* ═══════════════════════════════════════
+   STATE – Rohmontage
+   ═══════════════════════════════════════ */
+var RM_CATEGORIES = [
+  { name: 'Meterriss', items: [
+    'Meterriss vorhanden und schlüssig',
+    'Ort EG / Sitz über Boden',
+    'Ort OG / Sitz über Boden',
+    'Schalter/Steckdosen gem. Meterriss'
+  ]},
+  { name: 'Pläne', items: [
+    'Küchenpläne vorhanden',
+    'Badpläne vorhanden',
+    'Heizungspläne vorhanden',
+    'Änderungen/Ergänzungen eingetragen'
+  ]},
+  { name: 'Schlitzen / Stemmen / Fräsen', items: [
+    'Schlitztiefenbegrenzung beachtet',
+    'Schalterdosen fachgerecht gesetzt',
+    'Schalterdosen Kabeleinführungen geschlossen'
+  ]},
+  { name: 'Installation Leitungen Rohre', items: [
+    'Leitungen in Schlitzen fixiert',
+    'Leitungen auf Boden in Schutzrohr',
+    'Durchdringungen Dampfbremse mit Kabelmanschetten',
+    'Durchdringungen nach Außen abgedichtet',
+    'Leitungen in Leichtbauwänden fixiert',
+    'Leitungen beschriftet',
+    'Schalterdosen vorverdrahtet'
+  ]},
+  { name: 'Listen und Fotos', items: [
+    'Materialentnahme/rückgabe abgegeben',
+    'Kabelliste vollständig ausgefüllt',
+    'Schalteraufmaß vollständig erstellt',
+    'Fotos Installation in Leichtbauwänden',
+    'Fotos Außenanschlüsse'
+  ]}
+];
+
+var rmItems = [];
+var rmSigData = null;
+var rmHasSigned = false;
+
+document.getElementById('rm-datum').valueAsDate = new Date();
+
+function initRmItems() {
+  rmItems = [];
+  var idx = 0;
+  RM_CATEGORIES.forEach(function(cat) {
+    cat.items.forEach(function(label) {
+      rmItems.push({ id: idx, cat: cat.name, label: label, val: '', bem: '' });
+      idx++;
+    });
+  });
+}
+initRmItems();
+
+function renderRmChecklist() {
+  var el = document.getElementById('rmChecklistArea');
+  var html = '';
+  var lastCat = '';
+  rmItems.forEach(function(item) {
+    if (item.cat !== lastCat) {
+      lastCat = item.cat;
+      html += '<div class="cl-category">' + escHtml(item.cat) + '</div>';
+    }
+    html += '<div class="cl-item">'
+      + '<span class="cl-label">' + escHtml(item.label) + '</span>'
+      + '<div class="cl-btns">'
+      + '<button class="cl-btn' + (item.val === 'ja' ? ' yes' : '') + '" onclick="setRmItem(' + item.id + ',\'ja\',this)">Ja</button>'
+      + '<button class="cl-btn' + (item.val === 'nein' ? ' no' : '') + '" onclick="setRmItem(' + item.id + ',\'nein\',this)">Nein</button>'
+      + '</div>'
+      + '<input class="cl-bem" placeholder="Bem." value="' + escHtml(item.bem) + '" oninput="setRmBem(' + item.id + ',this.value)">'
+      + '</div>';
+  });
+  el.innerHTML = html;
+}
+renderRmChecklist();
+
+function setRmItem(id, val, btn) {
+  var item = rmItems[id];
+  if (!item) return;
+  item.val = item.val === val ? '' : val;
+  renderRmChecklist();
+}
+
+function setRmBem(id, val) {
+  if (rmItems[id]) rmItems[id].bem = val;
+}
+
+/* ═══════════════════════════════════════
+   STATE – Fertigmontage
+   ═══════════════════════════════════════ */
+var FM_CATEGORIES = [
+  { name: 'Zählerschrank', items: [
+    'Leitungen gemäß Plan aufgelegt',
+    'Abweichungen vom Plan',
+    'Beschriftung vollständig'
+  ]},
+  { name: 'Potentialausgleich', items: [
+    'Potentialausgleich hergestellt',
+    'PA-Schiene beschriftet',
+    'PA-Bock für Antenne eingebaut'
+  ]},
+  { name: 'Heizung HKV', items: [
+    'Heizung angeschlossen',
+    'Außenfühler montiert',
+    'Inbetriebnahme / Estrichprogramm',
+    'Stellventile angeschlossen',
+    'Zuordnung RTH - Heizkreise geprüft'
+  ]},
+  { name: 'Schaltermontage', items: [
+    'Schalter und Steckdosen montiert',
+    'Lot- und waagerecht überprüft',
+    'Kücheninstallation fertig',
+    'Bad/WC Installation fertig',
+    'Außensteckdosen montiert'
+  ]},
+  { name: 'Sonstiges', items: [
+    'Klingeltaster und Gong montiert + geprüft',
+    'Rauchmelder montiert'
+  ]},
+  { name: 'Antenne', items: [
+    'Antennen-Leitungen beschriftet',
+    'Antennen-Anschlüsse geprüft/gemessen'
+  ]},
+  { name: 'CAT', items: [
+    'CAT-Leitungen beschriftet',
+    'CAT-Anschlüsse geprüft/gemessen'
+  ]},
+  { name: 'Restarbeiten', items: [
+    'Restarbeiten notwendig',
+    'Restarbeiten aufgenommen'
+  ]},
+  { name: 'Prüfprotokoll', items: [
+    'Protokoll erstellt und unterschrieben',
+    'Zählernummern und Stände eingetragen'
+  ]}
+];
+
+var fmItems = [];
+var fmBegonnen = null;
+var fmSigData = null;
+var fmHasSigned = false;
+
+document.getElementById('fm-datum').valueAsDate = new Date();
+
+function initFmItems() {
+  fmItems = [];
+  var idx = 0;
+  FM_CATEGORIES.forEach(function(cat) {
+    cat.items.forEach(function(label) {
+      fmItems.push({ id: idx, cat: cat.name, label: label, val: '', bem: '' });
+      idx++;
+    });
+  });
+}
+initFmItems();
+
+function renderFmChecklist() {
+  var el = document.getElementById('fmChecklistArea');
+  var html = '';
+  var lastCat = '';
+  fmItems.forEach(function(item) {
+    if (item.cat !== lastCat) {
+      lastCat = item.cat;
+      html += '<div class="cl-category">' + escHtml(item.cat) + '</div>';
+    }
+    html += '<div class="cl-item">'
+      + '<span class="cl-label">' + escHtml(item.label) + '</span>'
+      + '<div class="cl-btns">'
+      + '<button class="cl-btn' + (item.val === 'ja' ? ' yes' : '') + '" onclick="setFmItem(' + item.id + ',\'ja\',this)">Ja</button>'
+      + '<button class="cl-btn' + (item.val === 'nein' ? ' no' : '') + '" onclick="setFmItem(' + item.id + ',\'nein\',this)">Nein</button>'
+      + '</div>'
+      + '<input class="cl-bem" placeholder="Bem." value="' + escHtml(item.bem) + '" oninput="setFmBem(' + item.id + ',this.value)">'
+      + '</div>';
+  });
+  el.innerHTML = html;
+}
+renderFmChecklist();
+
+function setFmItem(id, val, btn) {
+  var item = fmItems[id];
+  if (!item) return;
+  item.val = item.val === val ? '' : val;
+  renderFmChecklist();
+}
+
+function setFmBem(id, val) {
+  if (fmItems[id]) fmItems[id].bem = val;
+}
+
+function setFmBegonnen(val, btn) {
+  fmBegonnen = val;
+  var parent = btn.parentElement;
+  var btns = parent.querySelectorAll('.cl-btn');
+  btns[0].className = 'cl-btn' + (val === true ? ' yes' : '');
+  btns[1].className = 'cl-btn' + (val === false ? ' no' : '');
+}
+
+/* ═══════════════════════════════════════
+   STATE – Kabelliste
+   ═══════════════════════════════════════ */
+var KL_DEFAULTS = [
+  { stromkreis: 'Wärmepumpe Außen', art: 'NYY', leiter: '5x2,5', sicherung: 'F1' },
+  { stromkreis: 'Wärmepumpe Innen', art: 'NYM', leiter: '5x4', sicherung: 'F2' },
+  { stromkreis: 'Wärmepumpe Steuerung', art: 'NYM', leiter: '3x1,5', sicherung: 'F3' },
+  { stromkreis: 'HKV EG', art: 'NYM', leiter: '3x1,5', sicherung: 'F4' },
+  { stromkreis: 'HKV OG', art: 'NYM', leiter: '3x1,5', sicherung: 'F4' },
+  { stromkreis: 'Schütz', art: 'Intern', leiter: 'Intern', sicherung: 'F5' },
+  { stromkreis: 'Neozed', art: '', leiter: '', sicherung: '' }
+];
+
+var klRows = [];
+
+document.getElementById('kl-datum').valueAsDate = new Date();
+
+function initKlRows() {
+  klRows = [];
+  for (var i = 0; i < 30; i++) {
+    var def = KL_DEFAULTS[i] || { stromkreis: '', art: '', leiter: '', sicherung: '' };
+    klRows.push({ nr: i + 1, stromkreis: def.stromkreis, art: def.art, leiter: def.leiter, sicherung: def.sicherung });
+  }
+}
+initKlRows();
+
+function renderKlTable() {
+  var el = document.getElementById('klRows');
+  var html = '';
+  klRows.forEach(function(row, i) {
+    html += '<tr>'
+      + '<td class="kl-nr">' + row.nr + '</td>'
+      + '<td><input value="' + escHtml(row.stromkreis) + '" oninput="klRows[' + i + '].stromkreis=this.value"></td>'
+      + '<td><input value="' + escHtml(row.art) + '" oninput="klRows[' + i + '].art=this.value"></td>'
+      + '<td><input value="' + escHtml(row.leiter) + '" oninput="klRows[' + i + '].leiter=this.value"></td>'
+      + '<td><input value="' + escHtml(row.sicherung) + '" oninput="klRows[' + i + '].sicherung=this.value"></td>'
+      + '</tr>';
+  });
+  el.innerHTML = html;
+}
+renderKlTable();
+
+/* ═══════════════════════════════════════
+   STATE – Schalter
+   ═══════════════════════════════════════ */
+var SC_LABELS = [
+  'Universalschalter','Taster','Universalwippen','Serienschalter','Serienwippen',
+  'Kontrollausschalter','2-poliger Ausschalter mit Kontrollampe','Wippe mit Kontroll. Weiß',
+  'Jalousieschalter','Jalousiewippe','Steckdosen','Steckdosen Klappdeckel/Kindersicherung',
+  'Antennendose SAT','Zentralstück Antenne 3-Loch','Bewegungsmelder Innen','Bewegungsmelder Außen',
+  'Zentralstück Antenne 2-Loch','CAT-Dose 1-fach','Zentralstück CAT 1-fach','CAT-Dose 2-fach',
+  'Zentralstück CAT 2-fach','Rahmen 1-fach','Rahmen 2-fach','Rahmen 3-fach','Rahmen 4-fach/5-fach',
+  'Patchfeld','Steckdosen IP44','Rahmen IP44 1-fach','Rahmen IP44 2-fach',
+  'Steckdose Feuchtraum Ap 1-fach','Schalter-Steckdosen-Kombi FR AP','Herdanschlussdose','Spots Innen/Außen'
+];
+
+var scItems = [];
+var scFabrikat = 'Balance SI';
+
+document.getElementById('sc-datum').valueAsDate = new Date();
+
+function initScItems() {
+  scItems = [];
+  SC_LABELS.forEach(function(label, i) {
+    scItems.push({ nr: i + 1, label: label, count: 0 });
+  });
+}
+initScItems();
+
+function renderScTable() {
+  var el = document.getElementById('scRows');
+  var html = '';
+  scItems.forEach(function(item, i) {
+    html += '<tr>'
+      + '<td class="sc-nr">' + item.nr + '</td>'
+      + '<td class="sc-label">' + escHtml(item.label) + '</td>'
+      + '<td>'
+      + '<div class="cnt-wrap">'
+      + '<button class="cnt-btn" onclick="scCount(' + i + ',-1)">-</button>'
+      + '<input class="cnt-val" type="number" min="0" value="' + item.count + '" onchange="scSet(' + i + ',this.value)">'
+      + '<button class="cnt-btn" onclick="scCount(' + i + ',1)">+</button>'
+      + '</div>'
+      + '</td>'
+      + '</tr>';
+  });
+  el.innerHTML = html;
+}
+renderScTable();
+
+function scCount(idx, delta) {
+  scItems[idx].count = Math.max(0, scItems[idx].count + delta);
+  renderScTable();
+}
+
+function scSet(idx, val) {
+  scItems[idx].count = Math.max(0, parseInt(val) || 0);
+}
+
+function setScFabrikat(val, btn) {
+  var balBtn = document.getElementById('sc-fab-balance');
+  var andBtn = document.getElementById('sc-fab-andere');
+  var customInp = document.getElementById('sc-fab-custom');
+  balBtn.classList.remove('active');
+  andBtn.classList.remove('active');
+  btn.classList.add('active');
+  if (val === 'andere') {
+    customInp.style.display = 'block';
+    scFabrikat = customInp.value || 'andere';
+    customInp.oninput = function() { scFabrikat = this.value || 'andere'; };
+  } else {
+    customInp.style.display = 'none';
+    scFabrikat = 'Balance SI';
+  }
+}
+
+/* ═══════════════════════════════════════
+   MODULE NAVIGATION
+   ═══════════════════════════════════════ */
+function switchModule(name, btn) {
+  document.querySelectorAll('.module-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.module-panel').forEach(function(p){ p.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.getElementById('mod-' + name).classList.add('active');
+
+  var sub = document.getElementById('headerSubtitle');
+  if (name === 'kontrolle') sub.textContent = 'Mängeldokumentation';
+  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(calcArbeitszeit, 50); }
+  else if (name === 'rohmontage') sub.textContent = 'Checkliste Rohmontage';
+  else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
+  else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
+  else if (name === 'schalter') sub.textContent = 'Schalteraufmaß';
+  else if (name === 'history') { sub.textContent = 'Berichte'; renderHistory(); }
+  else if (name === 'stammdaten') { sub.textContent = 'Stammdaten verwalten'; sdSwitchTab('mitarbeiter', document.querySelector('.sd-tab')); }
+  else if (name === 'dashboard') { sub.textContent = 'Chef-Dashboard'; dashLoadReports(); }
+}
+
+/* ═══════════════════════════════════════
+   BAUSTELLENKONTROLLE – MÄNGEL
+   ═══════════════════════════════════════ */
+function addMangel() {
+  mangelSeq++;
+  maengel.push({ id: mangelSeq, text: '', fotos: [] });
+  renderMaengel();
+  setTimeout(function(){
+    var items = document.querySelectorAll('.mangel-item');
+    if (items.length) items[items.length-1].scrollIntoView({behavior:'smooth', block:'center'});
+  }, 50);
+}
+
+function removeMangel(id) {
+  maengel = maengel.filter(function(m){ return m.id !== id; });
+  renderMaengel();
+}
+
+function renderMaengel() {
+  var el = document.getElementById('maengelList');
+  var html = '';
+  maengel.forEach(function(m, i) {
+    var fotosHtml = '';
+    m.fotos.forEach(function(f, fi) {
+      fotosHtml += '<div class="photo-wrap">'
+        + '<img class="photo-thumb" src="' + f + '" onclick="openLB(this.src)" alt="Foto">'
+        + '<button class="photo-del" onclick="delPhoto(' + m.id + ',' + fi + ')" title="Entfernen">&#10005;</button>'
+        + '</div>';
+    });
+    html += '<div class="mangel-item" data-id="' + m.id + '">'
+      + '<div class="mangel-num">Mangel ' + String(i+1).padStart(2,'0') + '</div>'
+      + (maengel.length > 1 ? '<button class="mangel-remove" onclick="removeMangel(' + m.id + ')" title="Entfernen">&#10005;</button>' : '')
+      + '<div class="field"><label>Beschreibung</label>'
+      + '<textarea placeholder="Was wurde festgestellt?" oninput="updMangel(' + m.id + ',this.value)">' + escHtml(m.text) + '</textarea></div>'
+      + '<div style="margin-top:12px"><label style="font-size:13px;font-weight:600;color:var(--text-muted)">Fotos</label>'
+      + '<div class="photo-grid">' + fotosHtml
+      + '<button class="photo-add" onclick="triggerCam(' + m.id + ')" title="Foto aufnehmen">&#128247;</button>'
+      + '</div></div></div>';
+  });
+  el.innerHTML = html;
+}
+
+function updMangel(id, val) {
+  var m = maengel.find(function(x){ return x.id === id; });
+  if (m) m.text = val;
+}
+
+function delPhoto(mid, fi) {
+  var m = maengel.find(function(x){ return x.id === mid; });
+  if (m) { m.fotos.splice(fi, 1); renderMaengel(); }
+}
+
+/* ═══════════════════════════════════════
+   CAMERA / PHOTOS
+   ═══════════════════════════════════════ */
+function triggerCam(mid) {
+  activePhotoMId = mid;
+  var inp = document.getElementById('camInput');
+  inp.value = '';
+  inp.click();
+}
+
+document.getElementById('camInput').addEventListener('change', function() {
+  var file = this.files && this.files[0];
+  if (!file || !activePhotoMId) return;
+  compressImg(file, 1200, 0.7, function(dataUrl) {
+    var m = maengel.find(function(x){ return x.id === activePhotoMId; });
+    if (m) { m.fotos.push(dataUrl); renderMaengel(); }
+  });
+});
+
+function compressImg(file, maxDim, quality, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var c = document.createElement('canvas');
+      var w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      cb(c.toDataURL('image/jpeg', quality));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ═══════════════════════════════════════
+   LIGHTBOX
+   ═══════════════════════════════════════ */
+function openLB(src) {
+  document.getElementById('lbImg').src = src;
+  document.getElementById('lightbox').hidden = false;
+}
+function closeLB() {
+  document.getElementById('lightbox').hidden = true;
+}
+
+/* ═══════════════════════════════════════
+   SIGNATURE – Baustellenkontrolle
+   ═══════════════════════════════════════ */
+var sigCanvas = document.getElementById('sigCanvas');
+var sigCtx = sigCanvas.getContext('2d');
+var sigDrawing = false, sigLX, sigLY;
+
+function initSig() {
+  var r = sigCanvas.parentElement.getBoundingClientRect();
+  sigCanvas.width = r.width;
+  sigCanvas.height = 160;
+  var style = getComputedStyle(document.documentElement);
+  sigCtx.strokeStyle = '#000000';
+  sigCtx.lineWidth = 3;
+  sigCtx.lineCap = 'round';
+  sigCtx.lineJoin = 'round';
+}
+initSig();
+window.addEventListener('resize', function(){
+  if (!hasSigned) initSig();
+  if (!trHasSigned) initTrSig();
+  if (!rmHasSigned) initRmSig();
+  if (!fmHasSigned) initFmSig();
+});
+
+function sigPos(e, canvas) {
+  var r = canvas.getBoundingClientRect();
+  var t = e.touches ? e.touches[0] : e;
+  return [
+    (t.clientX - r.left) * (canvas.width / r.width),
+    (t.clientY - r.top) * (canvas.height / r.height)
+  ];
+}
+sigCanvas.addEventListener('mousedown', function(e){ sigStart(e); });
+sigCanvas.addEventListener('mousemove', function(e){ sigMove(e); });
+sigCanvas.addEventListener('mouseup', sigEnd);
+sigCanvas.addEventListener('touchstart', function(e){ sigStart(e); }, {passive:false});
+sigCanvas.addEventListener('touchmove', function(e){ sigMove(e); }, {passive:false});
+sigCanvas.addEventListener('touchend', sigEnd);
+
+function sigStart(e) {
+  e.preventDefault(); sigDrawing = true;
+  var p = sigPos(e, sigCanvas); sigLX = p[0]; sigLY = p[1];
+  document.getElementById('sigHint').style.opacity = '0';
+  hasSigned = true;
+}
+function sigMove(e) {
+  if (!sigDrawing) return; e.preventDefault();
+  var p = sigPos(e, sigCanvas);
+  sigCtx.beginPath();
+  sigCtx.moveTo(sigLX, sigLY);
+  sigCtx.lineTo(p[0], p[1]);
+  sigCtx.stroke();
+  sigLX = p[0]; sigLY = p[1];
+}
+function sigEnd() {
+  sigDrawing = false;
+  sigData = sigCanvas.toDataURL('image/png');
+}
+function clearSig() {
+  sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+  hasSigned = false; sigData = null;
+  document.getElementById('sigHint').style.opacity = '1';
+}
+
+/* ═══════════════════════════════════════
+   SIGNATURE – Tagesrapport
+   ═══════════════════════════════════════ */
+var trSigCanvas = document.getElementById('trSigCanvas');
+var trSigCtx = trSigCanvas.getContext('2d');
+var trSigDrawing = false, trSigLX, trSigLY;
+
+function initTrSig() {
+  var r = trSigCanvas.parentElement.getBoundingClientRect();
+  if (r.width < 10) return;
+  trSigCanvas.width = r.width;
+  trSigCanvas.height = 160;
+  var style = getComputedStyle(document.documentElement);
+  trSigCtx.strokeStyle = '#000000';
+  trSigCtx.lineWidth = 3;
+  trSigCtx.lineCap = 'round';
+  trSigCtx.lineJoin = 'round';
+}
+
+trSigCanvas.addEventListener('mousedown', function(e){ trSigStart(e); });
+trSigCanvas.addEventListener('mousemove', function(e){ trSigMove(e); });
+trSigCanvas.addEventListener('mouseup', trSigEnd);
+trSigCanvas.addEventListener('touchstart', function(e){ trSigStart(e); }, {passive:false});
+trSigCanvas.addEventListener('touchmove', function(e){ trSigMove(e); }, {passive:false});
+trSigCanvas.addEventListener('touchend', trSigEnd);
+
+function trSigStart(e) {
+  e.preventDefault(); trSigDrawing = true;
+  var p = sigPos(e, trSigCanvas); trSigLX = p[0]; trSigLY = p[1];
+  document.getElementById('trSigHint').style.opacity = '0';
+  trHasSigned = true;
+}
+function trSigMove(e) {
+  if (!trSigDrawing) return; e.preventDefault();
+  var p = sigPos(e, trSigCanvas);
+  trSigCtx.beginPath();
+  trSigCtx.moveTo(trSigLX, trSigLY);
+  trSigCtx.lineTo(p[0], p[1]);
+  trSigCtx.stroke();
+  trSigLX = p[0]; trSigLY = p[1];
+}
+function trSigEnd() {
+  trSigDrawing = false;
+  trSigData = trSigCanvas.toDataURL('image/png');
+}
+function clearTrSig() {
+  trSigCtx.clearRect(0, 0, trSigCanvas.width, trSigCanvas.height);
+  trHasSigned = false; trSigData = null;
+  document.getElementById('trSigHint').style.opacity = '1';
+}
+
+/* ═══════════════════════════════════════
+   SIGNATURE – Rohmontage
+   ═══════════════════════════════════════ */
+var rmSigCanvas = document.getElementById('rmSigCanvas');
+var rmSigCtx = rmSigCanvas.getContext('2d');
+var rmSigDrawing = false, rmSigLX, rmSigLY;
+
+function initRmSig() {
+  var r = rmSigCanvas.parentElement.getBoundingClientRect();
+  if (r.width < 10) return;
+  rmSigCanvas.width = r.width;
+  rmSigCanvas.height = 160;
+  var style = getComputedStyle(document.documentElement);
+  rmSigCtx.strokeStyle = '#000000';
+  rmSigCtx.lineWidth = 3;
+  rmSigCtx.lineCap = 'round';
+  rmSigCtx.lineJoin = 'round';
+}
+
+rmSigCanvas.addEventListener('mousedown', function(e){ rmSigStart(e); });
+rmSigCanvas.addEventListener('mousemove', function(e){ rmSigMove(e); });
+rmSigCanvas.addEventListener('mouseup', rmSigEnd);
+rmSigCanvas.addEventListener('touchstart', function(e){ rmSigStart(e); }, {passive:false});
+rmSigCanvas.addEventListener('touchmove', function(e){ rmSigMove(e); }, {passive:false});
+rmSigCanvas.addEventListener('touchend', rmSigEnd);
+
+function rmSigStart(e) {
+  e.preventDefault(); rmSigDrawing = true;
+  var p = sigPos(e, rmSigCanvas); rmSigLX = p[0]; rmSigLY = p[1];
+  document.getElementById('rmSigHint').style.opacity = '0';
+  rmHasSigned = true;
+}
+function rmSigMove(e) {
+  if (!rmSigDrawing) return; e.preventDefault();
+  var p = sigPos(e, rmSigCanvas);
+  rmSigCtx.beginPath();
+  rmSigCtx.moveTo(rmSigLX, rmSigLY);
+  rmSigCtx.lineTo(p[0], p[1]);
+  rmSigCtx.stroke();
+  rmSigLX = p[0]; rmSigLY = p[1];
+}
+function rmSigEnd() {
+  rmSigDrawing = false;
+  rmSigData = rmSigCanvas.toDataURL('image/png');
+}
+function clearRmSig() {
+  rmSigCtx.clearRect(0, 0, rmSigCanvas.width, rmSigCanvas.height);
+  rmHasSigned = false; rmSigData = null;
+  document.getElementById('rmSigHint').style.opacity = '1';
+}
+
+/* ═══════════════════════════════════════
+   SIGNATURE – Fertigmontage
+   ═══════════════════════════════════════ */
+var fmSigCanvas = document.getElementById('fmSigCanvas');
+var fmSigCtx = fmSigCanvas.getContext('2d');
+var fmSigDrawing = false, fmSigLX, fmSigLY;
+
+function initFmSig() {
+  var r = fmSigCanvas.parentElement.getBoundingClientRect();
+  if (r.width < 10) return;
+  fmSigCanvas.width = r.width;
+  fmSigCanvas.height = 160;
+  var style = getComputedStyle(document.documentElement);
+  fmSigCtx.strokeStyle = '#000000';
+  fmSigCtx.lineWidth = 3;
+  fmSigCtx.lineCap = 'round';
+  fmSigCtx.lineJoin = 'round';
+}
+
+fmSigCanvas.addEventListener('mousedown', function(e){ fmSigStart(e); });
+fmSigCanvas.addEventListener('mousemove', function(e){ fmSigMove(e); });
+fmSigCanvas.addEventListener('mouseup', fmSigEnd);
+fmSigCanvas.addEventListener('touchstart', function(e){ fmSigStart(e); }, {passive:false});
+fmSigCanvas.addEventListener('touchmove', function(e){ fmSigMove(e); }, {passive:false});
+fmSigCanvas.addEventListener('touchend', fmSigEnd);
+
+function fmSigStart(e) {
+  e.preventDefault(); fmSigDrawing = true;
+  var p = sigPos(e, fmSigCanvas); fmSigLX = p[0]; fmSigLY = p[1];
+  document.getElementById('fmSigHint').style.opacity = '0';
+  fmHasSigned = true;
+}
+function fmSigMove(e) {
+  if (!fmSigDrawing) return; e.preventDefault();
+  var p = sigPos(e, fmSigCanvas);
+  fmSigCtx.beginPath();
+  fmSigCtx.moveTo(fmSigLX, fmSigLY);
+  fmSigCtx.lineTo(p[0], p[1]);
+  fmSigCtx.stroke();
+  fmSigLX = p[0]; fmSigLY = p[1];
+}
+function fmSigEnd() {
+  fmSigDrawing = false;
+  fmSigData = fmSigCanvas.toDataURL('image/png');
+}
+function clearFmSig() {
+  fmSigCtx.clearRect(0, 0, fmSigCanvas.width, fmSigCanvas.height);
+  fmHasSigned = false; fmSigData = null;
+  document.getElementById('fmSigHint').style.opacity = '1';
+}
+
+/* ═══════════════════════════════════════
+   TAGESRAPPORT – Kategorie
+   ═══════════════════════════════════════ */
+function setKategorie(btn) {
+  document.querySelectorAll('#tr-kategorie .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  trKategorie = btn.getAttribute('data-val');
+}
+
+/* ═══════════════════════════════════════
+   TAGESRAPPORT – Tätigkeit
+   ═══════════════════════════════════════ */
+function toggleTaetigkeit(btn) {
+  btn.classList.toggle('active');
+  trTaetigkeiten = [];
+  document.querySelectorAll('#tr-taetigkeit .chip-toggle.active').forEach(function(b){
+    trTaetigkeiten.push(b.getAttribute('data-val'));
+  });
+}
+
+/* ═══════════════════════════════════════
+   TAGESRAPPORT – Workers
+   ═══════════════════════════════════════ */
+function addWorker() {
+  trWorkerSeq++;
+  var workerName = '';
+  var workerRolle = 'Facharbeiter';
+  // Auto-fill with logged-in user if not Chef
+  if (currentUser && !isChef) {
+    workerName = currentUser.name;
+    workerRolle = PERSONAL.rollen[currentUser.name] || 'Facharbeiter';
+  }
+  trWorkers.push({ id: trWorkerSeq, name: workerName, rolle: workerRolle, stunden: '', ausloese: false, verpfl: false });
+  renderWorkers();
+  setTimeout(function(){
+    var items = document.querySelectorAll('.worker-item');
+    if (items.length) items[items.length-1].scrollIntoView({behavior:'smooth', block:'center'});
+  }, 50);
+}
+
+function removeWorker(id) {
+  trWorkers = trWorkers.filter(function(w){ return w.id !== id; });
+  renderWorkers();
+  updateStundenSumme();
+}
+
+function renderWorkers() {
+  var el = document.getElementById('workerList');
+  var html = '';
+  trWorkers.forEach(function(w, i) {
+    var optionsHtml = '<option value="">— Mitarbeiter —</option>';
+    if (isChef) {
+      // Chef sees all employees
+      var groupE = '<optgroup label="Elektriker">';
+      PERSONAL.elektriker.forEach(function(n) {
+        groupE += '<option value="' + n + '"' + (w.name === n ? ' selected' : '') + '>' + n + '</option>';
+      });
+      groupE += '</optgroup>';
+      var groupA = '<optgroup label="Auszubildende">';
+      PERSONAL.azubi.forEach(function(n) {
+        groupA += '<option value="' + n + '"' + (w.name === n ? ' selected' : '') + '>' + n + '</option>';
+      });
+      groupA += '</optgroup>';
+      optionsHtml += groupE + groupA;
+    } else if (currentUser) {
+      // Normal user only sees themselves
+      optionsHtml += '<option value="' + currentUser.name + '"' + (w.name === currentUser.name ? ' selected' : '') + '>' + currentUser.name + '</option>';
+    }
+
+    html += '<div class="worker-item" data-id="' + w.id + '">'
+      + '<div class="worker-num">Mitarbeiter ' + String(i+1).padStart(2,'0') + '</div>'
+      + (trWorkers.length > 1 ? '<button class="worker-remove" onclick="removeWorker(' + w.id + ')" title="Entfernen">&#10005;</button>' : '')
+      + '<div class="field"><label>Name</label>'
+      + '<select onchange="updWorker(' + w.id + ',\'name\',this.value)">' + optionsHtml + '</select></div>'
+      + '<div class="row">'
+      + '<div class="field"><label>Rolle</label>'
+      + '<input type="text" value="' + (w.rolle || 'Facharbeiter') + '" readonly style="opacity:.7;cursor:default"></div>'
+      + '<div class="field"><label>Stunden</label>'
+      + '<input type="number" step="0.5" min="0" max="24" value="' + (w.stunden || '') + '" placeholder="Std." '
+      + 'oninput="updWorker(' + w.id + ',\'stunden\',this.value);updateStundenSumme()"></div>'
+      + '</div>'
+      + '<div class="worker-chips">'
+      + '<button class="worker-chip' + (w.ausloese ? ' active' : '') + '" onclick="toggleWorkerFlag(' + w.id + ',\'ausloese\',this)">Auslöse</button>'
+      + '<button class="worker-chip' + (w.verpfl ? ' active' : '') + '" onclick="toggleWorkerFlag(' + w.id + ',\'verpfl\',this)">Verpfl.geld</button>'
+      + '</div>'
+      + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function updWorker(id, field, val) {
+  var w = trWorkers.find(function(x){ return x.id === id; });
+  if (w) {
+    w[field] = val;
+    if (field === 'name' && val) {
+      w.rolle = PERSONAL.rollen[val] || 'Facharbeiter';
+      renderWorkers();
+    }
+  }
+}
+
+function toggleWorkerFlag(id, flag, btn) {
+  var w = trWorkers.find(function(x){ return x.id === id; });
+  if (w) {
+    w[flag] = !w[flag];
+    btn.classList.toggle('active');
+  }
+}
+
+function updateStundenSumme() {
+  var sum = 0;
+  trWorkers.forEach(function(w) {
+    sum += parseFloat(w.stunden) || 0;
+  });
+  var el = document.getElementById('tr-stunden-summe');
+  var val = document.getElementById('tr-summe-val');
+  if (sum > 0) {
+    el.hidden = false;
+    val.textContent = sum % 1 === 0 ? sum : sum.toFixed(1);
+  } else {
+    el.hidden = true;
+  }
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Baustellenkontrolle
+   ═══════════════════════════════════════ */
+function getFormData() {
+  return {
+    site: document.getElementById('f-site').value.trim(),
+    date: document.getElementById('f-date').value,
+    inspector: document.getElementById('f-inspector').value.trim(),
+    maengel: maengel,
+    signature: sigData
+  };
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso + 'T12:00:00');
+  return d.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+
+function buildReportHtml(data) {
+  var dateFmt = fmtDate(data.date);
+  var validM = data.maengel.filter(function(m){ return m.text || m.fotos.length; });
+
+  var mHtml = '';
+  validM.forEach(function(m, i) {
+    var fotos = m.fotos.map(function(f) {
+      return '<img src="' + f + '" style="width:200px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd">';
+    }).join(' ');
+    mHtml += '<div style="margin-bottom:24px;padding:16px;background:#f9f9f7;border-radius:6px;border:1px solid #e5e4e0">'
+      + '<div style="font-family:monospace;font-size:12px;color:#d97b0d;font-weight:bold;margin-bottom:8px">MANGEL ' + String(i+1).padStart(2,'0') + '</div>'
+      + '<p style="margin:0 0 12px;line-height:1.6">' + escHtml(m.text || '—').replace(/\n/g,'<br>') + '</p>'
+      + (fotos ? '<div style="display:flex;flex-wrap:wrap;gap:8px">' + fotos + '</div>' : '')
+      + '</div>';
+  });
+
+  var sigBlock = '';
+  if (data.signature) {
+    sigBlock = '<h2 style="font-size:16px;text-transform:uppercase;letter-spacing:0.06em;color:#6b6860;margin:32px 0 16px;border-bottom:1px solid #e5e4e0;padding-bottom:8px">Unterschrift Prüfer</h2>'
+      + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:300px;height:auto;border-bottom:1px solid #1a1917"></div>'
+      + '<div style="font-size:13px;color:#6b6860;margin-top:4px">' + escHtml(data.inspector || '—') + ', ' + dateFmt + '</div>';
+  }
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+    + '<title>Kontrolle – ' + escHtml(data.site || 'Baustelle') + '</title></head>'
+    + '<body style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;max-width:700px;margin:0 auto;padding:32px 24px;color:#1a1917;background:#fff">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #d97b0d">'
+    + '<div style="width:40px;height:40px;background:#d97b0d;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px">&#9874;</div>'
+    + '<div><h1 style="margin:0;font-size:22px">Baustellenkontrolle</h1>'
+    + '<div style="font-size:13px;color:#6b6860;margin-top:2px">Mängeldokumentation</div></div></div>'
+    + '<table style="width:100%;border-collapse:collapse;margin-bottom:24px;font-size:14px">'
+    + '<tr><td style="padding:8px 12px;font-weight:600;color:#6b6860;width:120px;background:#f4f3f0;border:1px solid #e5e4e0">Baustelle</td><td style="padding:8px 12px;border:1px solid #e5e4e0">' + escHtml(data.site || '—') + '</td></tr>'
+    + '<tr><td style="padding:8px 12px;font-weight:600;color:#6b6860;width:120px;background:#f4f3f0;border:1px solid #e5e4e0">Datum</td><td style="padding:8px 12px;border:1px solid #e5e4e0">' + dateFmt + '</td></tr>'
+    + '<tr><td style="padding:8px 12px;font-weight:600;color:#6b6860;width:120px;background:#f4f3f0;border:1px solid #e5e4e0">Prüfer</td><td style="padding:8px 12px;border:1px solid #e5e4e0">' + escHtml(data.inspector || '—') + '</td></tr>'
+    + '<tr><td style="padding:8px 12px;font-weight:600;color:#6b6860;width:120px;background:#f4f3f0;border:1px solid #e5e4e0">Mängel</td><td style="padding:8px 12px;border:1px solid #e5e4e0;font-family:monospace">' + validM.length + '</td></tr></table>'
+    + '<h2 style="font-size:16px;text-transform:uppercase;letter-spacing:0.06em;color:#6b6860;margin:32px 0 16px;border-bottom:1px solid #e5e4e0;padding-bottom:8px">Festgestellte Mängel</h2>'
+    + (mHtml || '<p style="color:#9c9890;font-style:italic">Keine Mängel dokumentiert.</p>')
+    + sigBlock
+    + '<div style="margin-top:40px;padding-top:16px;border-top:1px solid #e5e4e0;font-size:11px;color:#9c9890;text-align:center">Erstellt mit Elmbau Baustelle &middot; ' + dateFmt + '</div>'
+    + '</body></html>';
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Tagesrapport
+   ═══════════════════════════════════════ */
+function calcArbeitszeit() {
+  var display = document.getElementById('tr-az-display');
+  var auto = document.getElementById('tr-az-auto');
+  if (!display) return;
+  if (!auto || !auto.checked) { display.textContent = 'Manuell'; display.style.color = 'var(--text-muted)'; return; }
+
+  var beginn = document.getElementById('tr-beginn').value;
+  var ende = document.getElementById('tr-ende').value;
+  if (!beginn || !ende) { display.textContent = '—'; display.style.color = 'var(--text-muted)'; return; }
+
+  // Parse times to minutes since midnight
+  function toMin(t) { var p = t.split(':'); return parseInt(p[0], 10) * 60 + parseInt(p[1], 10); }
+  var totalMin = toMin(ende) - toMin(beginn);
+  if (totalMin <= 0) { display.textContent = '—'; display.style.color = 'var(--danger)'; return; }
+
+  // Subtract pauses (only if they fall within work window)
+  var bMin = toMin(beginn);
+  var eMin = toMin(ende);
+  var p1von = document.getElementById('tr-pause1-von').value;
+  var p1bis = document.getElementById('tr-pause1-bis').value;
+  if (p1von && p1bis) {
+    var pv1 = toMin(p1von); var pb1 = toMin(p1bis);
+    if (pv1 >= bMin && pb1 <= eMin && pb1 > pv1) totalMin -= (pb1 - pv1);
+  }
+  var p2von = document.getElementById('tr-pause2-von').value;
+  var p2bis = document.getElementById('tr-pause2-bis').value;
+  if (p2von && p2bis) {
+    var pv2 = toMin(p2von); var pb2 = toMin(p2bis);
+    if (pv2 >= bMin && pb2 <= eMin && pb2 > pv2) totalMin -= (pb2 - pv2);
+  }
+
+  if (totalMin <= 0) { display.textContent = '0:00 Std.'; display.style.color = 'var(--danger)'; return; }
+
+  // Round to nearest 15 minutes (kaufmännisch: ab 7:30 aufrunden, darunter abrunden)
+  var quarters = Math.round(totalMin / 15);
+  if (quarters === 0 && totalMin > 0) quarters = 1;
+  var roundedMin = quarters * 15;
+  var h = Math.floor(roundedMin / 60);
+  var m = roundedMin % 60;
+
+  display.textContent = h + ':' + (m < 10 ? '0' : '') + m + ' Std.';
+  display.style.color = 'var(--accent-dark)';
+}
+
+function getRapportData() {
+  return {
+    date: document.getElementById('tr-date').value,
+    kostenstelle: document.getElementById('tr-kostenstelle').value.trim(),
+    projekt: document.getElementById('tr-projekt').value.trim(),
+    baustelle: document.getElementById('tr-baustelle').value.trim(),
+    kategorie: trKategorie,
+    beginn: document.getElementById('tr-beginn').value,
+    ende: document.getElementById('tr-ende').value,
+    pause1von: document.getElementById('tr-pause1-von').value,
+    pause1bis: document.getElementById('tr-pause1-bis').value,
+    pause2von: document.getElementById('tr-pause2-von').value,
+    pause2bis: document.getElementById('tr-pause2-bis').value,
+    fahrzeug: document.getElementById('tr-fahrzeug').value.trim(),
+    km: document.getElementById('tr-km').value,
+    fahrer: document.getElementById('tr-fahrer').value,
+    hinfahrt: document.getElementById('tr-hinfahrt').value,
+    rueckfahrt: document.getElementById('tr-rueckfahrt').value,
+    workers: trWorkers,
+    taetigkeiten: trTaetigkeiten,
+    arbeiten: document.getElementById('tr-arbeiten').value.trim(),
+    bemerkungen: document.getElementById('tr-bemerkungen').value.trim(),
+    arbeitszeit: (document.getElementById('tr-az-display') ? document.getElementById('tr-az-display').textContent : ''),
+    signature: trSigData
+  };
+}
+
+function buildRapportHtml(data) {
+  var dateFmt = fmtDate(data.date);
+  var validW = data.workers.filter(function(w){ return w.name; });
+
+  var sumFach = 0, sumProbe = 0, sumLehr = 0;
+  validW.forEach(function(w){
+    var s = parseFloat(w.stunden) || 0;
+    if (w.rolle === 'Facharbeiter') sumFach += s;
+    else if (w.rolle === 'Probearbeit') sumProbe += s;
+    else if (w.rolle === 'Lehrling') sumLehr += s;
+  });
+
+  var taetKuerzel = '';
+  if (data.taetigkeiten && data.taetigkeiten.length) {
+    var map = {'Rohbau':'RB','Fertigmontage':'FM','Kundendienst':'KD','Gewährleistung':'GW','Sonstige':'So.'};
+    taetKuerzel = data.taetigkeiten.map(function(t){ return map[t] || t; }).join(', ');
+  }
+
+  var wRows = '';
+  for (var i = 0; i < 10; i++) {
+    var w = validW[i];
+    var fachStd = '', probeStd = '', lehrStd = '', ausloese = '', verpfl = '', name = '', arbeiten = '';
+    if (w) {
+      name = escHtml(w.name);
+      if (w.rolle === 'Facharbeiter') fachStd = w.stunden || '';
+      if (w.rolle === 'Probearbeit') probeStd = w.stunden || '';
+      if (w.rolle === 'Lehrling') lehrStd = w.stunden || '';
+      ausloese = w.ausloese ? 'X' : '';
+      verpfl = w.verpfl ? 'X' : '';
+      if (i === 0 && taetKuerzel) arbeiten = escHtml(taetKuerzel);
+    }
+    wRows += '<tr>'
+      + '<td class="c">' + (w ? dateFmt : '') + '</td>'
+      + '<td class="c">' + ausloese + '</td>'
+      + '<td class="c">' + verpfl + '</td>'
+      + '<td>' + name + '</td>'
+      + '<td class="c">' + fachStd + '</td>'
+      + '<td class="c">' + probeStd + '</td>'
+      + '<td class="c">' + lehrStd + '</td>'
+      + '<td class="c">' + arbeiten + '</td>'
+      + '<td class="arb">' + (w && i === 0 ? escHtml(data.arbeiten || '') : '') + '</td>'
+      + '</tr>';
+  }
+
+  var katElektro = data.kategorie === 'Elektro' ? 'X' : '';
+  var katElmbau = data.kategorie === 'Elmbau' ? 'X' : '';
+  var katLager = data.kategorie === 'Lager' ? 'X' : '';
+  var katSonstig = data.kategorie === 'Sonstiges' ? 'X' : '';
+
+  var sigImg = '';
+  if (data.signature) {
+    sigImg = '<img src="' + data.signature + '" style="max-height:38px;max-width:140px">';
+  }
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Tagesrapport – ' + escHtml(data.baustelle || data.projekt || dateFmt) + '</title>'
+    + '<style>'
+    + '@page { size: A4 landscape; margin: 8mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #000; background: #fff; margin: 0; padding: 8mm; width: 281mm; }'
+    + '@media print { body { padding: 0; width: auto; } }'
+    + 'table { border-collapse: collapse; }'
+    + '.form { width: 100%; border: 2px solid #000; }'
+    + '.form td, .form th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }'
+    + '.form th { background: #f0f0f0; font-weight: bold; text-align: center; }'
+    + '.hdr { font-size: 14px; font-weight: bold; }'
+    + '.sub { font-size: 10px; }'
+    + '.sm { font-size: 8px; }'
+    + '.c { text-align: center; }'
+    + '.r { text-align: right; }'
+    + '.b { font-weight: bold; }'
+    + '.chk { width: 14px; height: 14px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 14px; font-size: 10px; font-weight: bold; vertical-align: middle; }'
+    + '.data td { height: 20px; font-size: 9px; }'
+    + '.data td.arb { font-size: 8px; text-align: left; padding-left: 4px; }'
+    + '.bot td { font-size: 8px; padding: 2px 4px; vertical-align: top; }'
+    + '</style></head>'
+    + '<body>'
+    + '<table class="form" cellspacing="0">'
+    + '<tr>'
+    + '<td colspan="4" rowspan="2" style="width:28%"><span class="hdr">Elm Bau GmbH</span></td>'
+    + '<td colspan="3" rowspan="2" class="c" style="width:22%"><span class="sub" style="font-weight:bold">Tagesrapport</span><br><span class="sm">Bitte für jeden Tag einen Tagesrapport separat ausfüllen</span></td>'
+    + '<td colspan="2" style="width:50%;text-align:right;font-size:8px">Entfernung zum BV in km (ab 50km): <b>' + escHtml(data.km || '') + '</b></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td class="c sm" style="width:10%">Fahrzeug:</td>'
+    + '<td style="width:40%"><b>' + escHtml(data.fahrzeug || '') + '</b></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td colspan="4" rowspan="2" style="font-size:8px">Braunschweiger Str.22b &nbsp; 38154 Kgl.</td>'
+    + '<td class="c" style="width:8%"><span class="chk">' + katElektro + '</span></td>'
+    + '<td class="c sub" style="width:7%">Elektro</td>'
+    + '<td class="c" style="width:7%"></td>'
+    + '<td class="sm" style="width:10%">Fahrer</td>'
+    + '<td class="c"><b>' + escHtml(data.fahrer || '') + '</b></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td class="c"><span class="chk">' + katElmbau + '</span></td>'
+    + '<td class="c sub">Elmbau</td>'
+    + '<td class="c"></td>'
+    + '<td class="sm">Hinfahrt</td>'
+    + '<td class="c"><b>' + escHtml(data.hinfahrt || '') + '</b></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td colspan="4" style="font-size:8px">&nbsp;</td>'
+    + '<td class="c"><span class="chk">' + katLager + '</span></td>'
+    + '<td class="c sub">Lager</td>'
+    + '<td class="c"></td>'
+    + '<td class="sm">Rückfahrt</td>'
+    + '<td class="c"><b>' + escHtml(data.rueckfahrt || '') + '</b></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td class="sub" style="width:12%">Kostenstelle:</td>'
+    + '<td colspan="2"><b>' + escHtml(data.kostenstelle || '') + '</b></td>'
+    + '<td class="sub r">Projekt Nr.:</td>'
+    + '<td class="c"><span class="chk">' + katSonstig + '</span></td>'
+    + '<td class="c sub">Sonstiges</td>'
+    + '<td colspan="2"><b>' + escHtml(data.projekt || '') + '</b></td>'
+    + '<td class="sm" style="border-bottom:2px solid #000">Datum / Unterschrift<br>Vorgesetzter</td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td class="sub">Bauvorhaben:</td>'
+    + '<td colspan="7"><b>' + escHtml(data.baustelle || '') + '</b></td>'
+    + '<td class="c">' + sigImg + '</td>'
+    + '</tr>'
+    + '<tr style="background:#f0f0f0">'
+    + '<th style="width:10%">Datum</th>'
+    + '<th style="width:5%">Aus-<br>löse</th>'
+    + '<th style="width:5%">Verpfl.<br>Geld</th>'
+    + '<th style="width:16%">Mitarbeiter</th>'
+    + '<th style="width:7%">Fach-<br>arbeiter<br>Std.</th>'
+    + '<th style="width:7%">Probe-<br>arbeit<br>Std.</th>'
+    + '<th style="width:7%">Lehrling<br>Std.</th>'
+    + '<th style="width:7%">ausgef.<br>Arbeiten</th>'
+    + '<th style="width:36%">Ausgeführte Arbeiten / Bemerkungen</th>'
+    + '</tr>'
+    + '<tbody class="data">'
+    + wRows
+    + '</tbody>'
+    + '<tr style="background:#f0f0f0;font-weight:bold">'
+    + '<td colspan="4" class="r sub">Summe Stunden:</td>'
+    + '<td class="c">' + (sumFach ? (sumFach % 1 === 0 ? sumFach : sumFach.toFixed(1)) : '') + '</td>'
+    + '<td class="c">' + (sumProbe ? (sumProbe % 1 === 0 ? sumProbe : sumProbe.toFixed(1)) : '') + '</td>'
+    + '<td class="c">' + (sumLehr ? (sumLehr % 1 === 0 ? sumLehr : sumLehr.toFixed(1)) : '') + '</td>'
+    + '<td colspan="2"></td>'
+    + '</tr>'
+    + '<tr class="bot">'
+    + '<td colspan="4" style="border-top:2px solid #000">'
+    + '<b>Arbeitszeitbeginn (Uhrzeit):</b> ' + escHtml(data.beginn || '') + '<br>'
+    + '<b>Arbeitszeitende (Uhrzeit):</b> ' + escHtml(data.ende || '') + '<br>'
+    + '<b>Netto-Arbeitszeit:</b> ' + escHtml(data.arbeitszeit || '')
+    + '</td>'
+    + '<td colspan="3" style="border-top:2px solid #000">'
+    + '<b>Kürzel für ausgeführte Arbeiten:</b><br>'
+    + 'RB = Rohbau &nbsp; FM = Fertigmontage<br>'
+    + 'KD = Kundendienst &nbsp; GW = Gewährleistung'
+    + '</td>'
+    + '<td colspan="2" rowspan="2" style="border-top:2px solid #000;vertical-align:top">'
+    + '<b>Besondere Anmerkungen /<br>Urlaubswünsche usw.:</b><br>'
+    + escHtml(data.bemerkungen || '')
+    + '</td>'
+    + '</tr>'
+    + '<tr class="bot">'
+    + '<td colspan="2">'
+    + '<b>Pause 1:</b> ' + escHtml(data.pause1von || '') + (data.pause1von && data.pause1bis ? ' – ' + escHtml(data.pause1bis) : '') + '<br>'
+    + '<b>Pause 2:</b> ' + escHtml(data.pause2von || '') + (data.pause2von && data.pause2bis ? ' – ' + escHtml(data.pause2bis) : '')
+    + '</td>'
+    + '<td colspan="5"></td>'
+    + '</tr>'
+    + '</table>'
+    + '<div style="margin-top:4px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + '</body></html>';
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Rohmontage
+   ═══════════════════════════════════════ */
+function getRohmontageData() {
+  return {
+    bv: document.getElementById('rm-bv').value.trim(),
+    projekt: document.getElementById('rm-projekt').value.trim(),
+    monteur: document.getElementById('rm-monteur').value,
+    datum: document.getElementById('rm-datum').value,
+    items: rmItems,
+    bemerkungen: document.getElementById('rm-bemerkungen').value.trim(),
+    signature: rmSigData
+  };
+}
+
+function buildRohmontageHtml(data) {
+  var dateFmt = fmtDate(data.datum);
+
+  var itemRows = '';
+  var lastCat = '';
+  data.items.forEach(function(item) {
+    if (item.cat !== lastCat) {
+      lastCat = item.cat;
+      itemRows += '<tr><td colspan="5" style="background:#f0f0f0;font-weight:bold;font-size:10px;padding:4px 6px;text-transform:uppercase;letter-spacing:0.04em">' + escHtml(item.cat) + '</td></tr>';
+    }
+    itemRows += '<tr>'
+      + '<td style="font-size:9px;padding:3px 6px">' + escHtml(item.label) + '</td>'
+      + '<td class="c" style="width:30px">' + (item.val === 'ja' ? 'X' : '') + '</td>'
+      + '<td class="c" style="width:30px">' + (item.val === 'nein' ? 'X' : '') + '</td>'
+      + '<td style="font-size:8px;padding:3px 6px">' + escHtml(item.bem) + '</td>'
+      + '</tr>';
+  });
+
+  var sigBlock = '';
+  if (data.signature) {
+    sigBlock = '<div style="margin-top:20px;display:flex;justify-content:flex-end">'
+      + '<div><img src="' + data.signature + '" style="max-height:50px;max-width:200px;border-bottom:1px solid #000">'
+      + '<div style="font-size:8px;text-align:center;margin-top:2px">' + escHtml(data.monteur || '') + ', ' + dateFmt + '</div></div></div>';
+  }
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Rohmontage – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
+    + '<style>'
+    + '@page { size: A4 portrait; margin: 10mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
+    + '@media print { body { padding: 0; width: auto; } }'
+    + 'table { border-collapse: collapse; width: 100%; }'
+    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
+    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
+    + '.c { text-align: center; }'
+    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; }'
+    + '.sub { font-size: 11px; text-align: center; margin-bottom: 8px; }'
+    + '</style></head>'
+    + '<body>'
+    + '<div class="hdr">Checkliste - Rohbau</div>'
+    + '<div class="sub">Checkliste Elektro-Rohmontage</div>'
+    + '<table style="margin-bottom:8px">'
+    + '<tr><td style="width:20%;font-weight:bold">BV:</td><td style="width:30%">' + escHtml(data.bv) + '</td>'
+    + '<td style="width:20%;font-weight:bold">Monteur:</td><td style="width:30%">' + escHtml(data.monteur) + '</td></tr>'
+    + '<tr><td style="font-weight:bold">Projekt:</td><td>' + escHtml(data.projekt) + '</td>'
+    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
+    + '</table>'
+    + '<table>'
+    + '<tr><th style="width:auto">Beschreibung</th><th style="width:30px">Ja</th><th style="width:30px">Nein</th><th style="width:25%">Bemerkungen</th></tr>'
+    + itemRows
+    + '</table>'
+    + (data.bemerkungen ? '<div style="margin-top:10px;border:1px solid #000;padding:6px"><b>Sonstiges / Bemerkungen:</b><br>' + escHtml(data.bemerkungen).replace(/\n/g,'<br>') + '</div>' : '')
+    + sigBlock
+    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + '</body></html>';
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Fertigmontage
+   ═══════════════════════════════════════ */
+function getFertigmontageData() {
+  return {
+    bv: document.getElementById('fm-bv').value.trim(),
+    projekt: document.getElementById('fm-projekt').value.trim(),
+    monteur: document.getElementById('fm-monteur').value,
+    datum: document.getElementById('fm-datum').value,
+    items: fmItems,
+    begonnen: fmBegonnen,
+    bemerkungen: document.getElementById('fm-bemerkungen').value.trim(),
+    signature: fmSigData
+  };
+}
+
+function buildFertigmontageHtml(data) {
+  var dateFmt = fmtDate(data.datum);
+
+  var itemRows = '';
+  var lastCat = '';
+  data.items.forEach(function(item) {
+    if (item.cat !== lastCat) {
+      lastCat = item.cat;
+      itemRows += '<tr><td colspan="5" style="background:#f0f0f0;font-weight:bold;font-size:10px;padding:4px 6px;text-transform:uppercase;letter-spacing:0.04em">' + escHtml(item.cat) + '</td></tr>';
+    }
+    itemRows += '<tr>'
+      + '<td style="font-size:9px;padding:3px 6px">' + escHtml(item.label) + '</td>'
+      + '<td class="c" style="width:30px">' + (item.val === 'ja' ? 'X' : '') + '</td>'
+      + '<td class="c" style="width:30px">' + (item.val === 'nein' ? 'X' : '') + '</td>'
+      + '<td style="font-size:8px;padding:3px 6px">' + escHtml(item.bem) + '</td>'
+      + '</tr>';
+  });
+
+  var begonnenText = '';
+  if (data.begonnen === true) begonnenText = 'Ja';
+  else if (data.begonnen === false) begonnenText = 'Nein';
+
+  var sigBlock = '';
+  if (data.signature) {
+    sigBlock = '<div style="margin-top:20px;display:flex;justify-content:flex-end">'
+      + '<div><img src="' + data.signature + '" style="max-height:50px;max-width:200px;border-bottom:1px solid #000">'
+      + '<div style="font-size:8px;text-align:center;margin-top:2px">' + escHtml(data.monteur || '') + ', ' + dateFmt + '</div></div></div>';
+  }
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Fertigmontage – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
+    + '<style>'
+    + '@page { size: A4 portrait; margin: 10mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
+    + '@media print { body { padding: 0; width: auto; } }'
+    + 'table { border-collapse: collapse; width: 100%; }'
+    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
+    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
+    + '.c { text-align: center; }'
+    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; }'
+    + '.sub { font-size: 11px; text-align: center; margin-bottom: 8px; }'
+    + '</style></head>'
+    + '<body>'
+    + '<div class="hdr">Checkliste - Elektro-Fertigmontage</div>'
+    + '<div class="sub">&nbsp;</div>'
+    + '<table style="margin-bottom:8px">'
+    + '<tr><td style="width:20%;font-weight:bold">BV:</td><td style="width:30%">' + escHtml(data.bv) + '</td>'
+    + '<td style="width:20%;font-weight:bold">Monteur:</td><td style="width:30%">' + escHtml(data.monteur) + '</td></tr>'
+    + '<tr><td style="font-weight:bold">Projekt:</td><td>' + escHtml(data.projekt) + '</td>'
+    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
+    + '</table>'
+    + '<table>'
+    + '<tr><th style="width:auto">Beschreibung</th><th style="width:30px">Ja</th><th style="width:30px">Nein</th><th style="width:25%">Bemerkungen</th></tr>'
+    + itemRows
+    + '</table>'
+    + (begonnenText ? '<div style="margin-top:8px;font-size:10px"><b>Fertigmontage war durch Kollegen bereits begonnen:</b> ' + begonnenText + '</div>' : '')
+    + (data.bemerkungen ? '<div style="margin-top:10px;border:1px solid #000;padding:6px"><b>Sonstiges / Bemerkungen:</b><br>' + escHtml(data.bemerkungen).replace(/\n/g,'<br>') + '</div>' : '')
+    + sigBlock
+    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + '</body></html>';
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Kabelliste
+   ═══════════════════════════════════════ */
+function getKabellisteData() {
+  return {
+    bv: document.getElementById('kl-bv').value.trim(),
+    elnr: document.getElementById('kl-elnr').value.trim(),
+    monteur: document.getElementById('kl-monteur').value,
+    datum: document.getElementById('kl-datum').value,
+    rows: klRows,
+    evu: document.getElementById('kl-evu').value.trim(),
+    tuer: document.getElementById('kl-tuer').value
+  };
+}
+
+function buildKabellisteHtml(data) {
+  var dateFmt = fmtDate(data.datum);
+
+  var tRows = '';
+  data.rows.forEach(function(row) {
+    tRows += '<tr>'
+      + '<td class="c" style="width:35px">' + row.nr + '</td>'
+      + '<td>' + escHtml(row.stromkreis) + '</td>'
+      + '<td>' + escHtml(row.art) + '</td>'
+      + '<td>' + escHtml(row.leiter) + '</td>'
+      + '<td>' + escHtml(row.sicherung) + '</td>'
+      + '</tr>';
+  });
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Kabelliste – ' + escHtml(data.bv || data.elnr || dateFmt) + '</title>'
+    + '<style>'
+    + '@page { size: A4 portrait; margin: 10mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
+    + '@media print { body { padding: 0; width: auto; } }'
+    + 'table { border-collapse: collapse; width: 100%; }'
+    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
+    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
+    + '.c { text-align: center; }'
+    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 8px; }'
+    + '</style></head>'
+    + '<body>'
+    + '<div class="hdr">Kabelliste LWWP</div>'
+    + '<table style="margin-bottom:8px">'
+    + '<tr><td style="width:15%;font-weight:bold">BV:</td><td style="width:35%">' + escHtml(data.bv) + '</td>'
+    + '<td style="width:15%;font-weight:bold">Name:</td><td style="width:35%">' + escHtml(data.monteur) + '</td></tr>'
+    + '<tr><td style="font-weight:bold">el-Nr.:</td><td>' + escHtml(data.elnr) + '</td>'
+    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
+    + '</table>'
+    + '<table>'
+    + '<tr><th style="width:35px">lfd. Nr.</th><th>Stromkreis</th><th>Kabel Art</th><th>Leiter/qmm</th><th>Sicherung</th></tr>'
+    + tRows
+    + '</table>'
+    + '<table style="margin-top:8px">'
+    + '<tr><td style="width:15%;font-weight:bold">EVU:</td><td style="width:35%">' + escHtml(data.evu) + '</td>'
+    + '<td style="width:25%;font-weight:bold">Türanschlag:</td><td style="width:25%">' + escHtml(data.tuer) + ' <span style="font-size:8px;color:#666">(von Oben gesehen)</span></td></tr>'
+    + '</table>'
+    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + '</body></html>';
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Schalter
+   ═══════════════════════════════════════ */
+function getSchalterData() {
+  return {
+    bv: document.getElementById('sc-bv').value.trim(),
+    elnr: document.getElementById('sc-elnr').value.trim(),
+    monteur: document.getElementById('sc-monteur').value,
+    datum: document.getElementById('sc-datum').value,
+    fabrikat: scFabrikat,
+    items: scItems
+  };
+}
+
+function buildSchalterHtml(data) {
+  var dateFmt = fmtDate(data.datum);
+
+  var tRows = '';
+  data.items.forEach(function(item) {
+    var tally = '';
+    for (var t = 0; t < item.count; t++) { tally += '|'; if ((t + 1) % 5 === 0) tally += ' '; }
+    tRows += '<tr>'
+      + '<td class="c" style="width:35px">' + item.nr + '</td>'
+      + '<td>' + escHtml(item.label) + '</td>'
+      + '<td style="font-family:monospace;font-size:9px;letter-spacing:1px">' + tally + '</td>'
+      + '<td class="c" style="width:45px">' + (item.count > 0 ? item.count : '') + '</td>'
+      + '</tr>';
+  });
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Schalteraufmaß – ' + escHtml(data.bv || data.elnr || dateFmt) + '</title>'
+    + '<style>'
+    + '@page { size: A4 portrait; margin: 10mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 10mm; width: 190mm; }'
+    + '@media print { body { padding: 0; width: auto; } }'
+    + 'table { border-collapse: collapse; width: 100%; }'
+    + 'td, th { border: 1px solid #000; padding: 3px 6px; vertical-align: middle; }'
+    + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9px; }'
+    + '.c { text-align: center; }'
+    + '.hdr { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 4px; }'
+    + '.sub { font-size: 11px; text-align: center; margin-bottom: 8px; }'
+    + '</style></head>'
+    + '<body>'
+    + '<div class="hdr">Schalteraufmaß</div>'
+    + '<div class="sub">Fabrikat: Busch Jäger / ' + escHtml(data.fabrikat) + '</div>'
+    + '<table style="margin-bottom:8px">'
+    + '<tr><td style="width:15%;font-weight:bold">BV:</td><td style="width:35%">' + escHtml(data.bv) + '</td>'
+    + '<td style="width:15%;font-weight:bold">Monteur:</td><td style="width:35%">' + escHtml(data.monteur) + '</td></tr>'
+    + '<tr><td style="font-weight:bold">el-Nr.:</td><td>' + escHtml(data.elnr) + '</td>'
+    + '<td style="font-weight:bold">Datum:</td><td>' + dateFmt + '</td></tr>'
+    + '</table>'
+    + '<table>'
+    + '<tr><th style="width:35px">lfd. Nr.</th><th>Bezeichnung</th><th>Strichliste</th><th style="width:45px">Stück</th></tr>'
+    + tRows
+    + '</table>'
+    + '<div style="margin-top:12px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+    + '</body></html>';
+}
+
+/* ═══════════════════════════════════════
+   CREATE & SHARE – Baustellenkontrolle
+   ═══════════════════════════════════════ */
+function createReport() {
+  var data = getFormData();
+  if (!data.site) { toast('Bitte Baustellenname eingeben'); return; }
+
+  try { localStorage.setItem('bk_inspector', data.inspector); } catch(e) {}
+
+  var html = buildReportHtml(data);
+  var fileName = 'Kontrolle_' + data.site.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.date || 'undatiert') + '.html';
+
+  saveToHistory({ type: 'kontrolle', site: data.site, date: data.date, inspector: data.inspector, mangelCount: data.maengel.filter(function(m){ return m.text || m.fotos.length; }).length, html: html });
+  saveReportToFirestore('kontrolle', { site: data.site, date: data.date, inspector: data.inspector, baustelle: data.site, datum: data.date }, html);
+
+  document.getElementById('statusBadge').textContent = 'Erstellt';
+  document.getElementById('statusBadge').className = 'status-badge saved';
+
+  shareOrPreview(html, fileName, 'Baustellenkontrolle – ' + data.site, 'Baustellenkontrolle vom ' + fmtDate(data.date) + ', Prüfer: ' + (data.inspector || '—'));
+}
+
+/* ═══════════════════════════════════════
+   CREATE & SHARE – Tagesrapport
+   ═══════════════════════════════════════ */
+function createRapport() {
+  var data = getRapportData();
+  var validW = data.workers.filter(function(w){ return w.name; });
+  if (!validW.length) { toast('Bitte mindestens einen Mitarbeiter eintragen'); return; }
+
+  var html = buildRapportHtml(data);
+  var label = data.baustelle || data.projekt || fmtDate(data.date);
+  var fileName = 'Tagesrapport_' + label.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.date || 'undatiert') + '.html';
+
+  var sumStd = 0;
+  validW.forEach(function(w){ sumStd += parseFloat(w.stunden) || 0; });
+
+  saveToHistory({ type: 'rapport', site: label, date: data.date, workerCount: validW.length, sumStd: sumStd, html: html });
+  saveReportToFirestore('rapport', { baustelle: label, datum: data.date, workerCount: validW.length, sumStd: sumStd }, html);
+
+  document.getElementById('statusBadge').textContent = 'Erstellt';
+  document.getElementById('statusBadge').className = 'status-badge saved';
+
+  shareOrPreview(html, fileName, 'Tagesrapport – ' + label, 'Tagesrapport vom ' + fmtDate(data.date) + ', ' + validW.length + ' Mitarbeiter');
+}
+
+/* ═══════════════════════════════════════
+   CREATE & SHARE – Rohmontage
+   ═══════════════════════════════════════ */
+function createRohmontage() {
+  var data = getRohmontageData();
+  if (!data.bv && !data.projekt) { toast('Bitte BV oder Projekt eingeben'); return; }
+
+  var html = buildRohmontageHtml(data);
+  var label = data.bv || data.projekt || fmtDate(data.datum);
+  var fileName = 'Rohmontage_' + label.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.datum || 'undatiert') + '.html';
+
+  var jaCount = 0, neinCount = 0;
+  data.items.forEach(function(it) {
+    if (it.val === 'ja') jaCount++;
+    if (it.val === 'nein') neinCount++;
+  });
+
+  saveToHistory({ type: 'rohmontage', site: label, date: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount, html: html });
+  saveReportToFirestore('rohmontage', { baustelle: label, datum: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount }, html);
+
+  document.getElementById('statusBadge').textContent = 'Erstellt';
+  document.getElementById('statusBadge').className = 'status-badge saved';
+
+  shareOrPreview(html, fileName, 'Rohmontage – ' + label, 'Checkliste Rohmontage vom ' + fmtDate(data.datum));
+}
+
+/* ═══════════════════════════════════════
+   CREATE & SHARE – Fertigmontage
+   ═══════════════════════════════════════ */
+function createFertigmontage() {
+  var data = getFertigmontageData();
+  if (!data.bv && !data.projekt) { toast('Bitte BV oder Projekt eingeben'); return; }
+
+  var html = buildFertigmontageHtml(data);
+  var label = data.bv || data.projekt || fmtDate(data.datum);
+  var fileName = 'Fertigmontage_' + label.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.datum || 'undatiert') + '.html';
+
+  var jaCount = 0, neinCount = 0;
+  data.items.forEach(function(it) {
+    if (it.val === 'ja') jaCount++;
+    if (it.val === 'nein') neinCount++;
+  });
+
+  saveToHistory({ type: 'fertigmontage', site: label, date: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount, html: html });
+  saveReportToFirestore('fertigmontage', { baustelle: label, datum: data.datum, monteur: data.monteur, jaCount: jaCount, neinCount: neinCount }, html);
+
+  document.getElementById('statusBadge').textContent = 'Erstellt';
+  document.getElementById('statusBadge').className = 'status-badge saved';
+
+  shareOrPreview(html, fileName, 'Fertigmontage – ' + label, 'Checkliste Fertigmontage vom ' + fmtDate(data.datum));
+}
+
+/* ═══════════════════════════════════════
+   CREATE & SHARE – Kabelliste
+   ═══════════════════════════════════════ */
+function createKabelliste() {
+  var data = getKabellisteData();
+  if (!data.bv && !data.elnr) { toast('Bitte BV oder el-Nr. eingeben'); return; }
+
+  var html = buildKabellisteHtml(data);
+  var label = data.bv || data.elnr || fmtDate(data.datum);
+  var fileName = 'Kabelliste_' + label.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.datum || 'undatiert') + '.html';
+
+  var filledRows = data.rows.filter(function(r){ return r.stromkreis; }).length;
+
+  saveToHistory({ type: 'kabelliste', site: label, date: data.datum, monteur: data.monteur, filledRows: filledRows, html: html });
+  saveReportToFirestore('kabelliste', { baustelle: label, datum: data.datum, monteur: data.monteur, filledRows: filledRows }, html);
+
+  document.getElementById('statusBadge').textContent = 'Erstellt';
+  document.getElementById('statusBadge').className = 'status-badge saved';
+
+  shareOrPreview(html, fileName, 'Kabelliste – ' + label, 'Kabelliste LWWP vom ' + fmtDate(data.datum));
+}
+
+/* ═══════════════════════════════════════
+   CREATE & SHARE – Schalter
+   ═══════════════════════════════════════ */
+function createSchalter() {
+  var data = getSchalterData();
+  if (!data.bv && !data.elnr) { toast('Bitte BV oder el-Nr. eingeben'); return; }
+
+  var html = buildSchalterHtml(data);
+  var label = data.bv || data.elnr || fmtDate(data.datum);
+  var fileName = 'Schalter_' + label.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '_' + (data.datum || 'undatiert') + '.html';
+
+  var totalItems = 0;
+  data.items.forEach(function(it){ totalItems += it.count; });
+
+  saveToHistory({ type: 'schalter', site: label, date: data.datum, monteur: data.monteur, totalItems: totalItems, fabrikat: data.fabrikat, html: html });
+  saveReportToFirestore('schalter', { baustelle: label, datum: data.datum, monteur: data.monteur, totalItems: totalItems, fabrikat: data.fabrikat }, html);
+
+  document.getElementById('statusBadge').textContent = 'Erstellt';
+  document.getElementById('statusBadge').className = 'status-badge saved';
+
+  shareOrPreview(html, fileName, 'Schalteraufmaß – ' + label, 'Schalteraufmaß vom ' + fmtDate(data.datum));
+}
+
+/* ═══════════════════════════════════════
+   SHARED: Share or Preview
+   ═══════════════════════════════════════ */
+function shareOrPreview(html, fileName, title, text) {
+  var blob = new Blob([html], {type: 'text/html'});
+  var file = new File([blob], fileName, {type: 'text/html'});
+
+  if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
+    navigator.share({ title: title, text: text, files: [file] }).then(function() {
+      toast('Bericht geteilt');
+    }).catch(function(err) {
+      if (err.name !== 'AbortError') showPreview(html, fileName);
+    });
+  } else {
+    showPreview(html, fileName);
+  }
+}
+
+/* ═══════════════════════════════════════
+   PREVIEW & DOWNLOAD FALLBACK
+   ═══════════════════════════════════════ */
+function showPreview(html, fileName) {
+  var overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+
+  var bar = document.createElement('div');
+  bar.className = 'preview-bar';
+
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'btn btn-secondary';
+  closeBtn.textContent = 'Schließen';
+  closeBtn.onclick = function(){ document.body.removeChild(overlay); };
+
+  var dlBtn = document.createElement('button');
+  dlBtn.className = 'btn btn-primary';
+  dlBtn.innerHTML = '&#11015; Herunterladen';
+  dlBtn.onclick = function() {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('Bericht heruntergeladen');
+  };
+
+  var shareBtn = document.createElement('button');
+  shareBtn.className = 'btn btn-secondary';
+  shareBtn.innerHTML = '&#8599; Teilen';
+  shareBtn.onclick = function() {
+    var blob = new Blob([html], {type:'text/html'});
+    var file = new File([blob], fileName, {type:'text/html'});
+    if (navigator.share) {
+      navigator.share({ files: [file], title: 'Elmbau Baustelle' }).catch(function(){});
+    } else {
+      toast('Teilen nicht unterstützt – bitte herunterladen');
+    }
+  };
+
+  bar.appendChild(closeBtn);
+  bar.appendChild(shareBtn);
+  bar.appendChild(dlBtn);
+
+  var body = document.createElement('div');
+  body.className = 'preview-body';
+  var iframe = document.createElement('iframe');
+  iframe.style.width = '100%';
+  iframe.style.minHeight = '80vh';
+  iframe.style.border = '1px solid var(--border)';
+  iframe.style.borderRadius = 'var(--radius)';
+  iframe.style.background = '#fff';
+  body.appendChild(iframe);
+
+  overlay.appendChild(bar);
+  overlay.appendChild(body);
+  document.body.appendChild(overlay);
+
+  var doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+}
+
+/* ═══════════════════════════════════════
+   HISTORY (localStorage)
+   ═══════════════════════════════════════ */
+var historyFilter = 'all';
+
+function saveToHistory(entry) {
+  try {
+    var history = JSON.parse(localStorage.getItem('eb_history') || '[]');
+    entry.id = Date.now();
+    history.unshift(entry);
+    if (history.length > 50) history = history.slice(0, 50);
+    localStorage.setItem('eb_history', JSON.stringify(history));
+  } catch(e) {}
+}
+
+function filterHistory(type, btn) {
+  historyFilter = type;
+  document.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderHistory();
+}
+
+var HISTORY_TYPE_LABELS = {
+  kontrolle: 'Kontrolle',
+  rapport: 'Tagesrapport',
+  rohmontage: 'Rohmontage',
+  fertigmontage: 'Fertigmontage',
+  kabelliste: 'Kabelliste',
+  schalter: 'Schalter'
+};
+
+function renderHistory() {
+  var el = document.getElementById('historyList');
+
+  // Chef: load ALL reports from Firestore
+  if (isChef && db) {
+    el.innerHTML = '<div class="empty-state"><p>Lade Berichte...</p></div>';
+    db.collection('berichte').get().then(function(snap) {
+      // Client-side filter and sort to avoid Firestore index requirements
+      var docs = [];
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        d._id = doc.id;
+        if (historyFilter !== 'all' && d.type !== historyFilter) return;
+        docs.push(d);
+      });
+      docs.sort(function(a, b) {
+        var ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+        var tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+        return tb - ta;
+      });
+      if (docs.length > 100) docs = docs.slice(0, 100);
+      snap = { empty: docs.length === 0, forEach: function(fn) { docs.forEach(function(d) { fn({ id: d._id, data: function() { return d; } }); }); } };
+      if (snap.empty) {
+        el.innerHTML = '<div class="empty-state"><div class="em-icon">&#128203;</div><p>Noch keine Berichte' + (historyFilter !== 'all' ? ' in dieser Kategorie' : '') + '.</p></div>';
+        return;
+      }
+      el.innerHTML = '';
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        var hType = d.type || 'kontrolle';
+        var typeLabel = HISTORY_TYPE_LABELS[hType] || hType;
+        var meta = fmtDate(d.datum || '') + ' &middot; ' + escHtml(d.ersteller || '—');
+        if (d.data) {
+          if (hType === 'kontrolle') meta += ' &middot; ' + (d.data.mangelCount || d.data.inspector || '');
+          else if (hType === 'rapport') meta += ' &middot; ' + (d.data.workerCount || 0) + ' MA';
+        }
+        el.innerHTML += '<div class="history-item">'
+          + '<span class="history-dot ' + hType + '"></span>'
+          + '<div class="history-info">'
+          + '<div class="history-title">' + escHtml(d.baustelle || '—') + '</div>'
+          + '<div class="history-meta">' + meta + '</div>'
+          + '<span class="history-type ' + hType + '">' + typeLabel + '</span>'
+          + '</div>'
+          + '<div class="history-actions">'
+          + '<button class="history-btn" onclick="viewFirestoreReport(\'' + doc.id + '\')" title="Ansehen">&#128065;</button>'
+          + '<button class="history-btn" onclick="downloadFirestoreReport(\'' + doc.id + '\')" title="Herunterladen">&#11015;</button>'
+          + '<button class="history-btn" onclick="editFirestoreReport(\'' + doc.id + '\')" title="Editieren">&#9998;</button>'
+          + '<button class="history-btn" onclick="deleteFirestoreReport(\'' + doc.id + '\')" title="L&ouml;schen" style="color:#e74c3c">&#10005;</button>'
+          + '</div>'
+          + '</div>';
+      });
+    }).catch(function(err) {
+      console.error('Load reports error:', err);
+      el.innerHTML = '<div class="empty-state"><p>Fehler beim Laden: ' + err.message + '</p></div>';
+      renderLocalHistory(el);
+    });
+    return;
+  }
+
+  renderLocalHistory(el);
+}
+
+function renderLocalHistory(el) {
+  var history = [];
+  try { history = JSON.parse(localStorage.getItem('eb_history') || '[]'); } catch(e) {}
+
+  // Also migrate old bk_history
+  try {
+    var oldH = JSON.parse(localStorage.getItem('bk_history') || '[]');
+    if (oldH.length && !localStorage.getItem('eb_history_migrated')) {
+      oldH.forEach(function(h) {
+        h.type = 'kontrolle';
+        history.push(h);
+      });
+      history.sort(function(a,b){ return b.id - a.id; });
+      localStorage.setItem('eb_history', JSON.stringify(history));
+      localStorage.setItem('eb_history_migrated', '1');
+    }
+  } catch(e) {}
+
+  var filtered = history;
+  if (historyFilter !== 'all') {
+    filtered = history.filter(function(h){ return h.type === historyFilter; });
+  }
+
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty-state"><div class="em-icon">&#128203;</div><p>Noch keine Berichte' + (historyFilter !== 'all' ? ' in dieser Kategorie' : '') + '.</p></div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(function(h) {
+    var meta = '';
+    var hType = h.type || 'kontrolle';
+    if (hType === 'kontrolle') {
+      meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.inspector || '—') + ' &middot; ' + (h.mangelCount || 0) + ' Mängel';
+    } else if (hType === 'rapport') {
+      meta = fmtDate(h.date) + ' &middot; ' + (h.workerCount || 0) + ' MA &middot; ' + (h.sumStd || 0) + ' Std.';
+    } else if (hType === 'rohmontage' || hType === 'fertigmontage') {
+      meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.jaCount || 0) + ' Ja / ' + (h.neinCount || 0) + ' Nein';
+    } else if (hType === 'kabelliste') {
+      meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.filledRows || 0) + ' Einträge';
+    } else if (hType === 'schalter') {
+      meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.totalItems || 0) + ' Stück';
+    }
+
+    var typeLabel = HISTORY_TYPE_LABELS[hType] || hType;
+
+    return '<div class="history-item">'
+      + '<span class="history-dot ' + hType + '"></span>'
+      + '<div class="history-info">'
+      + '<div class="history-title">' + escHtml(h.site || '—') + '</div>'
+      + '<div class="history-meta">' + meta + '</div>'
+      + '<span class="history-type ' + hType + '">' + typeLabel + '</span>'
+      + '</div>'
+      + '<div class="history-actions">'
+      + '<button class="history-btn" onclick="shareHistoryItem(' + h.id + ')" title="Teilen">&#8599;</button>'
+      + '<button class="history-btn" onclick="viewHistoryItem(' + h.id + ')" title="Ansehen">&#128065;</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+var HISTORY_FILE_PREFIXES = {
+  kontrolle: 'Kontrolle_',
+  rapport: 'Tagesrapport_',
+  rohmontage: 'Rohmontage_',
+  fertigmontage: 'Fertigmontage_',
+  kabelliste: 'Kabelliste_',
+  schalter: 'Schalter_'
+};
+
+function viewHistoryItem(id) {
+  try {
+    var history = JSON.parse(localStorage.getItem('eb_history') || '[]');
+    var item = history.find(function(h){ return h.id === id; });
+    if (item && item.html) {
+      var prefix = HISTORY_FILE_PREFIXES[item.type] || 'Bericht_';
+      var fn = prefix + (item.site || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (item.date || '') + '.html';
+      showPreview(item.html, fn);
+    }
+  } catch(e) {}
+}
+
+function shareHistoryItem(id) {
+  try {
+    var history = JSON.parse(localStorage.getItem('eb_history') || '[]');
+    var item = history.find(function(h){ return h.id === id; });
+    if (!item || !item.html) return;
+    var prefix = HISTORY_FILE_PREFIXES[item.type] || 'Bericht_';
+    var typeLabel = HISTORY_TYPE_LABELS[item.type] || 'Bericht';
+    var fn = prefix + (item.site || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (item.date || '') + '.html';
+    var blob = new Blob([item.html], {type:'text/html'});
+    var file = new File([blob], fn, {type:'text/html'});
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      navigator.share({ files:[file], title: typeLabel + ' – ' + item.site }).catch(function(){});
+    } else {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fn;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast('Bericht heruntergeladen');
+    }
+  } catch(e) {}
+}
+
+/* ═══════════════════════════════════════
+   FIRESTORE REPORT VIEW/DOWNLOAD (Chef)
+   ═══════════════════════════════════════ */
+function viewFirestoreReport(docId) {
+  if (!db) return;
+  db.collection('berichte').doc(docId).get().then(function(doc) {
+    if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
+    var d = doc.data();
+    if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
+    var prefix = HISTORY_FILE_PREFIXES[d.type] || 'Bericht_';
+    var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '') + '.html';
+    showPreview(d.html, fn);
+  }).catch(function(err) {
+    toast('Fehler: ' + err.message);
+  });
+}
+
+function downloadFirestoreReport(docId) {
+  if (!db) return;
+  db.collection('berichte').doc(docId).get().then(function(doc) {
+    if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
+    var d = doc.data();
+    if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
+    var prefix = HISTORY_FILE_PREFIXES[d.type] || 'Bericht_';
+    var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '') + '.html';
+    var blob = new Blob([d.html], {type:'text/html'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('Bericht heruntergeladen');
+  }).catch(function(err) {
+    toast('Fehler: ' + err.message);
+  });
+}
+
+function editFirestoreReport(docId) {
+  if (!db) return;
+  db.collection('berichte').doc(docId).get().then(function(doc) {
+    if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
+    var d = doc.data();
+    if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
+
+    // Create visual edit overlay
+    var overlay = document.createElement('div');
+    overlay.className = 'preview-overlay';
+
+    var bar = document.createElement('div');
+    bar.className = 'preview-bar';
+    bar.style.cssText += ';flex-wrap:wrap;gap:8px';
+
+    var titleSpan = document.createElement('span');
+    titleSpan.style.cssText = 'color:var(--text);font-weight:700;font-size:15px;flex:1;min-width:100px';
+    titleSpan.innerHTML = '&#9998; Bericht editieren';
+
+    var hint = document.createElement('span');
+    hint.style.cssText = 'color:var(--text-muted);font-size:12px;flex-basis:100%;order:10';
+    hint.textContent = 'Klicke auf Text im Bericht, um ihn direkt zu bearbeiten.';
+
+    var saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-primary';
+    saveBtn.innerHTML = '&#10003; Speichern';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-secondary';
+    cancelBtn.textContent = 'Abbrechen';
+    cancelBtn.onclick = function() { document.body.removeChild(overlay); };
+
+    bar.appendChild(titleSpan);
+    bar.appendChild(saveBtn);
+    bar.appendChild(cancelBtn);
+    bar.appendChild(hint);
+
+    var body = document.createElement('div');
+    body.className = 'preview-body';
+    var iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.minHeight = '80vh';
+    iframe.style.border = '2px solid var(--accent)';
+    iframe.style.borderRadius = 'var(--radius)';
+    iframe.style.background = '#fff';
+    body.appendChild(iframe);
+
+    overlay.appendChild(bar);
+    overlay.appendChild(body);
+    document.body.appendChild(overlay);
+
+    // Write HTML into iframe and make it editable
+    var iDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iDoc.open();
+    iDoc.write(d.html);
+    iDoc.close();
+
+    // Make the body contentEditable for WYSIWYG editing
+    iDoc.body.contentEditable = 'true';
+    iDoc.body.style.outline = 'none';
+    iDoc.body.style.cursor = 'text';
+
+    // Highlight editable cells/fields on hover
+    var editStyle = iDoc.createElement('style');
+    editStyle.textContent = ''
+      + 'td, th, p, span, div, h1, h2, h3, h4, h5, h6, li, b, strong, em, i {'
+      + '  transition: background 0.15s ease;'
+      + '}'
+      + 'td:hover, th:hover, p:hover, h1:hover, h2:hover, h3:hover, h4:hover {'
+      + '  background: rgba(0, 153, 89, 0.12) !important;'
+      + '  outline: 1px dashed rgba(0, 153, 89, 0.5);'
+      + '}'
+      + 'td:focus, th:focus, p:focus, div:focus {'
+      + '  background: rgba(0, 153, 89, 0.08) !important;'
+      + '  outline: 2px solid #009959;'
+      + '}';
+    iDoc.head.appendChild(editStyle);
+
+    saveBtn.onclick = function() {
+      // Extract the full edited HTML from the iframe
+      var serializer = new XMLSerializer();
+      var newHtml = iDoc.documentElement.outerHTML;
+      // Restore doctype if present in original
+      if (d.html.indexOf('<!DOCTYPE') !== -1 || d.html.indexOf('<!doctype') !== -1) {
+        newHtml = '<!DOCTYPE html>' + newHtml;
+      }
+      // Remove the edit-style we injected
+      var styles = iDoc.querySelectorAll('style');
+      for (var i = 0; i < styles.length; i++) {
+        if (styles[i].textContent.indexOf('dashed rgba') !== -1) {
+          styles[i].parentNode.removeChild(styles[i]);
+        }
+      }
+      // Remove contentEditable attribute
+      iDoc.body.removeAttribute('contenteditable');
+      newHtml = iDoc.documentElement.outerHTML;
+      if (d.html.indexOf('<!DOCTYPE') !== -1 || d.html.indexOf('<!doctype') !== -1) {
+        newHtml = '<!DOCTYPE html>' + newHtml;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Speichere...';
+      db.collection('berichte').doc(docId).update({ html: newHtml }).then(function() {
+        toast('Bericht gespeichert');
+        document.body.removeChild(overlay);
+        renderHistory();
+        dashLoadReports();
+      }).catch(function(err) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '&#10003; Speichern';
+        toast('Fehler beim Speichern: ' + err.message);
+      });
+    };
+  }).catch(function(err) {
+    toast('Fehler: ' + err.message);
+  });
+}
+
+function deleteFirestoreReport(docId) {
+  if (!db) return;
+  if (!confirm('Bericht wirklich endgueltig loeschen?')) return;
+  db.collection('berichte').doc(docId).delete().then(function() {
+    toast('Bericht geloescht');
+    renderHistory();
+  }).catch(function(err) {
+    toast('Fehler beim Loeschen: ' + err.message);
+  });
+}
+
+/* ═══════════════════════════════════════
+   RESET FORMS
+   ═══════════════════════════════════════ */
+function resetForm() {
+  if (!confirm('Formular wirklich zurücksetzen?')) return;
+  document.getElementById('f-site').value = '';
+  document.getElementById('f-date').valueAsDate = new Date();
+  maengel = [];
+  mangelSeq = 0;
+  addMangel();
+  clearSig();
+  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').className = 'status-badge';
+  toast('Formular zurückgesetzt');
+}
+
+function resetRapport() {
+  if (!confirm('Tagesrapport zurücksetzen?')) return;
+  document.getElementById('tr-date').valueAsDate = new Date();
+  document.getElementById('tr-kostenstelle').value = '';
+  document.getElementById('tr-projekt').value = '';
+  document.getElementById('tr-baustelle').value = '';
+  document.getElementById('tr-fahrzeug').value = '';
+  document.getElementById('tr-km').value = '';
+  document.getElementById('tr-fahrer').value = '';
+  document.getElementById('tr-hinfahrt').value = '';
+  document.getElementById('tr-rueckfahrt').value = '';
+  document.getElementById('tr-beginn').value = '07:00';
+  document.getElementById('tr-ende').value = '16:00';
+  document.getElementById('tr-pause1-von').value = '09:30';
+  document.getElementById('tr-pause1-bis').value = '09:45';
+  document.getElementById('tr-pause2-von').value = '12:00';
+  document.getElementById('tr-pause2-bis').value = '12:30';
+  document.getElementById('tr-arbeiten').value = '';
+  document.getElementById('tr-bemerkungen').value = '';
+  trKategorie = 'Elektro';
+  document.querySelectorAll('#tr-kategorie .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelector('#tr-kategorie .chip-toggle[data-val="Elektro"]').classList.add('active');
+  trTaetigkeiten = [];
+  document.querySelectorAll('#tr-taetigkeit .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+  trWorkers = [];
+  trWorkerSeq = 0;
+  addWorker();
+  updateStundenSumme();
+  clearTrSig();
+  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').className = 'status-badge';
+  toast('Tagesrapport zurückgesetzt');
+}
+
+function resetRohmontage() {
+  if (!confirm('Rohmontage-Checkliste zurücksetzen?')) return;
+  document.getElementById('rm-bv').value = '';
+  document.getElementById('rm-projekt').value = '';
+  document.getElementById('rm-monteur').value = '';
+  document.getElementById('rm-datum').valueAsDate = new Date();
+  document.getElementById('rm-bemerkungen').value = '';
+  initRmItems();
+  renderRmChecklist();
+  clearRmSig();
+  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').className = 'status-badge';
+  toast('Rohmontage zurückgesetzt');
+}
+
+function resetFertigmontage() {
+  if (!confirm('Fertigmontage-Checkliste zurücksetzen?')) return;
+  document.getElementById('fm-bv').value = '';
+  document.getElementById('fm-projekt').value = '';
+  document.getElementById('fm-monteur').value = '';
+  document.getElementById('fm-datum').valueAsDate = new Date();
+  document.getElementById('fm-bemerkungen').value = '';
+  fmBegonnen = null;
+  initFmItems();
+  renderFmChecklist();
+  clearFmSig();
+  // Reset begonnen buttons
+  var begBtns = document.querySelectorAll('#mod-fertigmontage .cl-btn');
+  begBtns.forEach(function(b){ b.className = 'cl-btn'; });
+  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').className = 'status-badge';
+  toast('Fertigmontage zurückgesetzt');
+}
+
+function resetKabelliste() {
+  if (!confirm('Kabelliste zurücksetzen?')) return;
+  document.getElementById('kl-bv').value = '';
+  document.getElementById('kl-elnr').value = '';
+  document.getElementById('kl-monteur').value = '';
+  document.getElementById('kl-datum').valueAsDate = new Date();
+  document.getElementById('kl-evu').value = '';
+  document.getElementById('kl-tuer').value = '';
+  initKlRows();
+  renderKlTable();
+  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').className = 'status-badge';
+  toast('Kabelliste zurückgesetzt');
+}
+
+function resetSchalter() {
+  if (!confirm('Schalteraufmaß zurücksetzen?')) return;
+  document.getElementById('sc-bv').value = '';
+  document.getElementById('sc-elnr').value = '';
+  document.getElementById('sc-monteur').value = '';
+  document.getElementById('sc-datum').valueAsDate = new Date();
+  scFabrikat = 'Balance SI';
+  document.getElementById('sc-fab-balance').classList.add('active');
+  document.getElementById('sc-fab-andere').classList.remove('active');
+  document.getElementById('sc-fab-custom').style.display = 'none';
+  document.getElementById('sc-fab-custom').value = '';
+  initScItems();
+  renderScTable();
+  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').className = 'status-badge';
+  toast('Schalteraufmaß zurückgesetzt');
+}
+
+/* ═══════════════════════════════════════
+   UTILS
+   ═══════════════════════════════════════ */
+function escHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+/* ═══════════════════════════════════════
+   SPEECH-TO-TEXT (Web Speech API)
+   ═══════════════════════════════════════ */
+var activeDictation = null;
+
+function startDictation(textareaId, btn) {
+  // If already recording, stop
+  if (activeDictation && activeDictation.textareaId === textareaId) {
+    activeDictation.recognition.stop();
+    return;
+  }
+  // Stop any other active dictation
+  if (activeDictation) {
+    activeDictation.recognition.stop();
+  }
+
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    toast('Spracherkennung wird von diesem Browser nicht unterstützt');
+    return;
+  }
+
+  var recognition = new SpeechRecognition();
+  recognition.lang = 'de-DE';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  var textarea = document.getElementById(textareaId);
+  var startText = textarea.value;
+  btn.classList.add('recording');
+
+  activeDictation = { recognition: recognition, textareaId: textareaId, btn: btn };
+
+  recognition.onresult = function(event) {
+    var transcript = '';
+    for (var i = 0; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    textarea.value = startText + (startText ? ' ' : '') + transcript;
+  };
+
+  recognition.onerror = function(event) {
+    btn.classList.remove('recording');
+    activeDictation = null;
+    if (event.error === 'not-allowed') {
+      toast('Mikrofonzugriff verweigert. Bitte in den Browsereinstellungen erlauben.');
+    } else if (event.error !== 'aborted') {
+      toast('Spracherkennung-Fehler: ' + event.error);
+    }
+  };
+
+  recognition.onend = function() {
+    btn.classList.remove('recording');
+    activeDictation = null;
+  };
+
+  recognition.start();
+}
+
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+/* ═══════════════════════════════════════
+   INIT – deferred sig init for modules
+   ═══════════════════════════════════════ */
+var origSwitchModule = switchModule;
+switchModule = function(name, btn) {
+  origSwitchModule(name, btn);
+  if (name === 'rapport') {
+    setTimeout(initTrSig, 50);
+  }
+  if (name === 'rohmontage') {
+    setTimeout(initRmSig, 50);
+  }
+  if (name === 'fertigmontage') {
+    setTimeout(initFmSig, 50);
+  }
+};
+
+/* ═══════════════════════════════════════
+   APP BOOT – Firebase init
+   ═══════════════════════════════════════ */
+appBoot();
+</script>
+</body>
+</html>
