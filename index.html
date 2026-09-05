@@ -1424,7 +1424,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.6.0';
+var APP_VERSION = 'v1.7.0';
 
 var db = null;
 var storage = null;
@@ -3974,10 +3974,55 @@ function createReport() {
 /* ═══════════════════════════════════════
    CREATE & SHARE – Tagesrapport
    ═══════════════════════════════════════ */
+// Prueft die Pflichtfelder und liefert die erste Luecke zurueck,
+// damit der Nutzer gezielt an die richtige Stelle springen kann.
+function pruefeRapport(data) {
+  function fehlt(text, id) { return { text: text, id: id }; }
+
+  if (!data.baustelle) return fehlt('Bauvorhaben fehlt', 'tr-baustelle');
+  if (!data.niederlassung) return fehlt('Niederlassung fehlt', 'tr-niederlassung');
+  if (!data.date) return fehlt('Datum fehlt', 'tr-date');
+  if (!data.beginn) return fehlt('Arbeitszeit-Beginn fehlt', 'tr-beginn');
+  if (!data.ende) return fehlt('Arbeitszeit-Ende fehlt', 'tr-ende');
+
+  var mitName = data.workers.filter(function(w){ return w.name; });
+  if (!mitName.length) return fehlt('Mindestens ein Mitarbeiter fehlt', 'workerList');
+
+  for (var i = 0; i < mitName.length; i++) {
+    var w = mitName[i];
+    var nr = String(i + 1).padStart(2, '0');
+    if (!w.datum) return fehlt('Datum bei Tag ' + nr + ' fehlt', 'workerList');
+    if (!w.stunden || parseFloat(w.stunden) <= 0) return fehlt('Stunden bei Tag ' + nr + ' fehlen', 'workerList');
+  }
+
+  if (!data.taetigkeiten || !data.taetigkeiten.length) return fehlt('Tätigkeit auswählen', 'tr-taetigkeit');
+  if (!data.arbeiten) return fehlt('Beschreibung fehlt', 'tr-arbeiten');
+
+  return null;
+}
+
 function createRapport() {
   var data = getRapportData();
+
+  var luecke = pruefeRapport(data);
+  if (luecke) {
+    toast(luecke.text);
+    var ziel = document.getElementById(luecke.id);
+    if (ziel) {
+      ziel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (ziel.focus && ziel.tagName !== 'DIV') {
+        setTimeout(function(){ try { ziel.focus(); } catch(e) {} }, 400);
+      }
+      // kurz hervorheben, damit die Stelle ins Auge faellt
+      var alt = ziel.style.boxShadow;
+      ziel.style.transition = 'box-shadow .2s';
+      ziel.style.boxShadow = '0 0 0 3px var(--danger)';
+      setTimeout(function(){ ziel.style.boxShadow = alt || ''; }, 1600);
+    }
+    return;
+  }
+
   var validW = data.workers.filter(function(w){ return w.name; });
-  if (!validW.length) { toast('Bitte mindestens einen Mitarbeiter eintragen'); return; }
 
   var html = buildRapportHtml(data);
   var label = data.baustelle || data.projekt || fmtDate(data.date);
@@ -4096,18 +4141,8 @@ function createSchalter() {
    SHARED: Share or Preview
    ═══════════════════════════════════════ */
 function shareOrPreview(html, fileName, title, text) {
-  var blob = new Blob([html], {type: 'text/html'});
-  var file = new File([blob], fileName, {type: 'text/html'});
-
-  if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
-    navigator.share({ title: title, text: text, files: [file] }).then(function() {
-      toast('Bericht geteilt');
-    }).catch(function(err) {
-      if (err.name !== 'AbortError') showPreview(html, fileName);
-    });
-  } else {
-    showPreview(html, fileName);
-  }
+  // Teilen entfernt - direkt die Vorschau mit PDF- und HTML-Download zeigen
+  showPreview(html, fileName);
 }
 
 /* ═══════════════════════════════════════
@@ -4204,26 +4239,12 @@ function showPreview(html, fileName) {
     toast('Bericht heruntergeladen');
   };
 
-  var shareBtn = document.createElement('button');
-  shareBtn.className = 'btn btn-secondary';
-  shareBtn.innerHTML = '&#8599; Teilen';
-  shareBtn.onclick = function() {
-    var blob = new Blob([html], {type:'text/html'});
-    var file = new File([blob], fileName, {type:'text/html'});
-    if (navigator.share) {
-      navigator.share({ files: [file], title: 'Elmbau Baustelle' }).catch(function(){});
-    } else {
-      toast('Teilen nicht unterstützt – bitte herunterladen');
-    }
-  };
-
   var pdfBtn = document.createElement('button');
   pdfBtn.className = 'btn btn-primary';
   pdfBtn.innerHTML = '\u2193 PDF';
   pdfBtn.onclick = function() { exportPdf(html, fileName); };
 
   bar.appendChild(closeBtn);
-  bar.appendChild(shareBtn);
   bar.appendChild(pdfBtn);
   bar.appendChild(dlBtn);
 
@@ -4400,7 +4421,7 @@ function renderLocalHistory(el) {
       + '<span class="history-type ' + hType + '">' + typeLabel + '</span>'
       + '</div>'
       + '<div class="history-actions">'
-      + '<button class="history-btn" onclick="shareHistoryItem(' + h.id + ')" title="Teilen">&#8599;</button>'
+      + '<button class="history-btn" onclick="shareHistoryItem(' + h.id + ')" title="Herunterladen">&#11015;</button>'
       + '<button class="history-btn" onclick="viewHistoryItem(' + h.id + ')" title="Ansehen">&#128065;</button>'
       + '</div>'
       + '</div>';
@@ -4437,16 +4458,11 @@ function shareHistoryItem(id) {
     var typeLabel = HISTORY_TYPE_LABELS[item.type] || 'Bericht';
     var fn = prefix + (item.site || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (item.date || '') + '.html';
     var blob = new Blob([item.html], {type:'text/html'});
-    var file = new File([blob], fn, {type:'text/html'});
-    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-      navigator.share({ files:[file], title: typeLabel + ' – ' + item.site }).catch(function(){});
-    } else {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = fn;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      toast('Bericht heruntergeladen');
-    }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('Bericht heruntergeladen');
   } catch(e) {}
 }
 
