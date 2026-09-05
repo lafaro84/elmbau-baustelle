@@ -1424,7 +1424,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.7.0';
+var APP_VERSION = 'v1.7.1';
 
 var db = null;
 var storage = null;
@@ -4226,19 +4226,6 @@ function showPreview(html, fileName) {
   closeBtn.textContent = 'Schließen';
   closeBtn.onclick = function(){ document.body.removeChild(overlay); };
 
-  var dlBtn = document.createElement('button');
-  dlBtn.className = 'btn btn-secondary';
-  dlBtn.innerHTML = '&#11015; HTML';
-  dlBtn.onclick = function() {
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([html], {type:'text/html'}));
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    toast('Bericht heruntergeladen');
-  };
-
   var pdfBtn = document.createElement('button');
   pdfBtn.className = 'btn btn-primary';
   pdfBtn.innerHTML = '\u2193 PDF';
@@ -4246,7 +4233,6 @@ function showPreview(html, fileName) {
 
   bar.appendChild(closeBtn);
   bar.appendChild(pdfBtn);
-  bar.appendChild(dlBtn);
 
   var body = document.createElement('div');
   body.className = 'preview-body';
@@ -4455,14 +4441,8 @@ function shareHistoryItem(id) {
     var item = history.find(function(h){ return h.id === id; });
     if (!item || !item.html) return;
     var prefix = HISTORY_FILE_PREFIXES[item.type] || 'Bericht_';
-    var typeLabel = HISTORY_TYPE_LABELS[item.type] || 'Bericht';
-    var fn = prefix + (item.site || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (item.date || '') + '.html';
-    var blob = new Blob([item.html], {type:'text/html'});
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fn;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    toast('Bericht heruntergeladen');
+    var fn = prefix + (item.site || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (item.date || '');
+    exportPdf(item.html, fn);
   } catch(e) {}
 }
 
@@ -4490,13 +4470,8 @@ function downloadFirestoreReport(docId) {
     var d = doc.data();
     if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
     var prefix = HISTORY_FILE_PREFIXES[d.type] || 'Bericht_';
-    var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '') + '.html';
-    var blob = new Blob([d.html], {type:'text/html'});
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fn;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    toast('Bericht heruntergeladen');
+    var fn = prefix + (d.baustelle || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g,'_') + '_' + (d.datum || '');
+    exportPdf(d.html, fn);
   }).catch(function(err) {
     toast('Fehler: ' + err.message);
   });
