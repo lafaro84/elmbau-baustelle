@@ -1691,7 +1691,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.20.1';
+var APP_VERSION = 'v1.21.0';
 
 var db = null;
 var storage = null;
@@ -4596,7 +4596,7 @@ function buildReportHtml(data) {
 
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
     + '<title>Kontrolle – ' + escHtml(data.site || 'Baustelle') + '</title></head>'
-    + '<body style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;max-width:700px;margin:0 auto;padding:32px 24px;color:#1a1917;background:#fff">'
+    + '<body style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;max-width:170mm;margin:0;padding:24px 20mm;color:#1a1917;background:#fff">'
     + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #d97b0d">'
     + '<div style="width:40px;height:40px;background:#d97b0d;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px">&#9874;</div>'
     + '<div><h1 style="margin:0;font-size:22px">Baustellenkontrolle</h1>'
@@ -4761,7 +4761,7 @@ function buildRapportHtml(data) {
     + '<title>Tagesrapport - ' + escHtml(data.baustelle || data.projekt || dateFmt) + '</title>'
     + '<style>'
     + '@page { size: A4 landscape; margin: 8mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #000; background: #fff; margin: 0; padding: 0; width: 281mm; height: 194mm; box-sizing: border-box; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #000; background: #fff; margin: 0; padding: 0 0 0 12mm; width: 281mm; height: 194mm; box-sizing: border-box; }'
     + '@media print { body { width: 281mm; height: 194mm; } }'
     + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
     + 'td, th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; overflow: hidden; font-size: 11px; }'
@@ -4974,7 +4974,7 @@ function checklisteZeilen(items) {
 
 function checklisteStil() {
   return '@page { size: A4 portrait; margin: 10mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0; width: 190mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0 20mm; width: 170mm; }'
     + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
     + 'td, th { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }'
     + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 10px; }'
@@ -5126,7 +5126,7 @@ function buildKabellisteHtml(data) {
     + '<title>Kabelliste – ' + escHtml(data.bv || data.elnr || dateFmt) + '</title>'
     + '<style>'
     + '@page { size: A4 portrait; margin: 10mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0; width: 190mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0 20mm; width: 170mm; }'
     + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
     + 'td, th { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }'
     + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 10px; }'
@@ -5195,7 +5195,7 @@ function buildSchalterHtml(data) {
     + '<title>Schalteraufmaß – ' + escHtml(data.bv || data.elnr || dateFmt) + '</title>'
     + '<style>'
     + '@page { size: A4 portrait; margin: 10mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0; width: 190mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; background: #fff; margin: 0; padding: 0 20mm; width: 170mm; }'
     + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
     + 'td, th { border: 1px solid #000; padding: 2px 5px; vertical-align: middle; }'
     + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 10px; }'
@@ -6732,9 +6732,6 @@ function buildNetzwerkHtml(data) {
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
     + '<title>Prüfprotokoll Netzwerk/SAT – ' + escHtml(data.bv || data.projekt || dateFmt) + '</title>'
     + '<style>' + checklisteStil()
-    // Schmalerer Satzspiegel: 20 mm Rand links wie rechts. Links wird gelocht,
-    // deshalb darf die Tabelle dort nicht bis an den Blattrand laufen.
-    +   'body { width:170mm; padding:0 20mm; }'
     +   'td, th { border:1px solid #999; }'
     +   '.pn-nr { width:26mm; font-weight:bold; font-size:9.5px; background:#fafafa; }'
     +   '.pn-lbl { background:#f2f2f2; font-weight:bold; }'
