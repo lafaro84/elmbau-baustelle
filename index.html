@@ -788,7 +788,7 @@ body {
   <button class="module-btn" onclick="switchModule('fertigmontage',this)">Fertigm.</button>
   <button class="module-btn" onclick="switchModule('kabelliste',this)">Kabelliste</button>
   <button class="module-btn" onclick="switchModule('schalter',this)">Schalter</button>
-  <button class="module-btn" onclick="switchModule('history',this)">Berichte</button>
+  <button class="module-btn" id="nav-history" onclick="switchModule('history',this)">Berichte</button>
   <button class="module-btn chef-only" id="nav-stammdaten" onclick="switchModule('stammdaten',this)" style="display:none">Stammdaten</button>
   <button class="module-btn chef-only" id="nav-dashboard" onclick="switchModule('dashboard',this)" style="display:none">Dashboard</button>
 </div>
@@ -1488,7 +1488,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.14.0';
+var APP_VERSION = 'v1.15.0';
 
 var db = null;
 var storage = null;
@@ -1713,6 +1713,10 @@ function afterLogin() {
   // Show/hide chef modules
   document.getElementById('nav-stammdaten').style.display = isChef ? '' : 'none';
   document.getElementById('nav-dashboard').style.display = isChef ? '' : 'none';
+  // Der Berichte-Reiter ist fuer Chefs ueberfluessig: das Dashboard zeigt
+  // dieselbe Liste mit denselben Aktionen, dazu Kennzahlen, Filter und
+  // Sammel-Export. Zwei gleiche Abfragen waeren nur doppelte Lesevorgaenge.
+  document.getElementById('nav-history').style.display = isChef ? 'none' : '';
 
   // Set inspector name if on Kontrolle
   var insp = document.getElementById('f-inspector');
@@ -4903,8 +4907,10 @@ function createRapport() {
     document.getElementById('statusBadge').className = 'status-badge saved';
     toast(ergebnis === 'gespeichert' ? 'Tagesrapport eingereicht' : 'Eingereicht – wird bei Netz übertragen');
 
-    var navBtn = document.querySelector('.module-btn[onclick*="\'history\'"]');
-    switchModule('history', navBtn);
+    // Chefs haben keinen Berichte-Reiter -> auf das Dashboard leiten
+    var ziel = isChef ? 'dashboard' : 'history';
+    var navBtn = document.getElementById(isChef ? 'nav-dashboard' : 'nav-history');
+    switchModule(ziel, navBtn);
   });
 }
 
