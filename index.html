@@ -266,26 +266,6 @@ body {
   color: var(--info);
 }
 
-/* ── Speech-to-Text Mic Button ── */
-.mic-wrap { position: relative; }
-.mic-wrap textarea { padding-right: 44px; }
-.mic-btn {
-  position: absolute; right: 8px; bottom: 10px;
-  width: 32px; height: 32px; border-radius: 50%;
-  border: none; cursor: pointer;
-  background: var(--surface-alt); color: var(--text-muted);
-  font-size: 18px; display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s;
-}
-.mic-btn:hover { background: var(--accent); color: #fff; }
-.mic-btn.recording {
-  background: var(--danger); color: #fff;
-  animation: mic-pulse 1s ease-in-out infinite;
-}
-@keyframes mic-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
-}
 
 /* ── Photos ── */
 .photo-grid {
@@ -872,54 +852,46 @@ body {
     <div class="row">
       <div class="field">
         <label for="tr-beginn">Beginn</label>
-        <input type="time" id="tr-beginn" value="07:00" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-beginn" value="06:00" onchange="calcArbeitszeit();document.getElementById('tr-hinfahrt').value=this.value">
       </div>
       <div class="field">
         <label for="tr-ende">Ende</label>
-        <input type="time" id="tr-ende" value="16:00" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-ende" value="15:00" onchange="calcArbeitszeit();document.getElementById('tr-rueckfahrt').value=this.value">
       </div>
     </div>
     <div class="row">
       <div class="field">
         <label for="tr-pause1-von">Pause 1 von</label>
-        <input type="time" id="tr-pause1-von" value="09:30" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause1-von" onchange="calcArbeitszeit()">
       </div>
       <div class="field">
         <label for="tr-pause1-bis">Pause 1 bis</label>
-        <input type="time" id="tr-pause1-bis" value="09:45" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause1-bis" onchange="calcArbeitszeit()">
+      </div>
+      <div class="field" style="flex:0 0 auto;align-self:flex-end;padding-bottom:8px">
+        <button type="button" class="btn-sm" onclick="document.getElementById('tr-pause1-von').value='';document.getElementById('tr-pause1-bis').value='';calcArbeitszeit()" style="font-size:11px;padding:8px 12px">Clear</button>
       </div>
     </div>
     <div class="row">
       <div class="field">
         <label for="tr-pause2-von">Pause 2 von</label>
-        <input type="time" id="tr-pause2-von" value="12:00" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause2-von" onchange="calcArbeitszeit()">
       </div>
       <div class="field">
         <label for="tr-pause2-bis">Pause 2 bis</label>
-        <input type="time" id="tr-pause2-bis" value="12:30" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause2-bis" onchange="calcArbeitszeit()">
+      </div>
+      <div class="field" style="flex:0 0 auto;align-self:flex-end;padding-bottom:8px">
+        <button type="button" class="btn-sm" onclick="document.getElementById('tr-pause2-von').value='';document.getElementById('tr-pause2-bis').value='';calcArbeitszeit()" style="font-size:11px;padding:8px 12px">Clear</button>
       </div>
     </div>
-    <div class="row" style="align-items:center;margin-top:8px">
-      <div class="field" style="flex:0 0 auto">
-        <label class="toggle-wrap" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-muted)">
-          <input type="checkbox" id="tr-az-auto" checked onchange="calcArbeitszeit()" style="width:18px;height:18px;accent-color:var(--accent)">
-          Auto-Berechnung
-        </label>
-      </div>
-    </div>
+
   </div>
 
   <div class="section">
     <div class="section-label">Personal &amp; Stunden</div>
     <div id="workerList"></div>
-    <button class="btn btn-secondary" onclick="addWorker()" style="margin-top:8px">
-      + Mitarbeiter hinzufügen
-    </button>
-    <div class="summary-row" id="tr-stunden-summe" hidden>
-      <span class="summary-label">Summe Stunden</span>
-      <span class="summary-value" id="tr-summe-val">0</span>
-    </div>
-    <div style="margin-top:12px;padding:12px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between">
+<div style="margin-top:12px;padding:12px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:14px;font-weight:600;color:var(--accent-dark)">Netto-Arbeitszeit</span>
       <span id="tr-az-display" style="font-size:18px;font-weight:700;color:var(--accent-dark);letter-spacing:0.02em">—</span>
     </div>
@@ -948,11 +920,11 @@ body {
     <div class="row">
       <div class="field">
         <label for="tr-hinfahrt">Hinfahrt</label>
-        <input type="time" id="tr-hinfahrt">
+        <input type="time" id="tr-hinfahrt" value="06:00">
       </div>
       <div class="field">
         <label for="tr-rueckfahrt">Rückfahrt</label>
-        <input type="time" id="tr-rueckfahrt">
+        <input type="time" id="tr-rueckfahrt" value="15:00">
       </div>
     </div>
   </div>
@@ -969,7 +941,7 @@ body {
     </div>
     <div class="field">
       <label for="tr-arbeiten">Beschreibung</label>
-      <div class="mic-wrap"><textarea id="tr-arbeiten" placeholder="Was wurde heute gemacht?"></textarea><button type="button" class="mic-btn" onclick="startDictation('tr-arbeiten',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="tr-arbeiten" placeholder="Was wurde heute gemacht?"></textarea>
     </div>
   </div>
 
@@ -977,18 +949,18 @@ body {
     <div class="section-label">Bemerkungen</div>
     <div class="field">
       <label for="tr-bemerkungen">Anmerkungen / Urlaubswünsche</label>
-      <div class="mic-wrap"><textarea id="tr-bemerkungen" placeholder="Besondere Vorkommnisse, Urlaubswünsche etc."></textarea><button type="button" class="mic-btn" onclick="startDictation('tr-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="tr-bemerkungen" placeholder="Besondere Vorkommnisse, Urlaubswünsche etc."></textarea>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-label">Unterschrift Vorgesetzter</div>
-    <div class="sig-wrap" id="trSigWrap">
-      <canvas id="trSigCanvas" height="160"></canvas>
-      <div class="sig-hint" id="trSigHint">Mit dem Finger unterschreiben</div>
+    <div class="section-label">Unterschrift Kunde</div>
+    <div class="sig-wrap" id="trSig2Wrap">
+      <canvas id="trSig2Canvas" height="160"></canvas>
+      <div class="sig-hint" id="trSig2Hint">Mit dem Finger unterschreiben</div>
     </div>
     <div class="sig-actions">
-      <button class="btn-sm" onclick="clearTrSig()">Löschen</button>
+      <button class="btn-sm" onclick="clearTrSig2()">Löschen</button>
     </div>
   </div>
 
@@ -1038,7 +1010,7 @@ body {
   <div class="section">
     <div class="section-label">Sonstiges / Bemerkungen</div>
     <div class="field">
-      <div class="mic-wrap"><textarea id="rm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea><button type="button" class="mic-btn" onclick="startDictation('rm-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="rm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea>
     </div>
   </div>
 
@@ -1110,7 +1082,7 @@ body {
   <div class="section">
     <div class="section-label">Sonstiges / Bemerkungen</div>
     <div class="field">
-      <div class="mic-wrap"><textarea id="fm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea><button type="button" class="mic-btn" onclick="startDictation('fm-bemerkungen',this)" title="Spracheingabe">&#127908;</button></div>
+      <textarea id="fm-bemerkungen" placeholder="Sonstige Anmerkungen..."></textarea>
     </div>
   </div>
 
@@ -1324,6 +1296,12 @@ body {
             <select id="sd-ma-tr-rolle"><option value="Facharbeiter">Facharbeiter</option><option value="Lehrling">Lehrling</option><option value="Probearbeit">Probearbeit</option></select>
           </div>
           <div class="field"><label>PIN (4-6 Stellen)</label><input type="text" id="sd-ma-pin" inputmode="numeric" maxlength="6" placeholder="z.B. 1234"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Fahrzeug</label>
+            <select id="sd-ma-fahrzeug"><option value="">— Keins —</option></select>
+          </div>
+          <div class="field"></div>
         </div>
         <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveMitarbeiter()">Speichern</button></div>
         <input type="hidden" id="sd-ma-id">
@@ -1682,6 +1660,7 @@ function loadMasterData() {
     PERSONAL.azubi = [];
     PERSONAL.alle = [];
     PERSONAL.rollen = {};
+    PERSONAL.fahrzeuge = {};
     snap.forEach(function(doc) {
       var d = doc.data();
       if (d.aktiv === false) return;
@@ -1689,6 +1668,7 @@ function loadMasterData() {
       else if (d.rolle === 'azubi') PERSONAL.azubi.push(d.name);
       PERSONAL.alle.push(d.name);
       PERSONAL.rollen[d.name] = d.tagesrapportRolle || 'Facharbeiter';
+      PERSONAL.fahrzeuge[d.name] = d.fahrzeug || '';
     });
     PERSONAL.alle.sort();
     PERSONAL.elektriker.sort();
@@ -1714,6 +1694,27 @@ function loadMasterData() {
     });
     FAHRZEUGE.sort(function(a, b) { return (a.kennzeichen || '').localeCompare(b.kennzeichen || ''); });
     populateFahrzeugDropdowns();
+    populateSdMaFahrzeug();
+    // Auto-fill fahrzeug + fahrer for logged-in user
+    if (currentUser && PERSONAL.fahrzeuge && PERSONAL.fahrzeuge[currentUser.name]) {
+      var fzSel = document.getElementById('tr-fahrzeug');
+      if (fzSel && !fzSel.value) {
+        var userFz = PERSONAL.fahrzeuge[currentUser.name];
+        var found = false;
+        for (var oi = 0; oi < fzSel.options.length; oi++) {
+          if (fzSel.options[oi].value === userFz) { found = true; break; }
+        }
+        if (!found && userFz) {
+          var no = document.createElement('option');
+          no.value = userFz; no.textContent = userFz;
+          fzSel.appendChild(no);
+        }
+        fzSel.value = userFz;
+      }
+      // Auto-fill fahrer with current user if they have a vehicle
+      var fahrerSel = document.getElementById('tr-fahrer');
+      if (fahrerSel && !fahrerSel.value) fahrerSel.value = currentUser.name;
+    }
     checkTuevWarnungen();
   }).catch(function(err) {
     console.error('Load Fahrzeuge error:', err);
@@ -1912,7 +1913,8 @@ function sdSaveMitarbeiter() {
   if (!name) { toast('Name eingeben'); return; }
   if (!pin || pin.length < 4) { toast('PIN muss mindestens 4 Stellen haben'); return; }
 
-  var data = { name: name, rolle: rolle, tagesrapportRolle: trRolle, pin: pin, aktiv: true };
+  var fzg = document.getElementById("sd-ma-fahrzeug").value;
+  var data = { name: name, rolle: rolle, tagesrapportRolle: trRolle, fahrzeug: fzg, pin: pin, aktiv: true };
   var promise;
   if (editId) {
     promise = db.collection('mitarbeiter').doc(editId).update(data);
@@ -1926,6 +1928,7 @@ function sdSaveMitarbeiter() {
     document.getElementById('sd-ma-id').value = '';
     document.getElementById('sd-ma-rolle').value = 'elektriker';
     document.getElementById('sd-ma-tr-rolle').value = 'Facharbeiter';
+    document.getElementById('sd-ma-fahrzeug').value = '';
     sdLoadMitarbeiter();
     loadMasterData();
   }).catch(function(err) { toast('Fehler: ' + err.message); });
@@ -1938,6 +1941,7 @@ function sdEditMitarbeiter(id) {
     document.getElementById('sd-ma-name').value = d.name || '';
     document.getElementById('sd-ma-rolle').value = d.rolle || 'elektriker';
     document.getElementById('sd-ma-tr-rolle').value = d.tagesrapportRolle || 'Facharbeiter';
+    document.getElementById('sd-ma-fahrzeug').value = d.fahrzeug || '';
     document.getElementById('sd-ma-pin').value = d.pin || '';
     document.getElementById('sd-ma-id').value = id;
     document.getElementById('sd-ma-name').focus();
@@ -2053,6 +2057,20 @@ function sdDeleteFahrzeug(id) {
 
 function populateFahrzeugDropdowns() {
   var sel = document.getElementById('tr-fahrzeug');
+  if (!sel) return;
+  var val = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  FAHRZEUGE.forEach(function(fz) {
+    var o = document.createElement('option');
+    o.value = fz.kennzeichen;
+    o.textContent = fz.kennzeichen;
+    sel.appendChild(o);
+  });
+  if (val) sel.value = val;
+}
+
+function populateSdMaFahrzeug() {
+  var sel = document.getElementById('sd-ma-fahrzeug');
   if (!sel) return;
   var val = sel.value;
   while (sel.options.length > 1) sel.remove(1);
@@ -2753,7 +2771,7 @@ function switchModule(name, btn) {
 
   var sub = document.getElementById('headerSubtitle');
   if (name === 'kontrolle') sub.textContent = 'Mängeldokumentation';
-  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(calcArbeitszeit, 50); }
+  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(function(){ loadPauseMemory(); calcArbeitszeit(); initTrSig2(); }, 50); }
   else if (name === 'rohmontage') sub.textContent = 'Checkliste Rohmontage';
   else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
@@ -2885,7 +2903,7 @@ function initSig() {
 initSig();
 window.addEventListener('resize', function(){
   if (!hasSigned) initSig();
-  if (!trHasSigned) initTrSig();
+  initTrSig(); initTrSig2();
   if (!rmHasSigned) initRmSig();
   if (!fmHasSigned) initFmSig();
 });
@@ -2931,55 +2949,99 @@ function clearSig() {
 }
 
 /* ═══════════════════════════════════════
-   SIGNATURE – Tagesrapport
+   SIGNATURE – Tagesrapport (entfernt)
    ═══════════════════════════════════════ */
-var trSigCanvas = document.getElementById('trSigCanvas');
-var trSigCtx = trSigCanvas.getContext('2d');
-var trSigDrawing = false, trSigLX, trSigLY;
+function initTrSig() {}
+function clearTrSig() {}
+// ── Pause memory (localStorage) ──
+function savePauseMemory() {
+  try {
+    var pm = {
+      p1von: document.getElementById('tr-pause1-von').value,
+      p1bis: document.getElementById('tr-pause1-bis').value,
+      p2von: document.getElementById('tr-pause2-von').value,
+      p2bis: document.getElementById('tr-pause2-bis').value
+    };
+    localStorage.setItem('elmbau_pausen', JSON.stringify(pm));
+  } catch(e) {}
+}
+function loadPauseMemory() {
+  try {
+    var s = localStorage.getItem('elmbau_pausen');
+    if (!s) return;
+    var pm = JSON.parse(s);
+    if (pm.p1von) document.getElementById('tr-pause1-von').value = pm.p1von;
+    if (pm.p1bis) document.getElementById('tr-pause1-bis').value = pm.p1bis;
+    if (pm.p2von) document.getElementById('tr-pause2-von').value = pm.p2von;
+    if (pm.p2bis) document.getElementById('tr-pause2-bis').value = pm.p2bis;
+    calcArbeitszeit();
+  } catch(e) {}
+}
 
-function initTrSig() {
-  var r = trSigCanvas.parentElement.getBoundingClientRect();
+// ── Signature 2 (Kunde/Mitarbeiter toggle) ──
+var trSig2Type = 'Kunde';
+var trSig2Canvas = document.getElementById('trSig2Canvas');
+var trSig2Ctx = trSig2Canvas ? trSig2Canvas.getContext('2d') : null;
+var trSig2Drawing = false, trSig2LX, trSig2LY;
+var trSig2Data = null, trHasSigned2 = false;
+
+function initTrSig2() {
+  if (!trSig2Canvas) return;
+  var r = trSig2Canvas.parentElement.getBoundingClientRect();
   if (r.width < 10) return;
-  trSigCanvas.width = r.width;
-  trSigCanvas.height = 160;
-  var style = getComputedStyle(document.documentElement);
-  trSigCtx.strokeStyle = '#000000';
-  trSigCtx.lineWidth = 3;
-  trSigCtx.lineCap = 'round';
-  trSigCtx.lineJoin = 'round';
+  trSig2Canvas.width = r.width;
+  trSig2Canvas.height = 160;
+  trSig2Ctx.strokeStyle = '#000000';
+  trSig2Ctx.lineWidth = 3;
+  trSig2Ctx.lineCap = 'round';
+  trSig2Ctx.lineJoin = 'round';
+}
+if (trSig2Canvas) {
+  trSig2Canvas.addEventListener('mousedown', function(e){ trSig2Start(e); });
+  trSig2Canvas.addEventListener('mousemove', function(e){ trSig2Move(e); });
+  trSig2Canvas.addEventListener('mouseup', trSig2End);
+  trSig2Canvas.addEventListener('touchstart', function(e){ trSig2Start(e); }, {passive:false});
+  trSig2Canvas.addEventListener('touchmove', function(e){ trSig2Move(e); }, {passive:false});
+  trSig2Canvas.addEventListener('touchend', trSig2End);
+}
+function trSig2Start(e) {
+  e.preventDefault(); trSig2Drawing = true;
+  var p = sigPos(e, trSig2Canvas); trSig2LX = p[0]; trSig2LY = p[1];
+  document.getElementById('trSig2Hint').style.opacity = '0';
+  trHasSigned2 = true;
+}
+function trSig2Move(e) {
+  if (!trSig2Drawing) return; e.preventDefault();
+  var p = sigPos(e, trSig2Canvas);
+  trSig2Ctx.beginPath();
+  trSig2Ctx.moveTo(trSig2LX, trSig2LY);
+  trSig2Ctx.lineTo(p[0], p[1]);
+  trSig2Ctx.stroke();
+  trSig2LX = p[0]; trSig2LY = p[1];
+}
+function trSig2End() {
+  trSig2Drawing = false;
+  trSig2Data = trSig2Canvas.toDataURL('image/png');
+}
+function clearTrSig2() {
+  if (!trSig2Ctx) return;
+  trSig2Ctx.clearRect(0, 0, trSig2Canvas.width, trSig2Canvas.height);
+  trHasSigned2 = false; trSig2Data = null;
+  document.getElementById('trSig2Hint').style.opacity = '1';
+}
+function toggleTrSig2Type() {
+  if (trSig2Type === 'Kunde') {
+    trSig2Type = 'Mitarbeiter';
+    document.getElementById('trSig2Label').textContent = 'Unterschrift Mitarbeiter';
+    document.getElementById('trSig2Toggle').textContent = 'Kunde';
+  } else {
+    trSig2Type = 'Kunde';
+    document.getElementById('trSig2Label').textContent = 'Unterschrift Kunde';
+    document.getElementById('trSig2Toggle').textContent = 'Mitarbeiter';
+  }
+  clearTrSig2();
 }
 
-trSigCanvas.addEventListener('mousedown', function(e){ trSigStart(e); });
-trSigCanvas.addEventListener('mousemove', function(e){ trSigMove(e); });
-trSigCanvas.addEventListener('mouseup', trSigEnd);
-trSigCanvas.addEventListener('touchstart', function(e){ trSigStart(e); }, {passive:false});
-trSigCanvas.addEventListener('touchmove', function(e){ trSigMove(e); }, {passive:false});
-trSigCanvas.addEventListener('touchend', trSigEnd);
-
-function trSigStart(e) {
-  e.preventDefault(); trSigDrawing = true;
-  var p = sigPos(e, trSigCanvas); trSigLX = p[0]; trSigLY = p[1];
-  document.getElementById('trSigHint').style.opacity = '0';
-  trHasSigned = true;
-}
-function trSigMove(e) {
-  if (!trSigDrawing) return; e.preventDefault();
-  var p = sigPos(e, trSigCanvas);
-  trSigCtx.beginPath();
-  trSigCtx.moveTo(trSigLX, trSigLY);
-  trSigCtx.lineTo(p[0], p[1]);
-  trSigCtx.stroke();
-  trSigLX = p[0]; trSigLY = p[1];
-}
-function trSigEnd() {
-  trSigDrawing = false;
-  trSigData = trSigCanvas.toDataURL('image/png');
-}
-function clearTrSig() {
-  trSigCtx.clearRect(0, 0, trSigCanvas.width, trSigCanvas.height);
-  trHasSigned = false; trSigData = null;
-  document.getElementById('trSigHint').style.opacity = '1';
-}
 
 /* ═══════════════════════════════════════
    SIGNATURE – Rohmontage
@@ -3192,20 +3254,7 @@ function toggleWorkerFlag(id, flag, btn) {
   }
 }
 
-function updateStundenSumme() {
-  var sum = 0;
-  trWorkers.forEach(function(w) {
-    sum += parseFloat(w.stunden) || 0;
-  });
-  var el = document.getElementById('tr-stunden-summe');
-  var val = document.getElementById('tr-summe-val');
-  if (sum > 0) {
-    el.hidden = false;
-    val.textContent = sum % 1 === 0 ? sum : sum.toFixed(1);
-  } else {
-    el.hidden = true;
-  }
-}
+function updateStundenSumme() {}
 
 /* ═══════════════════════════════════════
    REPORT GENERATION – Baustellenkontrolle
@@ -3273,9 +3322,7 @@ function buildReportHtml(data) {
    ═══════════════════════════════════════ */
 function calcArbeitszeit() {
   var display = document.getElementById('tr-az-display');
-  var auto = document.getElementById('tr-az-auto');
   if (!display) return;
-  if (!auto || !auto.checked) { display.textContent = 'Manuell'; display.style.color = 'var(--text-muted)'; return; }
 
   var beginn = document.getElementById('tr-beginn').value;
   var ende = document.getElementById('tr-ende').value;
@@ -3313,6 +3360,7 @@ function calcArbeitszeit() {
 
   display.textContent = h + ':' + (m < 10 ? '0' : '') + m + ' Std.';
   display.style.color = 'var(--accent-dark)';
+  savePauseMemory();
 }
 
 function getRapportData() {
@@ -3338,7 +3386,7 @@ function getRapportData() {
     arbeiten: document.getElementById('tr-arbeiten').value.trim(),
     bemerkungen: document.getElementById('tr-bemerkungen').value.trim(),
     arbeitszeit: (document.getElementById('tr-az-display') ? document.getElementById('tr-az-display').textContent : ''),
-    signature: trSigData
+    kundeSignature: trSig2Data
   };
 }
 
@@ -3360,159 +3408,195 @@ function buildRapportHtml(data) {
     taetKuerzel = data.taetigkeiten.map(function(t){ return map[t] || t; }).join(', ');
   }
 
+  // Build 10 worker rows
   var wRows = '';
   for (var i = 0; i < 10; i++) {
     var w = validW[i];
-    var fachStd = '', probeStd = '', lehrStd = '', ausloese = '', verpfl = '', name = '', arbeiten = '';
+    var fachStd = '', probeStd = '', lehrStd = '', ausloese = '', verpfl = '', wname = '', arbeiten = '';
     if (w) {
-      name = escHtml(w.name);
+      wname = escHtml(w.name);
       if (w.rolle === 'Facharbeiter') fachStd = w.stunden || '';
       if (w.rolle === 'Probearbeit') probeStd = w.stunden || '';
       if (w.rolle === 'Lehrling') lehrStd = w.stunden || '';
-      ausloese = w.ausloese ? 'X' : '';
-      verpfl = w.verpfl ? 'X' : '';
+      ausloese = w.ausloese ? 'x' : '';
+      verpfl = w.verpfl ? 'x' : '';
       if (i === 0 && taetKuerzel) arbeiten = escHtml(taetKuerzel);
     }
-    wRows += '<tr>'
-      + '<td class="c">' + (w ? dateFmt : '') + '</td>'
-      + '<td class="c">' + ausloese + '</td>'
-      + '<td class="c">' + verpfl + '</td>'
-      + '<td>' + name + '</td>'
-      + '<td class="c">' + fachStd + '</td>'
-      + '<td class="c">' + probeStd + '</td>'
-      + '<td class="c">' + lehrStd + '</td>'
-      + '<td class="c">' + arbeiten + '</td>'
-      + '<td class="arb">' + (w && i === 0 ? escHtml(data.arbeiten || '') : '') + '</td>'
-      + '</tr>';
+    if (i === 0) {
+      wRows += '<tr class="drow">'
+        + '<td class="c">' + (w ? dateFmt : '') + '</td>'
+        + '<td class="c">' + ausloese + '</td>'
+        + '<td class="c">' + verpfl + '</td>'
+        + '<td>' + wname + '</td>'
+        + '<td class="c">' + fachStd + '</td>'
+        + '<td class="c">' + probeStd + '</td>'
+        + '<td class="c">' + lehrStd + '</td>'
+        + '<td class="c sm">' + arbeiten + '</td>'
+        + '<td rowspan="10" style="vertical-align:top;padding:3px 5px;font-size:8px;white-space:pre-wrap">' + escHtml(data.arbeiten || '') + '</td>'
+        + '</tr>';
+    } else {
+      wRows += '<tr class="drow">'
+        + '<td class="c">' + (w ? dateFmt : '') + '</td>'
+        + '<td class="c">' + ausloese + '</td>'
+        + '<td class="c">' + verpfl + '</td>'
+        + '<td>' + wname + '</td>'
+        + '<td class="c">' + fachStd + '</td>'
+        + '<td class="c">' + probeStd + '</td>'
+        + '<td class="c">' + lehrStd + '</td>'
+        + '<td class="c sm"></td>'
+        + '</tr>';
+    }
   }
 
-  var katElektro = data.kategorie === 'Elektro' ? 'X' : '';
-  var katElmbau = data.kategorie === 'Elmbau' ? 'X' : '';
-  var katLager = data.kategorie === 'Lager' ? 'X' : '';
-  var katSonstig = data.kategorie === 'Sonstiges' ? 'X' : '';
-
-  var sigImg = '';
-  if (data.signature) {
-    sigImg = '<img src="' + data.signature + '" style="max-height:38px;max-width:140px">';
+  var kundeSigImg = '';
+  if (data.kundeSignature) {
+    kundeSigImg = '<img src="' + data.kundeSignature + '" style="max-height:55px;max-width:180px">';
   }
 
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
-    + '<title>Tagesrapport – ' + escHtml(data.baustelle || data.projekt || dateFmt) + '</title>'
+    + '<title>Tagesrapport - ' + escHtml(data.baustelle || data.projekt || dateFmt) + '</title>'
     + '<style>'
-    + '@page { size: A4 landscape; margin: 8mm; }'
-    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #000; background: #fff; margin: 0; padding: 8mm; width: 281mm; }'
-    + '@media print { body { padding: 0; width: auto; } }'
-    + 'table { border-collapse: collapse; }'
-    + '.form { width: 100%; border: 2px solid #000; }'
-    + '.form td, .form th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }'
-    + '.form th { background: #f0f0f0; font-weight: bold; text-align: center; }'
-    + '.hdr { font-size: 14px; font-weight: bold; }'
-    + '.sub { font-size: 10px; }'
-    + '.sm { font-size: 8px; }'
+    + '@page { size: 297mm 210mm; margin: 8mm; }'
+    + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #000; background: #fff; margin: 0; padding: 0; width: 281mm; height: 194mm; box-sizing: border-box; }'
+    + '@media print { body { width: 281mm; height: 194mm; } }'
+    + 'table { border-collapse: collapse; width: 100%; table-layout: fixed; }'
+    + 'td, th { border: 1px solid #000; padding: 1px 3px; vertical-align: middle; overflow: hidden; font-size: 8px; }'
     + '.c { text-align: center; }'
-    + '.r { text-align: right; }'
     + '.b { font-weight: bold; }'
-    + '.chk { width: 14px; height: 14px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 14px; font-size: 10px; font-weight: bold; vertical-align: middle; }'
-    + '.data td { height: 20px; font-size: 9px; }'
-    + '.data td.arb { font-size: 8px; text-align: left; padding-left: 4px; }'
-    + '.bot td { font-size: 8px; padding: 2px 4px; vertical-align: top; }'
+    + '.sm { font-size: 7px; }'
+    + '.nb { border: none; }'
+    + '.nbl { border-left: none; }'
+    + '.nbr { border-right: none; }'
+    + '.nbt { border-top: none; }'
+    + '.nbb { border-bottom: none; }'
+    + 'th { background: #eee; font-size: 7px; padding: 2px 2px; }'
+    + '.drow td { height: 14px; font-size: 8px; }'
+    + '.hdr-tbl td { font-size: 8px; }'
+    + '.ftr-tbl td { font-size: 8px; }'
     + '</style></head>'
     + '<body>'
-    + '<table class="form" cellspacing="0">'
+
+    // ===== HEADER TABLE (3 columns: 16% / 61% / 23%) =====
+    + '<table class="hdr-tbl"><colgroup>'
+    + '<col style="width:16%"><col style="width:61%"><col style="width:23%">'
+    + '</colgroup>'
+
+    // Row 1: Company | Title | Entfernung
     + '<tr>'
-    + '<td colspan="4" rowspan="2" style="width:28%"><span class="hdr">Elm Bau GmbH</span></td>'
-    + '<td colspan="3" rowspan="2" class="c" style="width:22%"><span class="sub" style="font-weight:bold">Tagesrapport</span><br><span class="sm">Bitte für jeden Tag einen Tagesrapport separat ausfüllen</span></td>'
-    + '<td colspan="2" style="width:50%;text-align:right;font-size:8px">Entfernung zum BV in km (ab 50km): <b>' + escHtml(data.km || '') + '</b></td>'
-    + '</tr>'
-    + '<tr>'
-    + '<td class="c sm" style="width:10%">Fahrzeug:</td>'
-    + '<td style="width:40%"><b>' + escHtml(data.fahrzeug || '') + '</b></td>'
-    + '</tr>'
-    + '<tr>'
-    + '<td colspan="4" rowspan="2" style="font-size:8px">Braunschweiger Str.22b &nbsp; 38154 Kgl.</td>'
-    + '<td class="c" style="width:8%"><span class="chk">' + katElektro + '</span></td>'
-    + '<td class="c sub" style="width:7%">Elektro</td>'
-    + '<td class="c" style="width:7%"></td>'
-    + '<td class="sm" style="width:10%">Fahrer</td>'
-    + '<td class="c"><b>' + escHtml(data.fahrer || '') + '</b></td>'
-    + '</tr>'
-    + '<tr>'
-    + '<td class="c"><span class="chk">' + katElmbau + '</span></td>'
-    + '<td class="c sub">Elmbau</td>'
-    + '<td class="c"></td>'
-    + '<td class="sm">Hinfahrt</td>'
-    + '<td class="c"><b>' + escHtml(data.hinfahrt || '') + '</b></td>'
-    + '</tr>'
-    + '<tr>'
-    + '<td colspan="4" style="font-size:8px">&nbsp;</td>'
-    + '<td class="c"><span class="chk">' + katLager + '</span></td>'
-    + '<td class="c sub">Lager</td>'
-    + '<td class="c"></td>'
-    + '<td class="sm">Rückfahrt</td>'
-    + '<td class="c"><b>' + escHtml(data.rueckfahrt || '') + '</b></td>'
-    + '</tr>'
-    + '<tr>'
-    + '<td class="sub" style="width:12%">Kostenstelle:</td>'
-    + '<td colspan="2"><b>' + escHtml(data.kostenstelle || '') + '</b></td>'
-    + '<td class="sub r">Projekt Nr.:</td>'
-    + '<td class="c"><span class="chk">' + katSonstig + '</span></td>'
-    + '<td class="c sub">Sonstiges</td>'
-    + '<td colspan="2"><b>' + escHtml(data.projekt || '') + '</b></td>'
-    + '<td class="sm" style="border-bottom:2px solid #000">Datum / Unterschrift<br>Vorgesetzter</td>'
-    + '</tr>'
-    + '<tr>'
-    + '<td class="sub">Bauvorhaben:</td>'
-    + '<td colspan="7"><b>' + escHtml(data.baustelle || '') + '</b></td>'
-    + '<td class="c">' + sigImg + '</td>'
-    + '</tr>'
-    + '<tr style="background:#f0f0f0">'
-    + '<th style="width:10%">Datum</th>'
-    + '<th style="width:5%">Aus-<br>löse</th>'
-    + '<th style="width:5%">Verpfl.<br>Geld</th>'
-    + '<th style="width:16%">Mitarbeiter</th>'
-    + '<th style="width:7%">Fach-<br>arbeiter<br>Std.</th>'
-    + '<th style="width:7%">Probe-<br>arbeit<br>Std.</th>'
-    + '<th style="width:7%">Lehrling<br>Std.</th>'
-    + '<th style="width:7%">ausgef.<br>Arbeiten</th>'
-    + '<th style="width:36%">Ausgeführte Arbeiten / Bemerkungen</th>'
-    + '</tr>'
-    + '<tbody class="data">'
-    + wRows
-    + '</tbody>'
-    + '<tr style="background:#f0f0f0;font-weight:bold">'
-    + '<td colspan="4" class="r sub">Summe Stunden:</td>'
-    + '<td class="c">' + (sumFach ? (sumFach % 1 === 0 ? sumFach : sumFach.toFixed(1)) : '') + '</td>'
-    + '<td class="c">' + (sumProbe ? (sumProbe % 1 === 0 ? sumProbe : sumProbe.toFixed(1)) : '') + '</td>'
-    + '<td class="c">' + (sumLehr ? (sumLehr % 1 === 0 ? sumLehr : sumLehr.toFixed(1)) : '') + '</td>'
-    + '<td colspan="2"></td>'
-    + '</tr>'
-    + '<tr class="bot">'
-    + '<td colspan="4" style="border-top:2px solid #000">'
-    + '<b>Arbeitszeitbeginn (Uhrzeit):</b> ' + escHtml(data.beginn || '') + '<br>'
-    + '<b>Arbeitszeitende (Uhrzeit):</b> ' + escHtml(data.ende || '') + '<br>'
-    + '<b>Netto-Arbeitszeit:</b> ' + escHtml(data.arbeitszeit || '')
+    + '<td rowspan="2" style="font-weight:bold;font-size:10px;vertical-align:top;padding:3px">'
+    +   'Elm Bau GmbH<br><span style="font-size:7px;font-weight:normal">Braunschweiger Str.22b<br>38154 Kgl.</span>'
     + '</td>'
-    + '<td colspan="3" style="border-top:2px solid #000">'
-    + '<b>Kürzel für ausgeführte Arbeiten:</b><br>'
-    + 'RB = Rohbau &nbsp; FM = Fertigmontage<br>'
-    + 'KD = Kundendienst &nbsp; GW = Gewährleistung'
+    + '<td rowspan="2" class="c" style="padding:4px">'
+    +   '<div style="font-size:16px;font-weight:bold">Tagesrapport</div>'
+    +   '<div style="font-size:7px">einen Tagesrapport separat ausfüllen</div>'
+    +   '<div style="font-size:11px;font-weight:bold;margin-top:2px">' + escHtml(data.baustelle || '') + '</div>'
     + '</td>'
-    + '<td colspan="2" rowspan="2" style="border-top:2px solid #000;vertical-align:top">'
-    + '<b>Besondere Anmerkungen /<br>Urlaubswünsche usw.:</b><br>'
-    + escHtml(data.bemerkungen || '')
+    + '<td style="font-size:7px;padding:2px 4px">'
+    +   'Entfernung zum BV<br>in km (ab 50km): <b style="font-size:9px">' + escHtml(data.km || '') + '</b>'
     + '</td>'
     + '</tr>'
-    + '<tr class="bot">'
-    + '<td colspan="2">'
-    + '<b>Pause 1:</b> ' + escHtml(data.pause1von || '') + (data.pause1von && data.pause1bis ? ' – ' + escHtml(data.pause1bis) : '') + '<br>'
-    + '<b>Pause 2:</b> ' + escHtml(data.pause2von || '') + (data.pause2von && data.pause2bis ? ' – ' + escHtml(data.pause2bis) : '')
+
+    // Row 2: (cont) | (cont) | Fahrzeug
+    + '<tr>'
+    + '<td style="font-size:7px;padding:2px 4px">'
+    +   'Fahrzeug: <b style="font-size:9px">' + escHtml(data.fahrzeug || '') + '</b>'
     + '</td>'
-    + '<td colspan="5"></td>'
+    + '</tr>'
+
+    // Row 3: Address2 + Kostenstelle | Projekt | Fahrer/Hinfahrt
+    + '<tr>'
+    + '<td style="font-size:7px;padding:2px 3px">'
+    +   '<span style="font-size:6px">Am Mart 17 / 01561 Lampertswalde</span><br>'
+    +   'Kostenstelle: <b style="color:#c00;font-size:9px">' + escHtml(data.kostenstelle || '') + '</b>'
+    + '</td>'
+    + '<td style="padding:2px 4px">'
+    +   'Projekt Nr.: <b style="color:#c00;font-size:9px">' + escHtml(data.projekt || '') + '</b>'
+    +   '<span style="margin-left:20px;font-size:7px">' + escHtml(data.kategorie || '') + '</span>'
+    + '</td>'
+    + '<td style="font-size:7px;padding:2px 4px">'
+    +   'Fahrer: <b>' + escHtml(data.fahrer || '') + '</b><br>'
+    +   'Hinfahrt: <b>' + escHtml(data.hinfahrt || '') + '</b> &nbsp; Rückfahrt: <b>' + escHtml(data.rueckfahrt || '') + '</b>'
+    + '</td>'
     + '</tr>'
     + '</table>'
-    + '<div style="margin-top:4px;text-align:center;font-size:7px;color:#999">Erstellt mit Elmbau Baustelle</div>'
+
+    // ===== DATA TABLE (9 columns matching Excel proportions) =====
+    + '<table class="data-tbl" style="margin-top:-1px"><colgroup>'
+    + '<col style="width:7%">'
+    + '<col style="width:4.5%">'
+    + '<col style="width:4.5%">'
+    + '<col style="width:15%">'
+    + '<col style="width:9%">'
+    + '<col style="width:7%">'
+    + '<col style="width:9%">'
+    + '<col style="width:9%">'
+    + '<col style="width:35%">'
+    + '</colgroup>'
+
+    + '<tr>'
+    + '<th>Datum</th>'
+    + '<th>Auslöse</th>'
+    + '<th>Verpfl.<br>Geld</th>'
+    + '<th>Mitarbeiter</th>'
+    + '<th>Facharbeiter<br>Std.</th>'
+    + '<th>Probearbeit<br>Std.</th>'
+    + '<th>Lehrling<br>Std.</th>'
+    + '<th>ausgef.<br>Arbeiten</th>'
+    + '<th>Ausgeführte Arbeiten / Bemerkungen</th>'
+    + '</tr>'
+
+    + wRows
+    + '</table>'
+
+    // ===== FOOTER TABLE (3 columns: 31% / 34% / 35%) =====
+    + '<table class="ftr-tbl" style="margin-top:-1px"><colgroup>'
+    + '<col style="width:31%"><col style="width:34%"><col style="width:35%">'
+    + '</colgroup>'
+
+    // Row 1: Arbeitszeit | Kürzel | Bemerkungen + Unterschrift
+    + '<tr>'
+    + '<td style="vertical-align:top;padding:3px 4px">'
+    +   '<b>Arbeitszeitbeginn (Uhrzeit):</b> ' + escHtml(data.beginn || '') + '<br>'
+    +   '<b>Arbeitszeitende (Uhrzeit):</b> ' + escHtml(data.ende || '') + '<br>'
+    +   '<b>Netto-Arbeitszeit:</b> ' + escHtml(data.arbeitszeit || '')
+    + '</td>'
+    + '<td style="vertical-align:top;padding:3px 4px;font-size:7px">'
+    +   '<b><u>Kürzel:</u></b><br>'
+    +   'RB = Rohbau<br>'
+    +   'FM = Fertigmontage<br>'
+    +   'KD = Kundendienst'
+    + '</td>'
+    + '<td rowspan="2" style="vertical-align:top;padding:3px 4px">'
+    +   '<b>Besondere Anmerkungen / Urlaubswünsche usw.:</b><br>'
+    +   '<span style="white-space:pre-wrap;font-size:7px">' + escHtml(data.bemerkungen || '') + '</span>'
+    +   '<div style="position:relative;min-height:50px">'
+    +     '<div style="position:absolute;bottom:0;right:0;text-align:right">'
+    +       '<span style="font-size:6px;color:#666">Unterschrift Kunde:</span><br>'
+    +       kundeSigImg
+    +     '</div>'
+    +   '</div>'
+    + '</td>'
+    + '</tr>'
+
+    // Row 2: Pause 1 | Pause 2 | (cont Bemerkungen)
+    + '<tr>'
+    + '<td style="padding:3px 4px">'
+    +   '<b>Pause 1</b><br>'
+    +   'Beginn: ' + escHtml(data.pause1von || '') + '<br>'
+    +   'Ende: ' + escHtml(data.pause1bis || '')
+    + '</td>'
+    + '<td style="padding:3px 4px">'
+    +   '<b>Pause 2</b><br>'
+    +   'Beginn: ' + escHtml(data.pause2von || '') + '<br>'
+    +   'Ende: ' + escHtml(data.pause2bis || '')
+    + '</td>'
+    + '</tr>'
+
+    + '</table>'
     + '</body></html>';
 }
+
+
 
 /* ═══════════════════════════════════════
    REPORT GENERATION – Rohmontage
@@ -4381,7 +4465,7 @@ function resetForm() {
   mangelSeq = 0;
   addMangel();
   clearSig();
-  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Formular zurückgesetzt');
 }
@@ -4392,17 +4476,17 @@ function resetRapport() {
   document.getElementById('tr-kostenstelle').value = '';
   document.getElementById('tr-projekt').value = '';
   document.getElementById('tr-baustelle').value = '';
-  document.getElementById('tr-fahrzeug').value = '';
+  // fahrzeug bleibt vorausgefuellt
   document.getElementById('tr-km').value = '';
   document.getElementById('tr-fahrer').value = '';
-  document.getElementById('tr-hinfahrt').value = '';
-  document.getElementById('tr-rueckfahrt').value = '';
-  document.getElementById('tr-beginn').value = '07:00';
-  document.getElementById('tr-ende').value = '16:00';
-  document.getElementById('tr-pause1-von').value = '09:30';
-  document.getElementById('tr-pause1-bis').value = '09:45';
-  document.getElementById('tr-pause2-von').value = '12:00';
-  document.getElementById('tr-pause2-bis').value = '12:30';
+  document.getElementById('tr-hinfahrt').value = document.getElementById('tr-beginn').value;
+  document.getElementById('tr-rueckfahrt').value = document.getElementById('tr-ende').value;
+  document.getElementById('tr-beginn').value = '06:00';
+  document.getElementById('tr-ende').value = '15:00';
+  document.getElementById('tr-pause1-von').value = '';
+  document.getElementById('tr-pause1-bis').value = '';
+  document.getElementById('tr-pause2-von').value = '';
+  document.getElementById('tr-pause2-bis').value = '';
   document.getElementById('tr-arbeiten').value = '';
   document.getElementById('tr-bemerkungen').value = '';
   trKategorie = 'Elektro';
@@ -4415,7 +4499,8 @@ function resetRapport() {
   addWorker();
   updateStundenSumme();
   clearTrSig();
-  document.getElementById('statusBadge').textContent = APP_VERSION;
+  clearTrSig2();
+  document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Tagesrapport zurückgesetzt');
 }
@@ -4430,7 +4515,7 @@ function resetRohmontage() {
   initRmItems();
   renderRmChecklist();
   clearRmSig();
-  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Rohmontage zurückgesetzt');
 }
@@ -4449,7 +4534,7 @@ function resetFertigmontage() {
   // Reset begonnen buttons
   var begBtns = document.querySelectorAll('#mod-fertigmontage .cl-btn');
   begBtns.forEach(function(b){ b.className = 'cl-btn'; });
-  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Fertigmontage zurückgesetzt');
 }
@@ -4464,7 +4549,7 @@ function resetKabelliste() {
   document.getElementById('kl-tuer').value = '';
   initKlRows();
   renderKlTable();
-  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Kabelliste zurückgesetzt');
 }
@@ -4482,7 +4567,7 @@ function resetSchalter() {
   document.getElementById('sc-fab-custom').value = '';
   initScItems();
   renderScTable();
-  document.getElementById('statusBadge').textContent = APP_VERSION;
+  document.getElementById('statusBadge').textContent = '';
   document.getElementById('statusBadge').className = 'status-badge';
   toast('Schalteraufmaß zurückgesetzt');
 }
@@ -4496,64 +4581,7 @@ function escHtml(s) {
   return d.innerHTML;
 }
 
-/* ═══════════════════════════════════════
-   SPEECH-TO-TEXT (Web Speech API)
-   ═══════════════════════════════════════ */
-var activeDictation = null;
 
-function startDictation(textareaId, btn) {
-  // If already recording, stop
-  if (activeDictation && activeDictation.textareaId === textareaId) {
-    activeDictation.recognition.stop();
-    return;
-  }
-  // Stop any other active dictation
-  if (activeDictation) {
-    activeDictation.recognition.stop();
-  }
-
-  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    toast('Spracherkennung wird von diesem Browser nicht unterstützt');
-    return;
-  }
-
-  var recognition = new SpeechRecognition();
-  recognition.lang = 'de-DE';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-
-  var textarea = document.getElementById(textareaId);
-  var startText = textarea.value;
-  btn.classList.add('recording');
-
-  activeDictation = { recognition: recognition, textareaId: textareaId, btn: btn };
-
-  recognition.onresult = function(event) {
-    var transcript = '';
-    for (var i = 0; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-    textarea.value = startText + (startText ? ' ' : '') + transcript;
-  };
-
-  recognition.onerror = function(event) {
-    btn.classList.remove('recording');
-    activeDictation = null;
-    if (event.error === 'not-allowed') {
-      toast('Mikrofonzugriff verweigert. Bitte in den Browsereinstellungen erlauben.');
-    } else if (event.error !== 'aborted') {
-      toast('Spracherkennung-Fehler: ' + event.error);
-    }
-  };
-
-  recognition.onend = function() {
-    btn.classList.remove('recording');
-    activeDictation = null;
-  };
-
-  recognition.start();
-}
 
 function toast(msg) {
   var t = document.getElementById('toast');
@@ -4587,3 +4615,4 @@ appBoot();
 </script>
 </body>
 </html>
+
