@@ -872,31 +872,31 @@ body {
     <div class="row">
       <div class="field">
         <label for="tr-beginn">Beginn</label>
-        <input type="time" id="tr-beginn" value="07:00" onchange="calcArbeitszeit();document.getElementById('tr-hinfahrt').value=this.value">
+        <input type="time" id="tr-beginn" value="06:00" onchange="calcArbeitszeit();document.getElementById('tr-hinfahrt').value=this.value">
       </div>
       <div class="field">
         <label for="tr-ende">Ende</label>
-        <input type="time" id="tr-ende" value="16:00" onchange="calcArbeitszeit();document.getElementById('tr-rueckfahrt').value=this.value">
+        <input type="time" id="tr-ende" value="15:00" onchange="calcArbeitszeit();document.getElementById('tr-rueckfahrt').value=this.value">
       </div>
     </div>
     <div class="row">
       <div class="field">
         <label for="tr-pause1-von">Pause 1 von</label>
-        <input type="time" id="tr-pause1-von" value="09:30" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause1-von" onchange="calcArbeitszeit()">
       </div>
       <div class="field">
         <label for="tr-pause1-bis">Pause 1 bis</label>
-        <input type="time" id="tr-pause1-bis" value="09:45" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause1-bis" onchange="calcArbeitszeit()">
       </div>
     </div>
     <div class="row">
       <div class="field">
         <label for="tr-pause2-von">Pause 2 von</label>
-        <input type="time" id="tr-pause2-von" value="12:00" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause2-von" onchange="calcArbeitszeit()">
       </div>
       <div class="field">
         <label for="tr-pause2-bis">Pause 2 bis</label>
-        <input type="time" id="tr-pause2-bis" value="12:30" onchange="calcArbeitszeit()">
+        <input type="time" id="tr-pause2-bis" onchange="calcArbeitszeit()">
       </div>
     </div>
 
@@ -939,11 +939,11 @@ body {
     <div class="row">
       <div class="field">
         <label for="tr-hinfahrt">Hinfahrt</label>
-        <input type="time" id="tr-hinfahrt" value="07:00">
+        <input type="time" id="tr-hinfahrt" value="06:00">
       </div>
       <div class="field">
         <label for="tr-rueckfahrt">Rückfahrt</label>
-        <input type="time" id="tr-rueckfahrt" value="16:00">
+        <input type="time" id="tr-rueckfahrt" value="15:00">
       </div>
     </div>
   </div>
