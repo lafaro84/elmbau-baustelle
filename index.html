@@ -1421,7 +1421,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.1.0';
+var APP_VERSION = 'v1.1.1';
 
 var db = null;
 var storage = null;
@@ -1651,8 +1651,38 @@ function doLogout() {
   showLoginScreen();
 }
 
+var mitarbeiterGeladen = false;
+var fahrzeugeGeladen = false;
+
+// Laeuft erst wenn BEIDE Firestore-Abfragen fertig sind, sonst ist
+// PERSONAL.fahrzeuge noch leer wenn die Fahrzeug-Abfrage zuerst zurueckkommt
+function autofillFahrzeugFahrer() {
+  if (!mitarbeiterGeladen || !fahrzeugeGeladen) return;
+  if (!currentUser || !PERSONAL.fahrzeuge) return;
+  var userFz = PERSONAL.fahrzeuge[currentUser.name];
+  if (!userFz) return;
+
+  var fzSel = document.getElementById('tr-fahrzeug');
+  if (fzSel && !fzSel.value) {
+    var found = false;
+    for (var oi = 0; oi < fzSel.options.length; oi++) {
+      if (fzSel.options[oi].value === userFz) { found = true; break; }
+    }
+    if (!found) {
+      var no = document.createElement('option');
+      no.value = userFz; no.textContent = userFz;
+      fzSel.appendChild(no);
+    }
+    fzSel.value = userFz;
+  }
+  var fahrerSel = document.getElementById('tr-fahrer');
+  if (fahrerSel && !fahrerSel.value) fahrerSel.value = currentUser.name;
+}
+
 function loadMasterData() {
   if (!db) return;
+  mitarbeiterGeladen = false;
+  fahrzeugeGeladen = false;
 
   // Load Mitarbeiter (no compound query — filter + sort client-side)
   db.collection('mitarbeiter').get().then(function(snap) {
@@ -1680,6 +1710,8 @@ function loadMasterData() {
       trWorkers[0].rolle = PERSONAL.rollen[currentUser.name] || 'Facharbeiter';
       renderWorkers();
     }
+    mitarbeiterGeladen = true;
+    autofillFahrzeugFahrer();
   }).catch(function(err) {
     console.error('Load Mitarbeiter error:', err);
   });
@@ -1695,26 +1727,8 @@ function loadMasterData() {
     FAHRZEUGE.sort(function(a, b) { return (a.kennzeichen || '').localeCompare(b.kennzeichen || ''); });
     populateFahrzeugDropdowns();
     populateSdMaFahrzeug();
-    // Auto-fill fahrzeug + fahrer for logged-in user
-    if (currentUser && PERSONAL.fahrzeuge && PERSONAL.fahrzeuge[currentUser.name]) {
-      var fzSel = document.getElementById('tr-fahrzeug');
-      if (fzSel && !fzSel.value) {
-        var userFz = PERSONAL.fahrzeuge[currentUser.name];
-        var found = false;
-        for (var oi = 0; oi < fzSel.options.length; oi++) {
-          if (fzSel.options[oi].value === userFz) { found = true; break; }
-        }
-        if (!found && userFz) {
-          var no = document.createElement('option');
-          no.value = userFz; no.textContent = userFz;
-          fzSel.appendChild(no);
-        }
-        fzSel.value = userFz;
-      }
-      // Auto-fill fahrer with current user if they have a vehicle
-      var fahrerSel = document.getElementById('tr-fahrer');
-      if (fahrerSel && !fahrerSel.value) fahrerSel.value = currentUser.name;
-    }
+    fahrzeugeGeladen = true;
+    autofillFahrzeugFahrer();
     checkTuevWarnungen();
   }).catch(function(err) {
     console.error('Load Fahrzeuge error:', err);
@@ -3028,18 +3042,6 @@ function clearTrSig2() {
   trSig2Ctx.clearRect(0, 0, trSig2Canvas.width, trSig2Canvas.height);
   trHasSigned2 = false; trSig2Data = null;
   document.getElementById('trSig2Hint').style.opacity = '1';
-}
-function toggleTrSig2Type() {
-  if (trSig2Type === 'Kunde') {
-    trSig2Type = 'Mitarbeiter';
-    document.getElementById('trSig2Label').textContent = 'Unterschrift Mitarbeiter';
-    document.getElementById('trSig2Toggle').textContent = 'Kunde';
-  } else {
-    trSig2Type = 'Kunde';
-    document.getElementById('trSig2Label').textContent = 'Unterschrift Kunde';
-    document.getElementById('trSig2Toggle').textContent = 'Mitarbeiter';
-  }
-  clearTrSig2();
 }
 
 
@@ -4479,10 +4481,10 @@ function resetRapport() {
   // fahrzeug bleibt vorausgefuellt
   document.getElementById('tr-km').value = '';
   document.getElementById('tr-fahrer').value = '';
-  document.getElementById('tr-hinfahrt').value = document.getElementById('tr-beginn').value;
-  document.getElementById('tr-rueckfahrt').value = document.getElementById('tr-ende').value;
   document.getElementById('tr-beginn').value = '06:00';
   document.getElementById('tr-ende').value = '15:00';
+  document.getElementById('tr-hinfahrt').value = '06:00';
+  document.getElementById('tr-rueckfahrt').value = '15:00';
   document.getElementById('tr-pause1-von').value = '';
   document.getElementById('tr-pause1-bis').value = '';
   document.getElementById('tr-pause2-von').value = '';
