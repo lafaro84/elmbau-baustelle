@@ -870,7 +870,7 @@ body {
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <span class="user-badge" id="currentUserBadge" onclick="doLogout()" title="Abmelden"></span>
-    <div class="status-badge" id="statusBadge"></div>
+    <div class="status-badge" id="statusBadge" onclick="updVonHand()" title="Auf Updates pr&uuml;fen" style="cursor:pointer"></div>
   </div>
 </div>
 
@@ -1760,7 +1760,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.25.0';
+var APP_VERSION = 'v1.26.0';
 
 var db = null;
 var storage = null;
@@ -7243,7 +7243,7 @@ document.addEventListener('change', datumWaechter, true);
    ═══════════════════════════════════════ */
 var UPD_DATEI = 'version.json';
 var UPD_MARKER = 'elmbau_update_versuch';   // gegen Endlosschleifen
-var UPD_INTERVALL = 30 * 60 * 1000;         // alle 30 Minuten nachsehen
+var UPD_INTERVALL = 5 * 60 * 1000;          // alle 5 Minuten nachsehen
 var updBannerDa = false;
 
 function updBasisUrl() {
@@ -7300,6 +7300,30 @@ function updPruefen(beimStart) {
   }).catch(function(){ /* offline oder Datei fehlt: nicht stoeren */ });
 }
 
+// Klick auf die Versionsanzeige: sofort nachsehen und Bescheid geben
+function updVonHand() {
+  var badge = document.getElementById('statusBadge');
+  if (badge) badge.textContent = 'prüfe…';
+  var fertig = function(text) {
+    if (!badge) return;
+    badge.textContent = text;
+    setTimeout(function() {
+      badge.textContent = APP_VERSION;
+      badge.className = 'status-badge';
+    }, 2500);
+  };
+  if (!location.protocol || location.protocol === 'file:') { fertig(APP_VERSION); return; }
+  fetch(UPD_DATEI + '?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j) {
+      if (!j || !j.version) { fertig(APP_VERSION); return; }
+      if (j.version === APP_VERSION) { fertig('aktuell'); return; }
+      fertig(APP_VERSION);
+      updJetzt(j.version);
+    })
+    .catch(function(){ fertig(APP_VERSION); });
+}
+
 function updStarten() {
   updPruefen(true);
   setInterval(function(){ updPruefen(false); }, UPD_INTERVALL);
@@ -7307,6 +7331,10 @@ function updStarten() {
     if (document.hidden) return;
     updPruefen(false);
     datumsGrenzeSetzen();   // ueber Nacht wandert die Grenze weiter
+  });
+  window.addEventListener('focus', function() {
+    updPruefen(false);
+    datumsGrenzeSetzen();
   });
 }
 
