@@ -1423,7 +1423,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.2.0';
+var APP_VERSION = 'v1.2.1';
 
 var db = null;
 var storage = null;
@@ -4191,8 +4191,8 @@ var HISTORY_TYPE_LABELS = {
 function renderHistory() {
   var el = document.getElementById('historyList');
 
-  // Chef: load ALL reports from Firestore
-  if (isChef && db) {
+  // Chef sieht alle Berichte, Mitarbeiter nur die eigenen
+  if (db && currentUser) {
     el.innerHTML = '<div class="empty-state"><p>Lade Berichte...</p></div>';
     db.collection('berichte').get().then(function(snap) {
       // Client-side filter and sort to avoid Firestore index requirements
@@ -4201,6 +4201,7 @@ function renderHistory() {
         var d = doc.data();
         d._id = doc.id;
         if (historyFilter !== 'all' && d.type !== historyFilter) return;
+        if (!isChef && d.erstellerId !== currentUser.id) return;
         docs.push(d);
       });
       docs.sort(function(a, b) {
@@ -4224,6 +4225,17 @@ function renderHistory() {
           if (hType === 'kontrolle') meta += ' &middot; ' + (d.data.mangelCount || d.data.inspector || '');
           else if (hType === 'rapport') meta += ' &middot; ' + (d.data.workerCount || 0) + ' MA';
         }
+        // Editieren darf der Chef und der Ersteller selbst, Loeschen nur der Chef
+        var darfEditieren = isChef || (currentUser && d.erstellerId === currentUser.id);
+        var aktionen = ''
+          + '<button class="history-btn" onclick="viewFirestoreReport(\'' + doc.id + '\')" title="Ansehen">&#128065;</button>'
+          + '<button class="history-btn" onclick="downloadFirestoreReport(\'' + doc.id + '\')" title="Herunterladen">&#11015;</button>';
+        if (darfEditieren) {
+          aktionen += '<button class="history-btn" onclick="editFirestoreReport(\'' + doc.id + '\')" title="Editieren">&#9998;</button>';
+        }
+        if (isChef) {
+          aktionen += '<button class="history-btn" onclick="deleteFirestoreReport(\'' + doc.id + '\')" title="L&ouml;schen" style="color:#e74c3c">&#10005;</button>';
+        }
         el.innerHTML += '<div class="history-item">'
           + '<span class="history-dot ' + hType + '"></span>'
           + '<div class="history-info">'
@@ -4231,12 +4243,7 @@ function renderHistory() {
           + '<div class="history-meta">' + meta + '</div>'
           + '<span class="history-type ' + hType + '">' + typeLabel + '</span>'
           + '</div>'
-          + '<div class="history-actions">'
-          + '<button class="history-btn" onclick="viewFirestoreReport(\'' + doc.id + '\')" title="Ansehen">&#128065;</button>'
-          + '<button class="history-btn" onclick="downloadFirestoreReport(\'' + doc.id + '\')" title="Herunterladen">&#11015;</button>'
-          + '<button class="history-btn" onclick="editFirestoreReport(\'' + doc.id + '\')" title="Editieren">&#9998;</button>'
-          + '<button class="history-btn" onclick="deleteFirestoreReport(\'' + doc.id + '\')" title="L&ouml;schen" style="color:#e74c3c">&#10005;</button>'
-          + '</div>'
+          + '<div class="history-actions">' + aktionen + '</div>'
           + '</div>';
       });
     }).catch(function(err) {
@@ -4395,6 +4402,10 @@ function editFirestoreReport(docId) {
     if (!doc.exists) { toast('Bericht nicht gefunden'); return; }
     var d = doc.data();
     if (!d.html) { toast('Kein HTML-Inhalt vorhanden'); return; }
+    if (!isChef && (!currentUser || d.erstellerId !== currentUser.id)) {
+      toast('Nur eigene Berichte koennen bearbeitet werden');
+      return;
+    }
 
     // Create visual edit overlay
     var overlay = document.createElement('div');
