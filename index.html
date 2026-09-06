@@ -209,6 +209,10 @@ body {
 .kal-tag.kal-aus { border:none; background:none; cursor:default; }
 .kal-nr { font-size:12px; font-weight:600; color:var(--text); }
 .kal-zahl { position:absolute; top:3px; right:4px; font-size:9px; font-weight:700; color:var(--text-muted); }
+.kal-std { position:absolute; left:4px; top:19px; font-size:10px; font-weight:700; color:var(--text); }
+.kal-std.knapp { color:#FBBF24; }
+.kal-tag { min-height:54px; }
+.kal-soll { color:var(--text-faint); }
 .kal-dots { position:absolute; left:4px; right:4px; bottom:4px; display:flex; flex-wrap:wrap; gap:2px; }
 .kal-dot { width:6px; height:6px; border-radius:50%; display:block; }
 .kal-dot.rapport { background:var(--info); }
@@ -262,6 +266,31 @@ body {
 .idee-antwort { margin-top:8px; padding:8px 10px; border-left:3px solid var(--accent);
   background:var(--surface-alt); border-radius:0 var(--radius-sm) var(--radius-sm) 0; font-size:13px; }
 .idee-aktionen { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+
+/* ── Offline-Band ── */
+.off-banner {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9998;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: #4A3410; color: #FBBF24; font-size: 13px; font-weight: 600;
+  border-top: 1px solid #FBBF24;
+}
+.off-banner.senden { background: #10344A; color: #38BDF8; border-top-color: #38BDF8; }
+.off-punkt { width: 9px; height: 9px; border-radius: 50%; background: currentColor;
+  flex-shrink: 0; animation: offpuls 1.6s ease-in-out infinite; }
+@keyframes offpuls { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+
+/* ── Wochenstunden im Rapport ── */
+.tr-woche { margin: 0 20px 4px; padding: 12px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface); }
+.tw-kopf { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-muted); }
+.tw-tage { font-weight: 600; text-transform: none; letter-spacing: 0; }
+.tw-balken { height: 6px; border-radius: 3px; background: var(--surface-alt); margin: 8px 0 6px; overflow: hidden; }
+.tw-balken i { display: block; height: 100%; border-radius: 3px; transition: width .3s; }
+.tw-zahlen { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--text-muted); }
+.tw-zahlen b { font-size: 15px; }
 
 /* ── Update-Hinweis ── */
 .upd-banner {
@@ -968,6 +997,8 @@ body {
      MODULE: TAGESRAPPORT
      ═══════════════════════════════════════ -->
 <div class="module-panel" id="mod-rapport">
+
+  <div class="tr-woche" id="trWoche"></div>
 
   <div class="section">
     <div class="section-label">Projektdaten</div>
@@ -1825,7 +1856,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.28.1';
+var APP_VERSION = 'v1.29.0';
 
 var db = null;
 var storage = null;
@@ -3534,7 +3565,8 @@ function saveReportToFirestore(type, meta, vollDaten) {
     meta: meta,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
-  return db.collection('berichte').add(entry);
+  // Zaehlt mit, wie viele Berichte noch auf die Uebertragung warten
+  return offenMitzaehlen(db.collection('berichte').add(entry));
 }
 
 // Wartet hoechstens ms Millisekunden auf das Promise. Ohne Netz nimmt Firestore
@@ -4000,7 +4032,7 @@ function switchModule(name, btn) {
 
   var sub = document.getElementById('headerSubtitle');
   if (name === 'kontrolle') sub.textContent = 'Mängeldokumentation';
-  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; setTimeout(function(){ loadPauseMemory(); ladeEntwurf(); calcArbeitszeit(); initTrSig2(); }, 50); }
+  else if (name === 'rapport') { sub.textContent = 'Tagesrapport'; wochenStundenAktualisieren(); setTimeout(function(){ loadPauseMemory(); ladeEntwurf(); calcArbeitszeit(); initTrSig2(); }, 50); }
   else if (name === 'auftrag') sub.textContent = 'Arbeitsauftrag';
   else if (name === 'rohmontage') sub.textContent = 'Checkliste Rohmontage';
   else if (name === 'fertigmontage') sub.textContent = 'Checkliste Fertigmontage';
@@ -7198,7 +7230,10 @@ function kalLaden() {
       // den Bericht eingereicht hat. Fahrer und mitaufgefuehrte Kollegen
       // gelten ausdruecklich nicht als abgedeckt.
       liste.push({ tag: tag, typ: d.type || 'kontrolle', baustelle: d.baustelle || '',
-                   ersteller: d.ersteller || '' });
+                   ersteller: d.ersteller || '',
+                   // Stunden und abgedeckte Tage kommen aus den Tageszeilen:
+                   // ein Rapport kann mehrere Tage tragen
+                   zeilen: (d.type === 'rapport') ? rapportZeilen(d) : [] });
     });
     kalCache[schluessel] = liste;
     kalZeichnen();
@@ -7224,13 +7259,28 @@ function kalZeichnen() {
     liste = liste.filter(function(e){ return e.ersteller === kalPerson; });
   }
 
-  // Pro Tag: welche Berichtsarten, und wer hat einen Rapport abgedeckt
+  // Pro Tag: welche Berichtsarten, wer einen Rapport geschrieben hat und
+  // wie viele Stunden dabei eingetragen wurden.
   var tage = {};
+  function tagEintrag(iso) {
+    return tage[iso] || (tage[iso] = { typen: {}, rapportNamen: {}, std: {}, anzahl: 0 });
+  }
   liste.forEach(function(e) {
-    var t = tage[e.tag] || (tage[e.tag] = { typen: {}, rapportNamen: {}, anzahl: 0 });
+    var t = tagEintrag(e.tag);
     t.typen[e.typ] = true;
     t.anzahl++;
-    if (e.typ === 'rapport' && e.ersteller) t.rapportNamen[e.ersteller] = true;
+    if (e.typ !== 'rapport') return;
+    if (!e.zeilen || !e.zeilen.length) {
+      if (e.ersteller) t.rapportNamen[e.ersteller] = true;
+      return;
+    }
+    e.zeilen.forEach(function(z) {
+      if (!z.tag || !z.name) return;
+      var tz = tagEintrag(z.tag);
+      tz.typen.rapport = true;
+      tz.rapportNamen[z.name] = true;
+      tz.std[z.name] = (tz.std[z.name] || 0) + z.std;
+    });
   });
 
   // Erwartete Mannschaft: alle, oder nur die ausgewaehlte Person
@@ -7258,15 +7308,23 @@ function kalZeichnen() {
     if (zukunft) klassen.push('kal-zukunft');
     if (iso === heute) klassen.push('kal-heute');
 
-    var fehlend = [];
+    var fehlend = [], knapp = [], tagStd = 0;
+    var soll = tagesSoll(iso);
     if (!we && !zukunft) {
       erwartet.forEach(function(n) {
-        if (!eintrag || !eintrag.rapportNamen[n]) fehlend.push(n);
+        if (!eintrag || !eintrag.rapportNamen[n]) { fehlend.push(n); return; }
+        var h = eintrag.std[n] || 0;
+        tagStd += h;
+        // Rapport ist da, aber die Stunden bleiben deutlich unter dem Tagessoll
+        if (h > 0 && h < soll - 0.25) knapp.push({ name: n, std: h });
       });
       if (fehlend.length === erwartet.length && erwartet.length) klassen.push('kal-fehlt');
-      else if (fehlend.length) klassen.push('kal-teil');
+      else if (fehlend.length || knapp.length) klassen.push('kal-teil');
       else klassen.push('kal-ok');
-      if (fehlend.length) luecken.push({ iso: iso, tag: t, wt: KAL_WOCHENTAGE[kalSpalte(d)], namen: fehlend });
+      if (fehlend.length || knapp.length) {
+        luecken.push({ iso: iso, tag: t, wt: KAL_WOCHENTAGE[kalSpalte(d)],
+                       namen: fehlend, knapp: knapp, soll: soll });
+      }
     }
 
     var punkte = '';
@@ -7276,14 +7334,21 @@ function kalZeichnen() {
         if (eintrag.typen[typ]) punkte += '<i class="kal-dot ' + typ + '"></i>';
       });
     }
-    var zaehler = '';
-    if (!we && !zukunft && erwartet.length > 1) {
-      zaehler = '<span class="kal-zahl">' + (erwartet.length - fehlend.length) + '/' + erwartet.length + '</span>';
+    var zaehler = '', stunden = '';
+    if (!we && !zukunft && erwartet.length) {
+      if (erwartet.length > 1) {
+        zaehler = '<span class="kal-zahl">' + (erwartet.length - fehlend.length) + '/' + erwartet.length + '</span>';
+        if (tagStd > 0) stunden = '<span class="kal-std">' + stdText(tagStd) + ' h</span>';
+      } else if (!fehlend.length) {
+        var eng = knapp.length ? ' knapp' : '';
+        stunden = '<span class="kal-std' + eng + '">' + stdText(tagStd) + ' h</span>';
+      }
     }
 
     html += '<div class="' + klassen.join(' ') + '" onclick="kalTagInfo(\'' + iso + '\')">'
       + '<span class="kal-nr">' + t + '</span>'
       + zaehler
+      + stunden
       + '<span class="kal-dots">' + punkte + '</span>'
       + '</div>';
   }
@@ -7291,26 +7356,38 @@ function kalZeichnen() {
 
   var leg = document.getElementById('kalLegende');
   if (leg) {
-    leg.innerHTML = (erwartet.length > 1)
-      ? '<span><i class="kal-p kal-p-ok"></i>alle Rapporte da</span>'
-      + '<span><i class="kal-p kal-p-teil"></i>einzelne fehlen</span>'
+    var sollHinweis = '<span class="kal-soll">Tagessoll ' + stdText(tagesSoll(kalIso(kalMonat)))
+      + ' h (' + wochenSoll(kalIso(kalMonat)) + '-Stunden-Woche)</span>';
+    leg.innerHTML = ((erwartet.length > 1)
+      ? '<span><i class="kal-p kal-p-ok"></i>alle da, Stunden erf&uuml;llt</span>'
+      + '<span><i class="kal-p kal-p-teil"></i>fehlt oder unter Soll</span>'
       + '<span><i class="kal-p kal-p-fehlt"></i>niemand hat eingereicht</span>'
-      : '<span><i class="kal-p kal-p-ok"></i>Rapport geschrieben</span>'
-      + '<span><i class="kal-p kal-p-fehlt"></i>Rapport fehlt</span>';
+      : '<span><i class="kal-p kal-p-ok"></i>Rapport, Stunden erf&uuml;llt</span>'
+      + '<span><i class="kal-p kal-p-teil"></i>unter Tagessoll</span>'
+      + '<span><i class="kal-p kal-p-fehlt"></i>Rapport fehlt</span>') + sollHinweis;
   }
 
   var lk = document.getElementById('kalLuecken');
   if (lk) {
     if (!luecken.length) {
-      lk.innerHTML = '<div class="kal-info kal-gut">Keine fehlenden Tagesrapporte in diesem Monat.</div>';
+      lk.innerHTML = '<div class="kal-info kal-gut">Alle Rapporte da, keine Stunden unter Soll.</div>';
     } else {
-      lk.innerHTML = '<div class="kal-lk-titel">Fehlende Tagesrapporte (' + luecken.length + ' Tage)</div>'
+      lk.innerHTML = '<div class="kal-lk-titel">Zu kl&auml;ren (' + luecken.length + ' Tage)</div>'
         + luecken.map(function(l) {
-            var wer = (erwartet.length > 1)
-              ? l.namen.join(', ')
-              : 'kein Rapport';
+            var teile = [];
+            if (l.namen.length) {
+              teile.push((erwartet.length > 1)
+                ? 'kein Rapport: ' + escHtml(l.namen.join(', '))
+                : 'kein Rapport');
+            }
+            if (l.knapp.length) {
+              teile.push(l.knapp.map(function(k) {
+                return (erwartet.length > 1 ? escHtml(k.name) + ' ' : '')
+                  + stdText(k.std) + ' h von ' + stdText(l.soll) + ' h';
+              }).join(', '));
+            }
             return '<div class="kal-lk-zeile"><b>' + l.wt + ' ' + fmtDate(l.iso) + '</b>'
-              + '<span>' + escHtml(wer) + '</span></div>';
+              + '<span>' + teile.join(' &middot; ') + '</span></div>';
           }).join('');
     }
   }
@@ -7780,6 +7857,172 @@ function ideeLoeschen(id) {
   }).catch(function(err){ toast('Ging nicht: ' + err.message); });
 }
 
+
+/* ═══════════════════════════════════════
+   ARBEITSZEIT-SOLL (SOKA-Bau)
+   Winterarbeitszeit 1. Dezember bis 31. März: 38 Wochenstunden,
+   sonst 41. Das Tagessoll ist ein Fünftel davon.
+   ═══════════════════════════════════════ */
+var SOLL_WINTER = 38;
+var SOLL_SOMMER = 41;
+
+function wochenSoll(iso) {
+  var m = parseInt(String(iso).slice(5, 7), 10);
+  return (m === 12 || m <= 3) ? SOLL_WINTER : SOLL_SOMMER;
+}
+function tagesSoll(iso) { return wochenSoll(iso) / 5; }
+
+function stdZahl(v) {
+  if (v === 0) return 0;
+  if (!v) return 0;
+  var n = parseFloat(String(v).replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+function stdText(n) {
+  return (Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
+}
+// "9:30 Std." -> 9.5
+function nettoStunden(text) {
+  var m = String(text || '').match(/(\d+):(\d\d)/);
+  if (!m) return 0;
+  return parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+}
+
+// Liefert je Tag, welche Person wie viele Stunden eingetragen hat.
+// Grundlage sind die Tageszeilen des Rapports, nicht das Datum des Dokuments:
+// ein Rapport kann mehrere Tage abdecken, jede Zeile hat ihr eigenes Datum.
+// Gezaehlt werden nur Zeilen, die auf den Ersteller laufen -- wer auf einem
+// fremden Rapport mitsteht, hat seinen eigenen nicht geschrieben.
+function rapportZeilen(d) {
+  var raus = [];
+  var ersteller = d.ersteller || '';
+  var daten = d.daten || {};
+  var zeilen = daten.workers || [];
+  var netto = nettoStunden(daten.arbeitszeit);
+  var eigene = [];
+  zeilen.forEach(function(w) {
+    if (!w || !w.name) return;
+    if (ersteller && w.name !== ersteller) return;
+    eigene.push(w);
+  });
+  if (!eigene.length) {
+    // Altbestand oder Rapport ohne brauchbare Zeilen: auf das Dokumentdatum buchen
+    raus.push({ tag: d.datum || daten.date || '', name: ersteller, std: 0, netto: netto });
+    return raus;
+  }
+  eigene.forEach(function(w, i) {
+    raus.push({
+      tag: w.datum || d.datum || daten.date || '',
+      name: w.name,
+      std: stdZahl(w.stunden),
+      // Beginn/Ende gelten fuer den ganzen Rapport, deshalb nur einmal buchen
+      netto: i === 0 ? netto : 0
+    });
+  });
+  return raus;
+}
+
+/* ═══════════════════════════════════════
+   WOCHENSTUNDEN im Tagesrapport
+   ═══════════════════════════════════════ */
+function wocheMontag(d) {
+  var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+function wochenStundenAktualisieren() {
+  var el = document.getElementById('trWoche');
+  if (!el || !currentUser) return;
+  var mo = wocheMontag(new Date());
+  var tage = [];
+  for (var i = 0; i < 7; i++) {
+    var t = new Date(mo.getFullYear(), mo.getMonth(), mo.getDate() + i);
+    tage.push(kalIso(t));
+  }
+  var soll = 0;
+  for (var j = 0; j < 5; j++) soll += tagesSoll(tage[j]);   // Mo bis Fr
+
+  eigeneBerichte().then(function(alle) {
+    var eingetragen = 0, netto = 0, tageMitRapport = {};
+    alle.forEach(function(d) {
+      if (d.type !== 'rapport') return;
+      rapportZeilen(d).forEach(function(z) {
+        if (tage.indexOf(z.tag) === -1) return;
+        if (z.name !== currentUser.name) return;
+        eingetragen += z.std;
+        netto += z.netto;
+        tageMitRapport[z.tag] = true;
+      });
+    });
+    var anteil = soll > 0 ? Math.min(1, eingetragen / soll) : 0;
+    var farbe = eingetragen >= soll - 0.01 ? 'var(--success)'
+              : (eingetragen >= soll * 0.6 ? '#FBBF24' : 'var(--danger)');
+    el.innerHTML =
+        '<div class="tw-kopf"><span>Diese Woche</span>'
+      + '<span class="tw-tage">' + Object.keys(tageMitRapport).length + ' Tage eingereicht</span></div>'
+      + '<div class="tw-balken"><i style="width:' + Math.round(anteil * 100) + '%;background:' + farbe + '"></i></div>'
+      + '<div class="tw-zahlen">'
+      +   '<span><b style="color:' + farbe + '">' + stdText(eingetragen) + ' h</b> eingetragen</span>'
+      +   '<span>' + stdText(netto) + ' h netto</span>'
+      +   '<span>Soll ' + stdText(soll) + ' h</span>'
+      + '</div>';
+  }).catch(function() {
+    el.innerHTML = '';
+  });
+}
+
+/* ═══════════════════════════════════════
+   OFFLINE-ANZEIGE
+   Auf der Baustelle ist oft kein Netz. Firestore nimmt den Bericht trotzdem
+   an und schickt ihn spaeter -- nur sieht das niemand. Deshalb ein festes
+   Band: Zustand und wie viele Berichte noch unterwegs sind.
+   ═══════════════════════════════════════ */
+var offenAnzahl = 0;
+var offlineBandEl = null;
+
+function offlineBandZeichnen() {
+  var offline = (typeof navigator.onLine === 'boolean') ? !navigator.onLine : false;
+  if (!offline && !offenAnzahl) {
+    if (offlineBandEl) { offlineBandEl.parentNode.removeChild(offlineBandEl); offlineBandEl = null; }
+    return;
+  }
+  if (!offlineBandEl) {
+    offlineBandEl = document.createElement('div');
+    offlineBandEl.className = 'off-banner';
+    document.body.appendChild(offlineBandEl);
+  }
+  var text;
+  if (offline && offenAnzahl) {
+    text = 'Offline &ndash; ' + offenAnzahl + (offenAnzahl === 1 ? ' Bericht wartet' : ' Berichte warten')
+         + ' auf die &Uuml;bertragung';
+  } else if (offline) {
+    text = 'Offline &ndash; Eingaben werden gespeichert und sp&auml;ter gesendet';
+  } else {
+    text = offenAnzahl + (offenAnzahl === 1 ? ' Bericht wird' : ' Berichte werden') + ' gerade &uuml;bertragen&hellip;';
+  }
+  offlineBandEl.className = 'off-banner' + (offline ? '' : ' senden');
+  offlineBandEl.innerHTML = '<span class="off-punkt"></span><span>' + text + '</span>';
+}
+
+// Wird von saveReportToFirestore aufgerufen: die Zusage der echten Firestore-
+// Zusage haengt, solange kein Netz da ist. Genau daran haengt der Zaehler.
+function offenMitzaehlen(promise) {
+  offenAnzahl++;
+  offlineBandZeichnen();
+  promise.then(function() {
+    offenAnzahl = Math.max(0, offenAnzahl - 1);
+    offlineBandZeichnen();
+  }).catch(function() {
+    offenAnzahl = Math.max(0, offenAnzahl - 1);
+    offlineBandZeichnen();
+  });
+  return promise;
+}
+
+window.addEventListener('online', offlineBandZeichnen);
+window.addEventListener('offline', offlineBandZeichnen);
+
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
    ═══════════════════════════════════════ */
@@ -7827,6 +8070,7 @@ bvPickerInit();
 appBoot();
 updStarten();
 datumsGrenzeSetzen();
+offlineBandZeichnen();
 </script>
 </body>
 </html>
