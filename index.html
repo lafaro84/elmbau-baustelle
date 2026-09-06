@@ -267,6 +267,15 @@ body {
   background:var(--surface-alt); border-radius:0 var(--radius-sm) var(--radius-sm) 0; font-size:13px; }
 .idee-aktionen { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 
+/* ── CSV-Kasten in den Stammdaten ── */
+.csv-box { margin:0 20px 16px; padding:12px 14px; border:1px solid var(--border);
+  border-radius:var(--radius-sm); background:var(--surface-alt); }
+.csv-titel { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--text-muted); margin-bottom:8px; }
+.csv-knoepfe { display:flex; flex-wrap:wrap; gap:8px; }
+.csv-hinweis { font-size:11px; color:var(--text-faint); margin-top:8px; line-height:1.45; }
+.csv-status { font-size:12px; color:var(--accent); margin-top:6px; min-height:14px; }
+
 /* ── Baustellenakte ── */
 .ak-kacheln { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
 .ak-kachel { background:var(--surface); border:1px solid var(--border);
@@ -1141,9 +1150,9 @@ body {
     <div class="field">
       <label>Tätigkeit</label>
       <div class="chip-group" id="tr-taetigkeit">
-        <button class="chip-toggle" data-val="RB" onclick="toggleTaetigkeit(this)">RB – Rohbau</button>
-        <button class="chip-toggle" data-val="FM" onclick="toggleTaetigkeit(this)">FM – Fertigm.</button>
-        <button class="chip-toggle" data-val="KD" onclick="toggleTaetigkeit(this)">KD – Kundend.</button>
+        <button class="chip-toggle" data-val="RB" onclick="toggleTaetigkeit(this)">Rohbau</button>
+        <button class="chip-toggle" data-val="FM" onclick="toggleTaetigkeit(this)">Fertigmontage</button>
+        <button class="chip-toggle" data-val="KD" onclick="toggleTaetigkeit(this)">Kundendienst</button>
       </div>
     </div>
     <div class="field">
@@ -1684,6 +1693,7 @@ body {
 <!-- ── Hidden file input for camera ── -->
 <input type="file" id="camInput" accept="image/*" capture="environment" hidden>
 <input type="file" id="ideeInput" accept="image/*" hidden>
+<input type="file" id="csv-datei" accept=".csv,text/csv" hidden>
 
 <!-- ═══════════════════════════════════════
      MODULE: STAMMDATEN (Chef only)
@@ -1723,6 +1733,7 @@ body {
         <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveMitarbeiter()">Speichern</button></div>
         <input type="hidden" id="sd-ma-id">
       </div>
+      <div id="csv-mitarbeiter"></div>
       <div class="sd-list" id="sd-ma-list"></div>
     </div>
 
@@ -1739,6 +1750,7 @@ body {
         <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveBaustelle()">Speichern</button></div>
         <input type="hidden" id="sd-bv-id">
       </div>
+      <div id="csv-baustellen"></div>
       <div class="sd-list" id="sd-bv-list"></div>
     </div>
 
@@ -1753,6 +1765,7 @@ body {
         <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveKostenstelle()">Speichern</button></div>
         <input type="hidden" id="sd-kst-id">
       </div>
+      <div id="csv-kostenstellen"></div>
       <div class="sd-list" id="sd-kst-list"></div>
     </div>
 
@@ -1768,6 +1781,7 @@ body {
         <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="sdSaveFahrzeug()">Speichern</button></div>
         <input type="hidden" id="sd-fz-id">
       </div>
+      <div id="csv-fahrzeuge"></div>
       <div class="sd-list" id="sd-fz-list"></div>
     </div>
 
@@ -1887,7 +1901,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.31.1';
+var APP_VERSION = 'v1.32.1';
 
 var db = null;
 var storage = null;
@@ -2122,6 +2136,13 @@ function afterLogin() {
   // Set inspector name if on Kontrolle
   var insp = document.getElementById('f-inspector');
   if (insp && !insp.value) insp.value = currentUser.name;
+
+  // Der Tagesrapport ist das, was taeglich gebraucht wird -- also zuerst zeigen.
+  var rapBtn = null;
+  document.querySelectorAll('.module-btn').forEach(function(b) {
+    if (b.getAttribute('onclick') === "switchModule('rapport',this)") rapBtn = b;
+  });
+  if (rapBtn) switchModule('rapport', rapBtn);
 
   // Load master data from Firestore
   loadMasterData();
@@ -2656,6 +2677,8 @@ function sdSwitchTab(tab, btn) {
   btn.classList.add('active');
   document.querySelectorAll('.sd-panel').forEach(function(p){ p.style.display = 'none'; });
   document.getElementById('sd-' + tab).style.display = '';
+  var kasten = document.getElementById('csv-' + tab);
+  if (kasten && CSV_TABELLEN[tab]) kasten.innerHTML = csvBlock(tab);
   if (tab === 'mitarbeiter') sdLoadMitarbeiter();
   else if (tab === 'baustellen') sdLoadBaustellen();
   else if (tab === 'kostenstellen') sdLoadKostenstellen();
@@ -5907,6 +5930,12 @@ function berichteCacheLeeren() {
   kalCache = {};
 }
 
+// Gespeichert werden die Kuerzel RB/FM/KD -- im Ausdruck stehen sie so in der
+// Vorlage, in Auswertungen soll das ausgeschriebene Wort stehen.
+var TAET_LABELS = { RB: 'Rohbau', FM: 'Fertigmontage', KD: 'Kundendienst',
+                    GW: 'Gewährleistung', So: 'Sonstige' };
+function taetText(v) { return TAET_LABELS[v] || v; }
+
 var HISTORY_TYPE_LABELS = {
   kontrolle: 'Kontrolle',
   rapport: 'Tagesrapport',
@@ -8113,7 +8142,7 @@ function akteZeichnen() {
     }
     if (typ !== 'rapport') return;
     var taet = (d.daten && d.daten.taetigkeiten && d.daten.taetigkeiten.length)
-      ? d.daten.taetigkeiten.join(', ') : 'ohne Angabe';
+      ? d.daten.taetigkeiten.map(taetText).join(', ') : 'ohne Angabe';
     rapportZeilen(d).forEach(function(z) {
       if (!z.std) return;
       stdGesamt += z.std;
@@ -8359,6 +8388,229 @@ function vonGesternUebernehmen() {
     toast('Konnte nicht laden: ' + (err && err.message ? err.message : err));
   });
 }
+
+
+/* ═══════════════════════════════════════
+   STAMMDATEN ALS CSV
+   Am Handy einzeln pflegen ist muehsam. Deshalb: alles als CSV herunterladen,
+   am Rechner in Excel bearbeiten, wieder hochladen. Die Spalte "id" haelt die
+   Zuordnung -- Zeilen mit id werden geaendert, Zeilen ohne id neu angelegt.
+   Geloescht wird beim Import grundsaetzlich nichts; wer jemanden herausnehmen
+   will, setzt aktiv auf nein.
+   ═══════════════════════════════════════ */
+var CSV_TRENNER = ';';   // deutsches Excel erwartet Semikolon
+
+var CSV_TABELLEN = {
+  mitarbeiter: {
+    titel: 'Mitarbeiter',
+    datei: 'Mitarbeiter',
+    spalten: ['id','name','rolle','tagesrapportRolle','pin','fahrzeug','aktiv'],
+    pflicht: 'name',
+    bool: ['aktiv'],
+    hinweis: 'rolle: elektriker, azubi oder chef · tagesrapportRolle: Facharbeiter, Lehrling oder Probearbeit · aktiv: ja/nein'
+  },
+  baustellen: {
+    titel: 'Baustellen',
+    datei: 'Baustellen',
+    spalten: ['id','name','kostenstelle','projektNr','adresse','aktiv'],
+    pflicht: 'name',
+    bool: ['aktiv'],
+    hinweis: 'Vorgaben für Kabelliste und Schalter bleiben beim Import erhalten.'
+  },
+  kostenstellen: {
+    titel: 'Kostenstellen',
+    datei: 'Kostenstellen',
+    spalten: ['id','nummer','bezeichnung'],
+    pflicht: 'nummer',
+    bool: [],
+    hinweis: ''
+  },
+  fahrzeuge: {
+    titel: 'Fahrzeuge',
+    datei: 'Fahrzeuge',
+    spalten: ['id','kennzeichen','tuev','utaGueltig'],
+    pflicht: 'kennzeichen',
+    bool: [],
+    hinweis: 'tuev und utaGueltig im Format JJJJ-MM, z.B. 2027-04'
+  }
+};
+
+function csvFeld(wert) {
+  var t = (wert === null || wert === undefined) ? '' : String(wert);
+  if (t.indexOf('"') !== -1 || t.indexOf(CSV_TRENNER) !== -1 || /[\r\n]/.test(t)) {
+    return '"' + t.replace(/"/g, '""') + '"';
+  }
+  return t;
+}
+
+// Zerlegt eine CSV mit Anfuehrungszeichen und Zeilenumbruechen in Feldern
+function csvZerlegen(text) {
+  var zeilen = [], feld = '', zeile = [], inAnf = false;
+  text = String(text).replace(/^﻿/, '');
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (inAnf) {
+      if (c === '"') {
+        if (text.charAt(i + 1) === '"') { feld += '"'; i++; }
+        else inAnf = false;
+      } else feld += c;
+    } else if (c === '"') { inAnf = true; }
+    else if (c === CSV_TRENNER) { zeile.push(feld); feld = ''; }
+    else if (c === '\n') { zeile.push(feld); zeilen.push(zeile); zeile = []; feld = ''; }
+    else if (c === '\r') { /* ueberspringen */ }
+    else feld += c;
+  }
+  if (feld !== '' || zeile.length) { zeile.push(feld); zeilen.push(zeile); }
+  return zeilen.filter(function(z){ return z.length && z.join('').trim() !== ''; });
+}
+
+function csvJaNein(v) {
+  var t = String(v === undefined || v === null ? '' : v).trim().toLowerCase();
+  if (t === '' ) return true;                       // leer = aktiv
+  return ['ja','j','1','true','wahr','x','aktiv'].indexOf(t) !== -1;
+}
+
+function csvExport(art) {
+  var def = CSV_TABELLEN[art];
+  if (!def || !db) return;
+  var btn = document.getElementById('csv-ex-' + art);
+  if (btn) { btn.disabled = true; btn.textContent = 'Exportiere…'; }
+
+  db.collection(art).get().then(function(snap) {
+    var zeilen = [def.spalten.join(CSV_TRENNER)];
+    var eintraege = [];
+    snap.forEach(function(doc) {
+      var d = doc.data(); d.id = doc.id;
+      eintraege.push(d);
+    });
+    var sortFeld = def.pflicht;
+    eintraege.sort(function(a, b) {
+      return String(a[sortFeld] || '').localeCompare(String(b[sortFeld] || ''));
+    });
+    eintraege.forEach(function(d) {
+      zeilen.push(def.spalten.map(function(sp) {
+        if (def.bool.indexOf(sp) !== -1) return (d[sp] === false) ? 'nein' : 'ja';
+        return csvFeld(d[sp]);
+      }).join(CSV_TRENNER));
+    });
+    // BOM voran, sonst zeigt Excel Umlaute falsch an
+    var blob = new Blob(['﻿' + zeilen.join('\r\n') + '\r\n'],
+                        { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Elmbau_' + def.datei + '_' + heuteIso() + '.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 500);
+    csvStatus(art, eintraege.length + ' Zeilen exportiert');
+    if (btn) { btn.disabled = false; btn.textContent = 'CSV herunterladen'; }
+  }).catch(function(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'CSV herunterladen'; }
+    csvStatus(art, 'Fehler: ' + err.message);
+  });
+}
+
+function csvStatus(art, text) {
+  var el = document.getElementById('csv-status-' + art);
+  if (el) el.textContent = text || '';
+}
+
+function csvImportWaehlen(art) {
+  var inp = document.getElementById('csv-datei');
+  inp.setAttribute('data-art', art);
+  inp.value = '';
+  inp.click();
+}
+
+function csvImportLesen(art, text) {
+  var def = CSV_TABELLEN[art];
+  var zeilen = csvZerlegen(text);
+  if (zeilen.length < 2) { csvStatus(art, 'Datei enthält keine Daten'); return; }
+
+  var kopf = zeilen[0].map(function(h){ return String(h).trim(); });
+  var fehlt = [];
+  if (kopf.indexOf(def.pflicht) === -1) fehlt.push(def.pflicht);
+  if (fehlt.length) { csvStatus(art, 'Spalte fehlt: ' + fehlt.join(', ')); return; }
+
+  var neu = [], aendern = [], fehlerhaft = 0;
+  for (var i = 1; i < zeilen.length; i++) {
+    var z = zeilen[i], satz = {};
+    kopf.forEach(function(h, j) { satz[h] = (z[j] === undefined ? '' : String(z[j]).trim()); });
+    if (!satz[def.pflicht]) { fehlerhaft++; continue; }
+    var daten = {};
+    def.spalten.forEach(function(sp) {
+      if (sp === 'id') return;
+      if (satz[sp] === undefined) return;            // Spalte war nicht dabei
+      daten[sp] = (def.bool.indexOf(sp) !== -1) ? csvJaNein(satz[sp]) : satz[sp];
+    });
+    if (satz.id) aendern.push({ id: satz.id, daten: daten, name: satz[def.pflicht] });
+    else neu.push({ daten: daten, name: satz[def.pflicht] });
+  }
+
+  var meldung = def.titel + ':\n'
+    + aendern.length + ' werden geändert\n'
+    + neu.length + ' werden neu angelegt\n'
+    + (fehlerhaft ? fehlerhaft + ' Zeilen ohne ' + def.pflicht + ' werden übersprungen\n' : '')
+    + '\nEs wird nichts gelöscht. Fortfahren?';
+  if (!confirm(meldung)) { csvStatus(art, 'Abgebrochen'); return; }
+
+  csvSchreiben(art, aendern, neu);
+}
+
+function csvSchreiben(art, aendern, neu) {
+  var gesamt = aendern.length + neu.length;
+  var fertig = 0, fehler = 0;
+  if (!gesamt) { csvStatus(art, 'Nichts zu tun'); return; }
+  csvStatus(art, '0 von ' + gesamt + ' geschrieben…');
+
+  function weiter() {
+    fertig++;
+    csvStatus(art, fertig + ' von ' + gesamt + ' geschrieben…');
+    if (fertig < gesamt) return;
+    toast(gesamt + ' Datensätze übernommen');
+    loadMasterData();
+    // nur die Liste neu aufbauen -- sdSwitchTab wuerde den Kasten und damit
+    // die Meldung sofort wieder wegraeumen
+    var lader = { mitarbeiter: sdLoadMitarbeiter, baustellen: sdLoadBaustellen,
+                  kostenstellen: sdLoadKostenstellen, fahrzeuge: sdLoadFahrzeuge };
+    if (lader[art]) lader[art]();
+    csvStatus(art, gesamt + ' Datensätze übernommen' + (fehler ? ', ' + fehler + ' Fehler' : ''));
+  }
+  function schief(err) { fehler++; console.error('CSV:', err); weiter(); }
+
+  aendern.forEach(function(e) {
+    db.collection(art).doc(e.id).update(e.daten).then(weiter).catch(schief);
+  });
+  neu.forEach(function(e) {
+    db.collection(art).add(e.daten).then(weiter).catch(schief);
+  });
+}
+
+function csvBlock(art) {
+  var def = CSV_TABELLEN[art];
+  return '<div class="csv-box">'
+    + '<div class="csv-titel">' + def.titel + ' am Rechner bearbeiten</div>'
+    + '<div class="csv-knoepfe">'
+    +   '<button class="btn-sm" id="csv-ex-' + art + '" onclick="csvExport(\'' + art + '\')">CSV herunterladen</button>'
+    +   '<button class="btn-sm" onclick="csvImportWaehlen(\'' + art + '\')">CSV einlesen</button>'
+    + '</div>'
+    + (def.hinweis ? '<div class="csv-hinweis">' + def.hinweis + '</div>' : '')
+    + '<div class="csv-hinweis">Zeilen mit <b>id</b> werden geändert, Zeilen ohne id neu angelegt. Gelöscht wird nie.</div>'
+    + '<div class="csv-status" id="csv-status-' + art + '"></div>'
+    + '</div>';
+}
+
+document.getElementById('csv-datei').addEventListener('change', function() {
+  var art = this.getAttribute('data-art');
+  var datei = this.files && this.files[0];
+  this.value = '';
+  if (!datei || !art) return;
+  var leser = new FileReader();
+  leser.onload = function(e) {
+    try { csvImportLesen(art, e.target.result); }
+    catch(err) { csvStatus(art, 'Datei konnte nicht gelesen werden: ' + err.message); }
+  };
+  leser.readAsText(datei, 'utf-8');
+});
 
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
