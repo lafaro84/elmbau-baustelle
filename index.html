@@ -1993,7 +1993,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.34.4';
+var APP_VERSION = 'v1.34.5';
 
 var db = null;
 var storage = null;
@@ -4607,7 +4607,10 @@ function initTrSig() {}
 function clearTrSig() {}
 // ── Entwurf des Tagesrapports (genau ein Eintrag, wird nach dem Einreichen geloescht) ──
 var ENTWURF_KEY = 'elmbau_rapport_entwurf';
-var ENTWURF_MAX_TAGE = 14;
+// Ein Entwurf faengt den Fall ab, dass das Handy zumacht oder eine neue
+// Version ein Neuladen erzwingt - und das ist immer derselbe Tag. Aeltere
+// Entwuerfe holen wir nicht zurueck, sonst stehen ploetzlich Zeiten von
+// vorletzter Woche im Formular.
 var entwurfTimer = null;
 var entwurfGeprueft = false;
 
@@ -4620,10 +4623,19 @@ function speichereEntwurf() {
   try {
     var bs = document.getElementById('tr-baustelle');
     if (!bs) return;
-    // Nur sichern, wenn wirklich etwas drinsteht
+    // Nur sichern, wenn wirklich gearbeitet wurde. Eine ausgewaehlte Baustelle
+    // allein reicht nicht - sonst hinterlaesst schon ein kurzer Blick in den
+    // Rapport einen Entwurf, der beim naechsten Start wieder auftaucht.
     var arb = document.getElementById('tr-arbeiten').value.trim();
     var hatStunden = trWorkers.some(function(w){ return w.stunden; });
-    if (!bs.value && !arb && !hatStunden) { loescheEntwurf(); return; }
+    // Beginn und Ende sind vorbelegt - nur eine echte Aenderung zaehlt.
+    // defaultValue ist der Wert aus dem HTML, den nichts sonst anfasst.
+    function geaendert(id) {
+      var el = document.getElementById(id);
+      return !!el && el.value !== el.defaultValue;
+    }
+    var hatZeiten = geaendert('tr-beginn') || geaendert('tr-ende');
+    if (!arb && !hatStunden && !hatZeiten) { loescheEntwurf(); return; }
 
     var e = {
       v: 1,
@@ -4668,8 +4680,10 @@ function ladeEntwurf() {
     if (!roh) return;
     var e = JSON.parse(roh);
     if (!e || e.v !== 1) { loescheEntwurf(); return; }
-    // Alte Entwuerfe nicht ewig mitschleppen
-    if (e.ts && (Date.now() - e.ts) > ENTWURF_MAX_TAGE * 86400000) { loescheEntwurf(); return; }
+    // Nur der Entwurf von heute kommt zurueck, alles Aeltere fliegt still raus
+    if (!e.ts || new Date(e.ts).toDateString() !== new Date().toDateString()) {
+      loescheEntwurf(); return;
+    }
 
     function setz(id, wert) { var el = document.getElementById(id); if (el && wert) el.value = wert; }
     setz('tr-date', e.date);
@@ -4711,7 +4725,8 @@ function ladeEntwurf() {
       renderWorkers();
     }
     calcArbeitszeit();
-    toast('Entwurf wiederhergestellt');
+    // Bewusst ohne Meldung: das Formular steht so da, wie es verlassen wurde -
+    // genau dafuer ist der Entwurf da, das muss sich nicht ankuendigen.
   } catch(err) { loescheEntwurf(); }
 }
 
