@@ -57,7 +57,9 @@ body {
 
 /* ── Header ── */
 .app-header {
-  position: sticky; top: 0; z-index: 100;
+  /* Hoch genug, dass kein eingeblendetes Band und kein Hinweis den Kopf
+     verdecken kann - dort haengen Abmelden und die Versionspruefung dran. */
+  position: sticky; top: 0; z-index: 500;
   background: var(--header-bg);
   border-bottom: none;
   padding: 14px 20px;
@@ -472,7 +474,9 @@ body {
 
 /* ── Signature ── */
 .sig-wrap {
-  background: var(--surface);
+  /* Weiss wie Papier: die Unterschrift wird mit schwarzer Tinte gezeichnet und
+     waere auf dem dunklen Untergrund beim Unterschreiben kaum zu sehen. */
+  background: #FFFFFF;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   position: relative;
@@ -533,6 +537,10 @@ body {
   opacity: 0; transition: all .3s ease;
   z-index: 200; white-space: nowrap;
   max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
+  /* Der Hinweis bleibt dauerhaft im Dokument und liegt ausgeblendet ueber dem
+     Kopfbereich. Ohne das hier schluckt er dort jeden Fingertipp - Version und
+     Abmelden waeren nicht mehr anklickbar. */
+  pointer-events: none;
 }
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
@@ -978,7 +986,7 @@ body {
     <h1>Elmbau Baustelle</h1>
     <div class="subtitle" id="headerSubtitle">Digitale Baustellenformulare</div>
   </div>
-  <div style="display:flex;align-items:center;gap:8px">
+  <div style="display:flex;align-items:center;gap:8px;position:relative;z-index:2">
     <button type="button" class="user-badge" id="currentUserBadge" onclick="doLogout()" title="Abmelden"></button>
     <div class="status-badge" id="statusBadge" onclick="updVonHand()" title="Auf Updates pr&uuml;fen" style="cursor:pointer"></div>
   </div>
@@ -1985,7 +1993,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.34.3';
+var APP_VERSION = 'v1.34.4';
 
 var db = null;
 var storage = null;
@@ -5664,14 +5672,13 @@ function buildSchalterHtml(data) {
   var balance = (data.fabrikat === 'Balance SI') ? 'X' : '';
   var andere = (data.fabrikat && data.fabrikat !== 'Balance SI') ? 'X' : '';
 
+  // Keine Strichliste im Ausdruck: die ist fuer das Zaehlen beim Rundgang
+  // gedacht, und das erledigen in der App die Plus- und Minus-Knoepfe.
   var tRows = '';
   data.items.forEach(function(item) {
-    var tally = '';
-    for (var t = 0; t < item.count; t++) { tally += '|'; if ((t + 1) % 5 === 0) tally += ' '; }
     tRows += '<tr>'
       + '<td class="c">' + item.nr + '</td>'
       + '<td>' + escHtml(item.label) + '</td>'
-      + '<td class="strich">' + tally + '</td>'
       + '<td class="c" style="font-weight:bold">' + (item.count > 0 ? item.count : '') + '</td>'
       + '</tr>';
   });
@@ -5686,7 +5693,6 @@ function buildSchalterHtml(data) {
     + 'th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 10px; }'
     + '.c { text-align: center; }'
     + '.lbl { background: #f0f0f0; font-weight: bold; }'
-    + '.strich { font-family: monospace; font-size: 10px; letter-spacing: 1.5px; }'
     + '</style></head><body>'
     + '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px">'
     +   '<div style="font-size:15px;font-weight:bold">Schalteraufmaß</div>'
@@ -5701,8 +5707,8 @@ function buildSchalterHtml(data) {
     +     '<td class="lbl">Datum</td><td>' + dateFmt + '</td></tr>'
     + '</table>'
     + '<table>'
-    + '<colgroup><col style="width:8%"><col style="width:44%"><col style="width:36%"><col style="width:12%"></colgroup>'
-    + '<tr><th>lfd.<br>Nr.</th><th>Bezeichnung</th><th>Strichliste</th><th>Stück</th></tr>'
+    + '<colgroup><col style="width:10%"><col style="width:76%"><col style="width:14%"></colgroup>'
+    + '<tr><th>lfd.<br>Nr.</th><th>Bezeichnung</th><th>Stück</th></tr>'
     + tRows
     + '</table>'
     + '</body></html>';
@@ -9178,6 +9184,33 @@ bvPickerInit();
 appBoot();
 updStarten();
 datumsGrenzeSetzen();
+/* ═══════════════════════════════════════
+   NOTAUSGANG FUER DEN KOPFBEREICH
+   Legt sich irgendein eingeblendetes Element ueber den Kopf, kommt der Tipp
+   auf Abmelden oder die Versionsanzeige nie an. Wir fangen ihn dann ab und
+   leiten ihn selbst weiter - aber nur, wenn der Kopf wirklich verdeckt ist.
+   ═══════════════════════════════════════ */
+document.addEventListener('pointerdown', function(e) {
+  if (document.getElementById('frageOverlay')) return;   // Dialog hat Vorrang
+  var haupt = document.getElementById('app-main');
+  if (!haupt || haupt.style.display === 'none') return;
+  var kopf = haupt.querySelector('.app-header');
+  if (!kopf) return;
+  var oben = document.elementFromPoint(e.clientX, e.clientY);
+  if (!oben || kopf.contains(oben)) return;              // Kopf ist frei
+  ['currentUserBadge', 'statusBadge'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    if (r.width && e.clientX >= r.left && e.clientX <= r.right
+                && e.clientY >= r.top  && e.clientY <= r.bottom) {
+      e.preventDefault();
+      e.stopPropagation();
+      el.click();
+    }
+  });
+}, true);
+
 offlineBandZeichnen();
 </script>
 </body>
