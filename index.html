@@ -1016,6 +1016,12 @@ body {
 
   <div class="tr-woche" id="trWoche"></div>
 
+  <div style="padding:10px 20px 0">
+    <button class="btn btn-secondary" id="tr-gestern" onclick="vonGesternUebernehmen()">
+      Von gestern &uuml;bernehmen
+    </button>
+  </div>
+
   <div class="section">
     <div class="section-label">Projektdaten</div>
     <div class="field">
@@ -1881,7 +1887,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.30.0';
+var APP_VERSION = 'v1.31.1';
 
 var db = null;
 var storage = null;
@@ -8230,6 +8236,128 @@ function akteExport() {
     });
   }
   naechster(0);
+}
+
+
+/* ═══════════════════════════════════════
+   VON GESTERN ÜBERNEHMEN
+   Wer jeden Tag einen Rapport schreibt, tippt jeden Tag dieselben sieben
+   Felder. Der Knopf holt sie aus dem zuletzt eingereichten eigenen Rapport.
+   Bewusst NICHT uebernommen: Datum (immer heute), Stunden, Kilometer,
+   Beschreibung, Bemerkungen und Unterschrift -- das ist Tagesgeschaeft.
+   ═══════════════════════════════════════ */
+function vgLetzterRapport() {
+  return eigeneBerichte().then(function(alle) {
+    var rapporte = alle.filter(function(d){ return d.type === 'rapport' && d.daten; });
+    if (!rapporte.length) return null;
+    rapporte.sort(function(a, b) {
+      var da = a.datum || '', dbb = b.datum || '';
+      if (da !== dbb) return da < dbb ? 1 : -1;
+      var ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+      var tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+      return tb - ta;
+    });
+    return rapporte[0];
+  });
+}
+
+// Steht im Formular schon etwas Eigenes? Dann vorher fragen.
+// Die erste Tageszeile traegt beim Monteur von Haus aus den eigenen Namen und
+// das heutige Datum -- das ist keine Eingabe und darf nicht nachfragen lassen.
+function vgSchonGefuellt() {
+  if (document.getElementById('tr-baustelle').value) return true;
+  if (document.getElementById('tr-arbeiten').value.trim()) return true;
+  var bem = document.getElementById('tr-bemerkungen');
+  if (bem && bem.value.trim()) return true;
+  if (trTaetigkeiten && trTaetigkeiten.length) return true;
+  if (trWorkers.length > 1) return true;
+  for (var i = 0; i < trWorkers.length; i++) {
+    if (trWorkers[i].stunden) return true;
+    if (trWorkers[i].name && currentUser && trWorkers[i].name !== currentUser.name) return true;
+  }
+  return false;
+}
+
+function vonGesternUebernehmen() {
+  var btn = document.getElementById('tr-gestern');
+  if (btn) { btn.disabled = true; btn.textContent = 'Suche…'; }
+  function fertig() {
+    if (btn) { btn.disabled = false; btn.textContent = 'Von gestern übernehmen'; }
+  }
+
+  vgLetzterRapport().then(function(letzter) {
+    if (!letzter) { fertig(); toast('Noch kein eigener Rapport vorhanden'); return; }
+    var e = letzter.daten;
+
+    if (vgSchonGefuellt() &&
+        !confirm('Angaben aus dem Rapport vom ' + fmtDate(letzter.datum) + ' übernehmen?\n'
+                 + 'Baustelle, Arbeitszeit, Pausen, Fahrzeug und Tätigkeit werden überschrieben.')) {
+      fertig();
+      return;
+    }
+
+    function setz(id, wert) {
+      var el = document.getElementById(id);
+      if (el && wert) el.value = wert;
+    }
+
+    // Baustelle ueber die uebliche Auswahl, damit Kostenstelle und Projekt-Nr.
+    // wie gewohnt nachgezogen werden
+    if (e.baustelle) bvWaehle('tr-baustelle', e.baustelle);
+
+    if (e.niederlassung) {
+      trNiederlassung = e.niederlassung;
+      document.querySelectorAll('#tr-niederlassung .chip-toggle').forEach(function(b){ b.classList.remove('active'); });
+      var nb = document.querySelector('#tr-niederlassung .chip-toggle[data-val="' + e.niederlassung + '"]');
+      if (nb) nb.classList.add('active');
+    }
+
+    setz('tr-beginn', e.beginn);
+    setz('tr-ende', e.ende);
+    setz('tr-pause1-von', e.pause1von);
+    setz('tr-pause1-bis', e.pause1bis);
+    setz('tr-pause2-von', e.pause2von);
+    setz('tr-pause2-bis', e.pause2bis);
+    setz('tr-hinfahrt', e.hinfahrt);
+    setz('tr-rueckfahrt', e.rueckfahrt);
+    setz('tr-fahrzeug', e.fahrzeug);
+    setz('tr-fahrer', e.fahrer);
+
+    if (e.taetigkeiten && e.taetigkeiten.length) {
+      trTaetigkeiten = e.taetigkeiten.slice();
+      document.querySelectorAll('#tr-taetigkeit .chip-toggle').forEach(function(b){
+        b.classList.toggle('active', trTaetigkeiten.indexOf(b.getAttribute('data-val')) !== -1);
+      });
+    }
+
+    // Mannschaft mit Rolle uebernehmen, aber ohne Stunden und mit heutigem Datum
+    var namen = [];
+    (e.workers || []).forEach(function(w) {
+      if (w && w.name && namen.indexOf(w.name) === -1) namen.push(w.name);
+    });
+    if (namen.length) {
+      trWorkers = [];
+      trWorkerSeq = 0;
+      namen.forEach(function(n) {
+        trWorkerSeq++;
+        trWorkers.push({ id: trWorkerSeq, name: n,
+                         rolle: (PERSONAL.rollen && PERSONAL.rollen[n]) || 'Facharbeiter',
+                         datum: heuteIso(), stunden: '', ausloese: false, verpfl: false });
+      });
+      renderWorkers();
+      updateStundenSumme();
+    }
+
+    document.getElementById('tr-date').valueAsDate = new Date();
+    calcArbeitszeit();
+    datumsGrenzeSetzen();
+    entwurfAnstossen();
+    fertig();
+    toast('Übernommen vom ' + fmtDate(letzter.datum) + ' – Stunden und Beschreibung fehlen noch');
+  }).catch(function(err) {
+    fertig();
+    toast('Konnte nicht laden: ' + (err && err.message ? err.message : err));
+  });
 }
 
 /* ═══════════════════════════════════════
