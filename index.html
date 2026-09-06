@@ -10,7 +10,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
@@ -1826,7 +1825,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.27.1';
+var APP_VERSION = 'v1.28.1';
 
 var db = null;
 var storage = null;
@@ -1895,7 +1894,9 @@ function initFirebase(cfg) {
         console.warn('Offline-Speicher nicht aktiv:', err && err.code);
       });
     } catch(e) { console.warn('Offline-Speicher nicht verfügbar:', e); }
-    storage = firebase.storage();
+    // Cloud Storage laeuft erst ab dem Blaze-Tarif und wird nicht genutzt.
+    // Das SDK dafuer wird gar nicht erst geladen.
+    storage = null;
     fbAuth = firebase.auth();
 
     // Sign in anonymously
@@ -2068,6 +2069,8 @@ function doLogout() {
   if (!confirm('Abmelden?')) return;
   currentUser = null;
   isChef = false;
+  berichteCacheLeeren();
+  ideeDaten = [];
   document.getElementById('login-pin').value = '';
   var am = document.getElementById('admin-mail'); if (am) am.value = '';
   var ap = document.getElementById('admin-pw'); if (ap) ap.value = '';
@@ -2178,19 +2181,21 @@ function loadMasterData() {
     console.error('Load Baustellen error:', err);
   });
 
-  // Load Kostenstellen
-  db.collection('kostenstellen').get().then(function(snap) {
-    KOSTENSTELLEN = [];
-    snap.forEach(function(doc) {
-      var d = doc.data();
-      d.id = doc.id;
-      KOSTENSTELLEN.push(d);
+  // Kostenstellen braucht nur die Stammdatenpflege, also der Chef.
+  // Monteure sparen sich damit bei jeder Anmeldung die ganze Sammlung.
+  if (isChef) {
+    db.collection('kostenstellen').get().then(function(snap) {
+      KOSTENSTELLEN = [];
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        d.id = doc.id;
+        KOSTENSTELLEN.push(d);
+      });
+      KOSTENSTELLEN.sort(function(a, b) { return (a.nummer || '').localeCompare(b.nummer || ''); });
+    }).catch(function(err) {
+      console.error('Load Kostenstellen error:', err);
     });
-    KOSTENSTELLEN.sort(function(a, b) { return (a.nummer || '').localeCompare(b.nummer || ''); });
-    populateKostenstellenDropdowns();
-  }).catch(function(err) {
-    console.error('Load Kostenstellen error:', err);
-  });
+  }
 }
 
 function populatePersonalDropdowns() {
@@ -2576,22 +2581,10 @@ function uebernehmeSchalterVorgabe(bv) {
   toast('Vorgabe der Baustelle übernommen');
 }
 
-function populateKostenstellenDropdowns() {
-  var selectIds = ['tr-kostenstelle'];
-  selectIds.forEach(function(sid) {
-    var sel = document.getElementById(sid);
-    if (!sel) return;
-    var val = sel.value;
-    while (sel.options.length > 1) sel.remove(1);
-    KOSTENSTELLEN.forEach(function(kst) {
-      var o = document.createElement('option');
-      o.value = kst.nummer;
-      o.textContent = kst.nummer + (kst.bezeichnung ? ' – ' + kst.bezeichnung : '');
-      sel.appendChild(o);
-    });
-    if (val) sel.value = val;
-  });
-}
+// Frueher gab es ein Auswahlfeld fuer die Kostenstelle. Heute wird sie aus
+// der Baustelle uebernommen und steht in einem schreibgeschuetzten Textfeld.
+// Die alte Funktion lief in eine Ausnahme (input hat kein .options) und wurde
+// bei jeder Anmeldung ausgeloest -- ersatzlos gestrichen.
 
 /* ═══════════════════════════════════════
    STAMMDATEN CRUD
@@ -3186,16 +3179,27 @@ function dashLoadReports() {
   var siteFilter = document.getElementById('dash-filter-site').value;
   var fromFilter = document.getElementById('dash-filter-from').value;
 
-  // Nur die neuesten Berichte holen statt der ganzen Sammlung
-  db.collection('berichte').orderBy('createdAt', 'desc').limit(dashLimit).get().then(function(snap) {
+  // Ohne Filter: die neuesten Berichte. Mit Filter: serverseitig auf einem
+  // Feld einschraenken -- sonst durchsucht der Filter nur die letzten 20
+  // Dokumente und findet aeltere Berichte nie. Zusammengesetzte Indizes
+  // braucht das nicht, weil immer nur EIN Feld an den Server geht.
+  var abfrage;
+  if (siteFilter) {
+    abfrage = db.collection('berichte').where('baustelle', '==', siteFilter).limit(200);
+  } else if (typeFilter) {
+    abfrage = db.collection('berichte').where('type', '==', typeFilter).limit(200);
+  } else if (fromFilter) {
+    abfrage = db.collection('berichte').where('datum', '>=', fromFilter).limit(200);
+  } else {
+    abfrage = db.collection('berichte').orderBy('createdAt', 'desc').limit(dashLimit);
+  }
+  var gefiltert = !!(siteFilter || typeFilter || fromFilter);
+
+  abfrage.get().then(function(snap) {
     var reports = [];
-    var erstellerGesehen = {};
     snap.forEach(function(doc) {
       var d = doc.data();
       d.id = doc.id;
-
-      // Namen fuer den Sammel-Export sammeln, bevor die Filter greifen
-      if (d.ersteller) erstellerGesehen[d.ersteller] = true;
 
       // Client-side filters
       if (typeFilter && d.type !== typeFilter) return;
@@ -3205,9 +3209,28 @@ function dashLoadReports() {
       reports.push(d);
     });
 
-    var mehrDa = snap.size >= dashLimit;
+    // Bei einer gefilterten Abfrage fehlt die Sortierung vom Server
+    if (gefiltert) {
+      reports.sort(function(a, b) {
+        var ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+        var tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+        if (ta !== tb) return tb - ta;
+        return (b.datum || '').localeCompare(a.datum || '');
+      });
+    }
+    var mehrDa = !gefiltert && snap.size >= dashLimit;
+    if (gefiltert && reports.length > dashLimit) {
+      mehrDa = true;
+      reports = reports.slice(0, dashLimit);
+    }
 
-    dashErsteller = Object.keys(erstellerGesehen).sort(function(a, b){ return a.localeCompare(b); });
+    // Die Auswahlliste fuer den Sammel-Export kommt aus den Stammdaten.
+    // Frueher stand dort nur, wer in den letzten 20 Berichten vorkam --
+    // wer im Urlaub war, liess sich dann gar nicht exportieren.
+    var namen = {};
+    (PERSONAL.alle || []).forEach(function(n){ namen[n] = true; });
+    snap.forEach(function(doc) { var e = doc.data().ersteller; if (e) namen[e] = true; });
+    dashErsteller = Object.keys(namen).sort(function(a, b){ return a.localeCompare(b); });
     dxFuelleNutzer();
     dashKennzahlen();
 
@@ -3494,8 +3517,8 @@ function berichtDateiname(d) {
    ═══════════════════════════════════════ */
 function saveReportToFirestore(type, meta, vollDaten) {
   if (!db || !currentUser) return Promise.reject(new Error('keine Verbindung'));
-  // Der Kalender liest gecacht -- nach einem neuen Bericht muss er neu laden
-  kalCache = {};
+  // Liste und Kalender lesen gecacht -- nach einem neuen Bericht neu laden
+  berichteCacheLeeren();
   var entry = {
     type: type,
     baustelle: meta.baustelle || meta.site || '',
@@ -5733,14 +5756,47 @@ function historyMehr() {
   renderHistory();
 }
 
+// Die lokale Historie ist nur die Notfallanzeige, wenn Firestore nicht
+// erreichbar ist. Fotos und Unterschriften gehoeren nicht auf das Handy:
+// 20 Kontrollen mit Fotos haben den Speicher auf 3 MB getrieben, danach
+// scheitern auch der Rapport-Entwurf und alles andere still.
+var HISTORIE_MAX = 25;
+var HISTORIE_BYTES = 300 * 1024;
+
+function historieSchlank(entry) {
+  var kopie;
+  try { kopie = JSON.parse(JSON.stringify(entry)); } catch(e) { return entry; }
+  var d = kopie.daten;
+  if (d) {
+    if (d.maengel) d.maengel.forEach(function(m){ if (m && m.fotos) m.fotos = []; });
+    ['signature','signatur','signaturKunde','kundeSignature'].forEach(function(f) {
+      if (d[f]) d[f] = null;
+    });
+  }
+  return kopie;
+}
+
 function saveToHistory(entry) {
   try {
     var history = JSON.parse(localStorage.getItem('eb_history') || '[]');
-    entry.id = Date.now();
-    history.unshift(entry);
-    if (history.length > 50) history = history.slice(0, 50);
-    localStorage.setItem('eb_history', JSON.stringify(history));
-  } catch(e) {}
+    var schlank = historieSchlank(entry);
+    schlank.id = Date.now();
+    entry.id = schlank.id;
+    history.unshift(schlank);
+    if (history.length > HISTORIE_MAX) history = history.slice(0, HISTORIE_MAX);
+    // Zusaetzlich ein Byte-Deckel: lieber alte Eintraege verlieren als den
+    // ganzen lokalen Speicher blockieren
+    var text = JSON.stringify(history);
+    while (history.length > 1 && text.length > HISTORIE_BYTES) {
+      history.pop();
+      text = JSON.stringify(history);
+    }
+    localStorage.setItem('eb_history', text);
+  } catch(e) {
+    // Speicher voll: alte Historie wegwerfen, damit wenigstens der Entwurf
+    // und die zuletzt genutzten Baustellen weiter gespeichert werden koennen
+    try { localStorage.removeItem('eb_history'); } catch(e2) {}
+  }
 }
 
 function filterHistory(type, btn) {
@@ -5749,6 +5805,43 @@ function filterHistory(type, btn) {
   document.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   renderHistory();
+}
+
+// Die eigenen Berichte werden je Sitzung einmal geholt und von Liste und
+// Kalender gemeinsam genutzt. Beim Einreichen, Aendern und Loeschen wird der
+// Zwischenspeicher verworfen.
+var eigeneBerichteCache = null;
+var eigeneBerichteLaeuft = null;   // laufende Abfrage, damit Liste und
+                                   // Kalender sie sich teilen statt zweimal
+                                   // dieselben Dokumente zu holen
+
+function eigeneBerichte() {
+  if (eigeneBerichteCache) return Promise.resolve(eigeneBerichteCache);
+  if (eigeneBerichteLaeuft) return eigeneBerichteLaeuft;
+  if (!db || !currentUser) return Promise.resolve([]);
+  eigeneBerichteLaeuft = db.collection('berichte')
+    .where('erstellerId', '==', currentUser.id).get()
+    .then(function(snap) {
+      var docs = [];
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        d._id = doc.id;
+        docs.push(d);
+      });
+      eigeneBerichteCache = docs;
+      eigeneBerichteLaeuft = null;
+      return docs;
+    }).catch(function(err) {
+      eigeneBerichteLaeuft = null;
+      throw err;
+    });
+  return eigeneBerichteLaeuft;
+}
+
+function berichteCacheLeeren() {
+  eigeneBerichteCache = null;
+  eigeneBerichteLaeuft = null;
+  kalCache = {};
 }
 
 var HISTORY_TYPE_LABELS = {
@@ -5771,21 +5864,18 @@ function renderHistory() {
   // nur ihre eigenen Berichte ab, der Chef die neuesten.
   if (db && currentUser) {
     el.innerHTML = '<div class="empty-state"><p>Lade Berichte...</p></div>';
-    var abfrage;
-    if (isChef) {
-      abfrage = db.collection('berichte').orderBy('createdAt', 'desc').limit(historyLimit);
-    } else {
-      // Einfache Gleichheit auf einem Feld - braucht keinen zusammengesetzten Index
-      abfrage = db.collection('berichte').where('erstellerId', '==', currentUser.id);
-    }
-    abfrage.get().then(function(snap) {
-      // Client-side filter and sort to avoid Firestore index requirements
-      var docs = [];
-      snap.forEach(function(doc) {
-        var d = doc.data();
-        d._id = doc.id;
-        if (historyFilter !== 'all' && d.type !== historyFilter) return;
-        docs.push(d);
+    var holen = isChef
+      ? db.collection('berichte').orderBy('createdAt', 'desc').limit(historyLimit).get()
+          .then(function(snap) {
+            var a = [];
+            snap.forEach(function(doc) { var d = doc.data(); d._id = doc.id; a.push(d); });
+            return a;
+          })
+      : eigeneBerichte();
+
+    holen.then(function(alle) {
+      var docs = alle.filter(function(d) {
+        return historyFilter === 'all' || d.type === historyFilter;
       });
       docs.sort(function(a, b) {
         var ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
@@ -5794,7 +5884,7 @@ function renderHistory() {
       });
       var mehrDa = docs.length > historyLimit;
       if (docs.length > historyLimit) docs = docs.slice(0, historyLimit);
-      snap = { empty: docs.length === 0, forEach: function(fn) { docs.forEach(function(d) { fn({ id: d._id, data: function() { return d; } }); }); } };
+      var snap = { empty: docs.length === 0, forEach: function(fn) { docs.forEach(function(d) { fn({ id: d._id, data: function() { return d; } }); }); } };
       if (snap.empty) {
         el.innerHTML = '<div class="empty-state"><div class="em-icon">&#128203;</div><p>Noch keine Berichte' + (historyFilter !== 'all' ? ' in dieser Kategorie' : '') + '.</p></div>';
         return;
@@ -6085,6 +6175,7 @@ function editFirestoreReport(docId) {
       db.collection('berichte').doc(docId).update(aenderung).then(function() {
         toast('Bericht gespeichert');
         document.body.removeChild(overlay);
+        berichteCacheLeeren();
         renderHistory();
         dashLoadReports();
       }).catch(function(err) {
@@ -6103,6 +6194,7 @@ function deleteFirestoreReport(docId) {
   if (!confirm('Bericht wirklich endgueltig loeschen?')) return;
   db.collection('berichte').doc(docId).delete().then(function() {
     toast('Bericht geloescht');
+    berichteCacheLeeren();
     renderHistory();
   }).catch(function(err) {
     toast('Fehler beim Loeschen: ' + err.message);
@@ -7090,15 +7182,15 @@ function kalLaden() {
 
   // Chef: Bereichsabfrage auf einem Feld -- braucht keinen zusammengesetzten Index.
   // Monteur: nur die eigenen Berichte, der Monat wird hier gefiltert.
-  var abfrage = isChef
-    ? db.collection('berichte').where('datum', '>=', von).where('datum', '<=', bis)
-    : db.collection('berichte').where('erstellerId', '==', currentUser.id);
+  var holen = isChef
+    ? db.collection('berichte').where('datum', '>=', von).where('datum', '<=', bis).get()
+        .then(function(snap) { var a = []; snap.forEach(function(doc){ a.push(doc.data()); }); return a; })
+    : eigeneBerichte();   // teilt sich die Abfrage mit der Berichtsliste
 
-  abfrage.get().then(function(snap) {
+  holen.then(function(rohdaten) {
     kalLaedt = false;
     var liste = [];
-    snap.forEach(function(doc) {
-      var d = doc.data();
+    rohdaten.forEach(function(d) {
       var tag = d.datum || '';
       if (!tag) return;
       if (isChef && (tag < von || tag > bis)) return;
