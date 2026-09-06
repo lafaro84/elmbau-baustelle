@@ -903,31 +903,39 @@ body {
     <div class="fb-logo">&#9874;</div>
     <h2>Elmbau Baustelle</h2>
     <p class="fb-sub">Anmeldung</p>
-    <div class="field">
-      <label for="login-user">Mitarbeiter</label>
-      <select id="login-user">
-        <option value="">Bitte w&auml;hlen&hellip;</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="login-pin">PIN</label>
-      <input type="password" id="login-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="4-6 stellige PIN">
-    </div>
-    <div class="fb-error" id="login-error"></div>
-    <button class="btn btn-primary" onclick="doLogin()" style="margin-top:12px">Anmelden</button>
+    <form id="login-form" onsubmit="return doLoginForm(event)" autocomplete="on">
+      <div class="field">
+        <label for="login-user">Mitarbeiter</label>
+        <select id="login-user" onchange="loginNameMerken()">
+          <option value="">Bitte w&auml;hlen&hellip;</option>
+        </select>
+      </div>
+      <!-- Der Passwortspeicher braucht ein echtes Benutzernamenfeld. Es laeuft
+           mit der Auswahl mit und ist fuer den Nutzer nicht sichtbar. -->
+      <input type="text" id="login-name" name="username" autocomplete="username"
+             tabindex="-1" aria-hidden="true" readonly
+             style="position:absolute;opacity:0;height:0;width:0;padding:0;border:0;pointer-events:none">
+      <div class="field">
+        <label for="login-pin">PIN</label>
+        <input type="password" id="login-pin" name="password" autocomplete="current-password"
+               inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="4-6 stellige PIN">
+      </div>
+      <div class="fb-error" id="login-error"></div>
+      <button type="submit" class="btn btn-primary" style="margin-top:12px">Anmelden</button>
+    </form>
     <hr class="fb-divider">
     <button class="btn btn-secondary" onclick="showAdminLogin()" style="font-size:13px">Administratorzugang</button>
-    <div id="admin-login-area" style="display:none;margin-top:12px">
+    <form id="admin-login-area" style="display:none;margin-top:12px" onsubmit="return doAdminLoginForm(event)" autocomplete="on">
       <div class="field">
         <label for="admin-mail">E-Mail</label>
-        <input type="email" id="admin-mail" autocomplete="username">
+        <input type="email" id="admin-mail" name="email" autocomplete="username">
       </div>
       <div class="field">
         <label for="admin-pw">Passwort</label>
-        <input type="password" id="admin-pw" autocomplete="current-password" placeholder="Passwort">
+        <input type="password" id="admin-pw" name="password" autocomplete="current-password" placeholder="Passwort">
       </div>
-      <button class="btn btn-primary" onclick="doAdminLogin()" style="margin-top:8px">Anmelden</button>
-    </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px">Anmelden</button>
+    </form>
   </div>
 </div>
 
@@ -1901,7 +1909,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.32.2';
+var APP_VERSION = 'v1.33.0';
 
 var db = null;
 var storage = null;
@@ -2018,6 +2026,32 @@ function showLoginScreen() {
   loadLoginUsers();
 }
 
+var LOGIN_LETZTER = 'elmbau_letzter_nutzer';
+
+// Haelt das versteckte Benutzernamenfeld auf dem gewaehlten Mitarbeiter.
+// Ohne dieses Feld bietet kein Handy an, die PIN zu speichern.
+function loginNameMerken() {
+  var sel = document.getElementById('login-user');
+  var feld = document.getElementById('login-name');
+  if (!sel || !feld) return;
+  feld.value = sel.value ? (sel.options[sel.selectedIndex].textContent || '') : '';
+}
+
+// Das Formular loest die Anmeldung aus. Erst dadurch fragt der Browser,
+// ob er die PIN speichern soll.
+function doLoginForm(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  loginNameMerken();
+  doLogin();
+  return false;
+}
+
+function doAdminLoginForm(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  doAdminLogin();
+  return false;
+}
+
 function loadLoginUsers() {
   if (!db) return;
   db.collection('mitarbeiter').get().then(function(snap) {
@@ -2034,10 +2068,24 @@ function loadLoginUsers() {
     users.forEach(function(u) {
       var o = document.createElement('option');
       o.value = u.id;
-      o.textContent = u.name + ' (' + u.rolle + ')';
+      o.textContent = u.name;
       o.setAttribute('data-rolle', u.rolle);
       sel.appendChild(o);
     });
+
+    // Zuletzt angemeldeten Mitarbeiter auf diesem Geraet wieder vorwaehlen
+    var zuletzt = '';
+    try { zuletzt = localStorage.getItem(LOGIN_LETZTER) || ''; } catch(e) {}
+    if (zuletzt) {
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === zuletzt) { sel.value = zuletzt; break; }
+      }
+    }
+    loginNameMerken();
+    if (sel.value) {
+      var pin = document.getElementById('login-pin');
+      if (pin && !pin.value) setTimeout(function(){ try { pin.focus(); } catch(e) {} }, 100);
+    }
     if (users.length === 0) {
       document.getElementById('login-error').textContent = 'Keine Mitarbeiter gefunden. Bitte zuerst über den Administratorzugang anmelden und Mitarbeiter anlegen.';
     }
@@ -2050,6 +2098,10 @@ function loadLoginUsers() {
 function showAdminLogin() {
   var area = document.getElementById('admin-login-area');
   area.style.display = area.style.display === 'none' ? '' : 'none';
+  if (area.style.display === '') {
+    var m = document.getElementById('admin-mail');
+    if (m) setTimeout(function(){ try { m.focus(); } catch(e) {} }, 50);
+  }
 }
 
 function doLogin() {
@@ -2066,6 +2118,8 @@ function doLogin() {
     var d = doc.data();
     if (d.pin !== pin) { errEl.textContent = 'Falsche PIN'; return; }
     currentUser = { id: doc.id, name: d.name, rolle: d.rolle || 'mitarbeiter', pin: d.pin };
+    // Auf diesem Geraet beim naechsten Mal vorwaehlen
+    try { localStorage.setItem(LOGIN_LETZTER, doc.id); } catch(e) {}
     // Chef-Rechte gibt es ausschliesslich ueber die Anmeldung mit einem
     // Firebase-Konto, das in der Sammlung 'chefs' freigeschaltet ist.
     // Ein Feld in der Mitarbeiter-Sammlung darf das nicht koennen -- sonst
@@ -2155,6 +2209,8 @@ function doLogout() {
   berichteCacheLeeren();
   ideeDaten = [];
   document.getElementById('login-pin').value = '';
+  // Die Mitarbeiterauswahl bleibt stehen -- am selben Handy meldet sich
+  // in aller Regel dieselbe Person wieder an.
   var am = document.getElementById('admin-mail'); if (am) am.value = '';
   var ap = document.getElementById('admin-pw'); if (ap) ap.value = '';
   document.getElementById('login-error').textContent = '';
