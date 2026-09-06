@@ -916,17 +916,17 @@ body {
     <div class="fb-error" id="login-error"></div>
     <button class="btn btn-primary" onclick="doLogin()" style="margin-top:12px">Anmelden</button>
     <hr class="fb-divider">
-    <button class="btn btn-secondary" onclick="showAdminLogin()" style="font-size:13px">Chef-Zugang (Ersteinrichtung)</button>
+    <button class="btn btn-secondary" onclick="showAdminLogin()" style="font-size:13px">Administratorzugang</button>
     <div id="admin-login-area" style="display:none;margin-top:12px">
       <div class="field">
         <label for="admin-mail">E-Mail</label>
-        <input type="email" id="admin-mail" autocomplete="username" placeholder="chef@elmbau.de">
+        <input type="email" id="admin-mail" autocomplete="username">
       </div>
       <div class="field">
         <label for="admin-pw">Passwort</label>
         <input type="password" id="admin-pw" autocomplete="current-password" placeholder="Passwort">
       </div>
-      <button class="btn btn-primary" onclick="doAdminLogin()" style="margin-top:8px">Als Chef anmelden</button>
+      <button class="btn btn-primary" onclick="doAdminLogin()" style="margin-top:8px">Anmelden</button>
     </div>
   </div>
 </div>
@@ -1901,7 +1901,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.32.1';
+var APP_VERSION = 'v1.32.2';
 
 var db = null;
 var storage = null;
@@ -2039,7 +2039,7 @@ function loadLoginUsers() {
       sel.appendChild(o);
     });
     if (users.length === 0) {
-      document.getElementById('login-error').textContent = 'Keine Mitarbeiter gefunden. Bitte zuerst als Chef anmelden und Mitarbeiter anlegen.';
+      document.getElementById('login-error').textContent = 'Keine Mitarbeiter gefunden. Bitte zuerst über den Administratorzugang anmelden und Mitarbeiter anlegen.';
     }
   }).catch(function(err) {
     console.error('Load users error:', err);
