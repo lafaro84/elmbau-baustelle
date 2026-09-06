@@ -798,10 +798,13 @@ body {
 .dash-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
 .dash-empty .em-icon { font-size: 40px; margin-bottom: 8px; }
 .user-badge {
-  font-size: 11px; padding: 3px 10px; border-radius: 12px;
+  font-size: 11px; padding: 8px 12px; border-radius: 14px;
   background: var(--accent-light); color: var(--accent);
   font-weight: 600; cursor: pointer;
+  border: none; font-family: var(--font); line-height: 1;
+  min-height: 32px;
 }
+.user-badge:active { opacity: .7; }
 
 /* ── Auswahlkaestchen im Sammel-Export ──
    Die allgemeine Regel .field input setzt -webkit-appearance:none und
@@ -952,7 +955,7 @@ body {
     <div class="subtitle" id="headerSubtitle">Digitale Baustellenformulare</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
-    <span class="user-badge" id="currentUserBadge" onclick="doLogout()" title="Abmelden"></span>
+    <button type="button" class="user-badge" id="currentUserBadge" onclick="doLogout()" title="Abmelden"></button>
     <div class="status-badge" id="statusBadge" onclick="updVonHand()" title="Auf Updates pr&uuml;fen" style="cursor:pointer"></div>
   </div>
 </div>
@@ -1909,7 +1912,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.33.0';
+var APP_VERSION = 'v1.33.1';
 
 var db = null;
 var storage = null;
@@ -2027,6 +2030,7 @@ function showLoginScreen() {
 }
 
 var LOGIN_LETZTER = 'elmbau_letzter_nutzer';
+var loginZweiterVersuch = false;
 
 // Haelt das versteckte Benutzernamenfeld auf dem gewaehlten Mitarbeiter.
 // Ohne dieses Feld bietet kein Handy an, die PIN zu speichern.
@@ -2064,6 +2068,7 @@ function loadLoginUsers() {
       if (d.aktiv === false) return;
       users.push({ id: doc.id, name: d.name, rolle: d.rolle || 'mitarbeiter' });
     });
+    loginZweiterVersuch = false;
     users.sort(function(a, b) { return a.name.localeCompare(b.name); });
     users.forEach(function(u) {
       var o = document.createElement('option');
@@ -2091,6 +2096,14 @@ function loadLoginUsers() {
     }
   }).catch(function(err) {
     console.error('Load users error:', err);
+    // Direkt nach einem Anmeldewechsel ist der Zugriff manchmal noch nicht
+    // durch -- einmal nachfassen, bevor gemeckert wird.
+    if (!loginZweiterVersuch) {
+      loginZweiterVersuch = true;
+      setTimeout(function(){ loadLoginUsers(); }, 900);
+      return;
+    }
+    loginZweiterVersuch = false;
     document.getElementById('login-error').textContent = 'Mitarbeiter konnten nicht geladen werden: ' + err.message;
   });
 }
@@ -2203,23 +2216,38 @@ function afterLogin() {
 }
 
 function doLogout() {
-  if (!confirm('Abmelden?')) return;
-  currentUser = null;
-  isChef = false;
-  berichteCacheLeeren();
-  ideeDaten = [];
-  document.getElementById('login-pin').value = '';
-  // Die Mitarbeiterauswahl bleibt stehen -- am selben Handy meldet sich
-  // in aller Regel dieselbe Person wieder an.
-  var am = document.getElementById('admin-mail'); if (am) am.value = '';
-  var ap = document.getElementById('admin-pw'); if (ap) ap.value = '';
-  document.getElementById('login-error').textContent = '';
-  // Chef-Sitzung beenden und wieder anonym anmelden, damit die
-  // Mitarbeiter-Anmeldung danach normal funktioniert
-  if (fbAuth) {
-    fbAuth.signInAnonymously().catch(function(err){ console.warn('Anon-Anmeldung:', err); });
+  try {
+    if (!confirm('Abmelden?')) return;
+    currentUser = null;
+    isChef = false;
+    berichteCacheLeeren();
+    ideeDaten = [];
+    var pinFeld = document.getElementById('login-pin');
+    if (pinFeld) pinFeld.value = '';
+    // Die Mitarbeiterauswahl bleibt stehen -- am selben Handy meldet sich
+    // in aller Regel dieselbe Person wieder an.
+    var am = document.getElementById('admin-mail'); if (am) am.value = '';
+    var ap = document.getElementById('admin-pw'); if (ap) ap.value = '';
+    var fehlerFeld = document.getElementById('login-error');
+    if (fehlerFeld) fehlerFeld.textContent = '';
+
+    // Der Anmeldebildschirm liest die Mitarbeiterliste. Firestore laesst das
+    // nur mit gueltiger Anmeldung zu -- beim Chef wird die E-Mail-Sitzung
+    // gerade gegen eine anonyme getauscht. Deshalb erst den Tausch abwarten.
+    if (fbAuth) {
+      fbAuth.signInAnonymously()
+        .then(function(){ showLoginScreen(); })
+        .catch(function(err) {
+          console.warn('Anon-Anmeldung:', err);
+          showLoginScreen();
+        });
+    } else {
+      showLoginScreen();
+    }
+  } catch (e) {
+    console.error('Abmelden:', e);
+    toast('Abmelden fehlgeschlagen: ' + (e && e.message ? e.message : e));
   }
-  showLoginScreen();
 }
 
 var mitarbeiterGeladen = false;
