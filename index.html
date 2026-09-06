@@ -267,6 +267,22 @@ body {
   background:var(--surface-alt); border-radius:0 var(--radius-sm) var(--radius-sm) 0; font-size:13px; }
 .idee-aktionen { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 
+/* ── Baustellenakte ── */
+.ak-kacheln { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+.ak-kachel { background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:10px 12px; }
+.ak-wert { font-size:19px; font-weight:700; color:var(--text); }
+.ak-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+.ak-zeitraum { margin-top:10px; font-size:13px; color:var(--text-muted); }
+.ak-arten { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.ak-chip { display:flex; align-items:center; gap:5px; font-size:12px; padding:4px 9px;
+  border-radius:12px; background:var(--surface-alt); color:var(--text-muted); }
+.ak-zeile { display:flex; align-items:center; gap:10px; padding:9px 0;
+  border-bottom:1px solid var(--border); }
+.ak-info { flex:1; min-width:0; }
+.ak-titel { font-size:14px; }
+.ak-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
+
 /* ── Offline-Band ── */
 .off-banner {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 9998;
@@ -1784,6 +1800,15 @@ body {
     <div class="section-label">Kalender &ndash; eingereichte Berichte</div>
     <div id="kalDash"></div>
   </div>
+
+  <div class="section">
+    <div class="section-label">Baustellenakte</div>
+    <div class="field">
+      <label for="ak-bv">Bauvorhaben</label>
+      <select id="ak-bv" onchange="akteLaden()"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+    </div>
+    <div id="akteInhalt"><div class="kal-info">Bitte oben eine Baustelle w&auml;hlen.</div></div>
+  </div>
   <div class="section">
     <div class="section-label">Sammel-Export als PDF</div>
     <div class="row">
@@ -1856,7 +1881,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.29.0';
+var APP_VERSION = 'v1.30.0';
 
 var db = null;
 var storage = null;
@@ -2247,7 +2272,7 @@ function populatePersonalDropdowns() {
 }
 
 function populateBaustellenDropdowns() {
-  var selectIds = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site'];
+  var selectIds = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site','ak-bv'];
   selectIds.forEach(function(sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
@@ -2271,7 +2296,7 @@ function populateBaustellenDropdowns() {
    zuletzt verwendete zuerst, und das Anlegen erst, wenn die Suche nichts
    findet, samt Warnung vor aehnlichen Namen.
    ═══════════════════════════════════════ */
-var BV_FELDER = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site'];
+var BV_FELDER = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site','ak-bv'];
 var BV_ZULETZT_KEY = 'elmbau_bv_zuletzt';
 var BV_ZULETZT_MAX = 5;
 var bvOverlayEl = null;
@@ -8022,6 +8047,190 @@ function offenMitzaehlen(promise) {
 
 window.addEventListener('online', offlineBandZeichnen);
 window.addEventListener('offline', offlineBandZeichnen);
+
+
+/* ═══════════════════════════════════════
+   BAUSTELLENAKTE
+   Alles zu einer Baustelle an einer Stelle: was wurde wann eingereicht,
+   wie viele Stunden stecken drin, und mit einem Griff als Sammel-PDF fuers
+   Archiv. Eine Abfrage auf einem Feld, kein zusammengesetzter Index.
+   ═══════════════════════════════════════ */
+var akteDaten = [];
+var akteBv = '';
+var akteLaeuft = false;
+
+function akteLaden() {
+  var bv = document.getElementById('ak-bv').value;
+  var el = document.getElementById('akteInhalt');
+  if (!el) return;
+  if (!bv) { el.innerHTML = '<div class="kal-info">Bitte oben eine Baustelle wählen.</div>'; akteDaten = []; return; }
+  if (!db) { el.innerHTML = '<div class="kal-info">Keine Verbindung.</div>'; return; }
+  akteBv = bv;
+  el.innerHTML = '<div class="kal-info">Lade&hellip;</div>';
+
+  db.collection('berichte').where('baustelle', '==', bv).limit(300).get().then(function(snap) {
+    akteDaten = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      d._id = doc.id;
+      akteDaten.push(d);
+    });
+    akteDaten.sort(function(a, b) {
+      var da = a.datum || '', dbb = b.datum || '';
+      if (da !== dbb) return da < dbb ? 1 : -1;     // neueste zuerst
+      return (a.ersteller || '').localeCompare(b.ersteller || '');
+    });
+    akteZeichnen();
+  }).catch(function(err) {
+    el.innerHTML = '<div class="kal-info">Fehler beim Laden: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function akteZeichnen() {
+  var el = document.getElementById('akteInhalt');
+  if (!el) return;
+  if (!akteDaten.length) {
+    el.innerHTML = '<div class="kal-info">Für diese Baustelle liegt noch kein Bericht vor.</div>';
+    return;
+  }
+
+  // Kennzahlen: Berichtsarten, Zeitraum, Stunden nach Geselle und Azubi
+  var proTyp = {}, ersterTag = null, letzterTag = null;
+  var stdGeselle = 0, stdAzubi = 0, stdGesamt = 0;
+  var proTaetigkeit = {};
+  akteDaten.forEach(function(d) {
+    var typ = d.type || 'kontrolle';
+    proTyp[typ] = (proTyp[typ] || 0) + 1;
+    if (d.datum) {
+      if (!ersterTag || d.datum < ersterTag) ersterTag = d.datum;
+      if (!letzterTag || d.datum > letzterTag) letzterTag = d.datum;
+    }
+    if (typ !== 'rapport') return;
+    var taet = (d.daten && d.daten.taetigkeiten && d.daten.taetigkeiten.length)
+      ? d.daten.taetigkeiten.join(', ') : 'ohne Angabe';
+    rapportZeilen(d).forEach(function(z) {
+      if (!z.std) return;
+      stdGesamt += z.std;
+      proTaetigkeit[taet] = (proTaetigkeit[taet] || 0) + z.std;
+      var rolle = (PERSONAL.rollen && PERSONAL.rollen[z.name]) || '';
+      var istAzubi = /azubi|lehr/i.test(rolle) ||
+        (PERSONAL.azubi && PERSONAL.azubi.indexOf(z.name) !== -1);
+      if (istAzubi) stdAzubi += z.std; else stdGeselle += z.std;
+    });
+  });
+
+  var kacheln = ''
+    + akteKachel(akteDaten.length, akteDaten.length === 1 ? 'Bericht' : 'Berichte')
+    + akteKachel(stdText(stdGesamt) + ' h', 'Stunden gesamt')
+    + akteKachel(stdText(stdGeselle) + ' h', 'Geselle')
+    + akteKachel(stdText(stdAzubi) + ' h', 'Azubi');
+
+  var zeitraum = ersterTag
+    ? fmtDate(ersterTag) + (letzterTag && letzterTag !== ersterTag ? ' – ' + fmtDate(letzterTag) : '')
+    : '—';
+
+  var arten = Object.keys(proTyp).sort(function(a,b){ return proTyp[b] - proTyp[a]; })
+    .map(function(t) {
+      return '<span class="ak-chip"><i class="kal-dot ' + t + '"></i>'
+        + escHtml(HISTORY_TYPE_LABELS[t] || t) + ' ' + proTyp[t] + '</span>';
+    }).join('');
+
+  var taetigkeiten = Object.keys(proTaetigkeit).sort(function(a,b){ return proTaetigkeit[b]-proTaetigkeit[a]; })
+    .map(function(t) {
+      return '<div class="kal-lk-zeile"><b>' + escHtml(t) + '</b><span>'
+        + stdText(proTaetigkeit[t]) + ' h</span></div>';
+    }).join('');
+
+  var liste = akteDaten.map(function(d) {
+    var typ = d.type || 'kontrolle';
+    var std = '';
+    if (typ === 'rapport') {
+      var h = 0;
+      rapportZeilen(d).forEach(function(z){ h += z.std; });
+      if (h) std = ' &middot; ' + stdText(h) + ' h';
+    }
+    return '<div class="ak-zeile">'
+      + '<span class="history-dot ' + typ + '"></span>'
+      + '<div class="ak-info">'
+      +   '<div class="ak-titel">' + escHtml(HISTORY_TYPE_LABELS[typ] || typ) + '</div>'
+      +   '<div class="ak-meta">' + fmtDate(d.datum || '') + ' &middot; '
+      +      escHtml(d.ersteller || '—') + std + '</div>'
+      + '</div>'
+      + '<div class="history-actions">'
+      +   '<button class="history-btn" onclick="dashViewReport(\'' + d._id + '\')" title="Ansehen">&#128065;</button>'
+      +   '<button class="history-btn" onclick="downloadFirestoreReport(\'' + d._id + '\')" title="Herunterladen">&#11015;</button>'
+      + '</div></div>';
+  }).join('');
+
+  el.innerHTML =
+      '<div class="ak-kacheln">' + kacheln + '</div>'
+    + '<div class="ak-zeitraum">' + zeitraum + '</div>'
+    + '<div class="ak-arten">' + arten + '</div>'
+    + '<button class="btn btn-primary" id="ak-btn" onclick="akteExport()" style="margin:14px 0 4px">'
+    +   'Akte als PDF (' + akteDaten.length + ' Berichte)</button>'
+    + '<div id="ak-status" class="kal-info" style="text-align:center"></div>'
+    + (taetigkeiten ? '<div class="kal-lk-titel" style="margin-top:14px">Stunden nach Tätigkeit</div>' + taetigkeiten : '')
+    + '<div class="kal-lk-titel" style="margin-top:14px">Alle Berichte</div>'
+    + liste;
+}
+
+function akteKachel(wert, text) {
+  return '<div class="ak-kachel"><div class="ak-wert">' + wert + '</div>'
+    + '<div class="ak-label">' + text + '</div></div>';
+}
+
+function akteExport() {
+  if (akteLaeuft) return;
+  if (!akteDaten.length) { toast('Keine Berichte'); return; }
+  if (!pdfBereit()) return;
+
+  // fuer die Akte chronologisch von vorn nach hinten
+  var liste = akteDaten.slice().sort(function(a, b) {
+    var da = a.datum || '', dbb = b.datum || '';
+    if (da !== dbb) return da < dbb ? -1 : 1;
+    return (a.ersteller || '').localeCompare(b.ersteller || '');
+  }).filter(function(d){ return d.html || d.daten; });
+
+  if (!liste.length) { toast('Keine ausdruckbaren Berichte'); return; }
+  if (liste.length > 40 && !confirm(liste.length + ' Berichte werden zusammengefasst. Das kann einige Minuten dauern. Fortfahren?')) return;
+
+  var btn = document.getElementById('ak-btn');
+  var status = document.getElementById('ak-status');
+  akteLaeuft = true;
+  if (btn) btn.disabled = true;
+
+  var PDF = window.jspdf.jsPDF;
+  var pdf = null;
+
+  function fertig(text) {
+    akteLaeuft = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Akte als PDF (' + akteDaten.length + ' Berichte)'; }
+    if (status) status.textContent = text || '';
+  }
+
+  function naechster(i) {
+    if (i >= liste.length) {
+      pdf.save('Baustellenakte_' + akteBv.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_') + '.pdf');
+      fertig(liste.length + ' Berichte exportiert');
+      toast('Akte mit ' + liste.length + ' Berichten heruntergeladen');
+      return;
+    }
+    if (btn) btn.textContent = 'Erstelle PDF… ' + (i + 1) + '/' + liste.length;
+    if (status) status.textContent = fmtDate(liste[i].datum) + ' – '
+      + (HISTORY_TYPE_LABELS[liste[i].type] || liste[i].type);
+    var berHtml = berichtHtml(liste[i]);
+    if (!berHtml) { setTimeout(function(){ naechster(i + 1); }, 10); return; }
+    htmlZuBild(berHtml).then(function(s) {
+      if (!pdf) pdf = new PDF({ orientation: s.landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+      else pdf.addPage([s.pageW, s.pageH], s.landscape ? 'landscape' : 'portrait');
+      seiteEinfuegen(pdf, s);
+      setTimeout(function(){ naechster(i + 1); }, 30);
+    }).catch(function(e) {
+      fertig('Fehler bei Bericht ' + (i + 1) + ': ' + (e && e.message ? e.message : e));
+    });
+  }
+  naechster(0);
+}
 
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
