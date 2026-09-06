@@ -223,6 +223,7 @@ body {
 .kal-dot.kabelliste { background:#A78BFA; }
 .kal-dot.schalter { background:#F472B6; }
 .kal-dot.netzwerk { background:#FBBF24; }
+.kal-dot.fotodoku { background:#C084FC; }
 .kal-we { background:var(--surface-alt); }
 .kal-we .kal-nr { color:var(--text-muted); }
 .kal-zukunft { opacity:.45; }
@@ -266,6 +267,27 @@ body {
 .idee-antwort { margin-top:8px; padding:8px 10px; border-left:3px solid var(--accent);
   background:var(--surface-alt); border-radius:0 var(--radius-sm) var(--radius-sm) 0; font-size:13px; }
 .idee-aktionen { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+
+/* ── Eigener Rückfrage-Dialog ── */
+.frage-overlay { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6);
+  display:flex; align-items:center; justify-content:center; padding:24px; }
+.frage-box { background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:20px; max-width:420px; width:100%;
+  box-shadow:0 8px 32px rgba(0,0,0,.5); }
+.frage-text { font-size:15px; line-height:1.5; color:var(--text); white-space:pre-wrap; }
+.frage-knoepfe { display:flex; gap:10px; margin-top:18px; }
+.frage-knoepfe .btn { flex:1; }
+
+/* ── Fotodokumentation ── */
+.fd-item { padding:12px 20px; border-bottom:1px solid var(--border); }
+.fd-kopf { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.fd-nr { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); }
+.fd-nav { display:flex; gap:4px; }
+.fd-bild { display:block; width:100%; max-height:220px; object-fit:cover;
+  border-radius:var(--radius-sm); background:var(--surface-alt); cursor:pointer; }
+.fd-text { width:100%; margin-top:8px; min-height:60px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--text); font-family:var(--font); font-size:13px; }
 
 /* ── CSV-Kasten in den Stammdaten ── */
 .csv-box { margin:0 20px 16px; padding:12px 14px; border:1px solid var(--border);
@@ -549,6 +571,7 @@ body {
 .history-dot.kabelliste { background: #A78BFA; }
 .history-dot.schalter { background: #F472B6; }
 .history-dot.netzwerk { background: #FBBF24; }
+.history-dot.fotodoku { background: #C084FC; }
 .history-info { flex: 1; min-width: 0; }
 .history-title { font-size: 15px; font-weight: 500; }
 .history-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
@@ -565,6 +588,7 @@ body {
 .history-type.kabelliste { background: #2D1F5E; color: #A78BFA; }
 .history-type.schalter { background: #4A1942; color: #F472B6; }
 .history-type.netzwerk { background: #3D2E05; color: #FBBF24; }
+.history-type.fotodoku { background: #2E1F45; color: #C084FC; }
 .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .history-btn {
   width: 32px; height: 32px;
@@ -970,6 +994,7 @@ body {
   <button class="module-btn" onclick="switchModule('kabelliste',this)">Kabelliste</button>
   <button class="module-btn" onclick="switchModule('schalter',this)">Schalter</button>
   <button class="module-btn" onclick="switchModule('netzwerk',this)">Netzwerk</button>
+  <button class="module-btn" onclick="switchModule('fotodoku',this)">Fotodoku</button>
   <button class="module-btn" onclick="switchModule('ideen',this)">Ideen</button>
   <button class="module-btn" id="nav-history" onclick="switchModule('history',this)">Berichte</button>
   <button class="module-btn chef-only" id="nav-stammdaten" onclick="switchModule('stammdaten',this)" style="display:none">Stammdaten</button>
@@ -1638,6 +1663,49 @@ body {
 </div>
 
 <!-- ═══════════════════════════════════════
+     MODULE: FOTODOKUMENTATION
+     ═══════════════════════════════════════ -->
+<div class="module-panel" id="mod-fotodoku">
+
+  <div class="section">
+    <div class="section-label">Projektdaten</div>
+    <div class="field">
+      <label for="fd-bv">Bauvorhaben</label>
+      <select id="fd-bv" onchange="handleBaustelleChange(this)"><option value="">Baustelle w&auml;hlen&hellip;</option></select>
+    </div>
+    <div class="row">
+      <div class="field"><label for="fd-projekt">Projekt-Nr.</label><input type="text" id="fd-projekt" placeholder="EL 00-000"></div>
+      <div class="field"><label for="fd-datum">Datum</label><input type="date" id="fd-datum"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="fd-monteur">Aufgenommen von</label><select id="fd-monteur"><option value="">&mdash; Ausw&auml;hlen &mdash;</option></select></div>
+      <div class="field"><label for="fd-abschnitt">Abschnitt</label><input type="text" id="fd-abschnitt" placeholder="z.B. Rohbau EG"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Aufnahmen</div>
+    <div id="fdListe"></div>
+    <div style="padding:12px 20px 0;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-sm" onclick="fdFotoWaehlen()">+ Foto aufnehmen</button>
+      <button class="btn-sm" onclick="fdMehrereWaehlen()">Aus Galerie w&auml;hlen</button>
+    </div>
+    <div id="fdHinweis" style="padding:10px 20px 0;font-size:12px;color:var(--text-muted)"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Bemerkungen</div>
+    <div class="field"><textarea id="fd-bemerkungen" placeholder="Allgemeine Anmerkungen zur Dokumentation..."></textarea></div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" id="fd-submit" onclick="createFotodoku()">Dokumentation einreichen</button>
+    <button class="btn btn-secondary" onclick="fdNurExport()">Nur als PDF, ohne Speichern</button>
+    <button class="btn btn-danger-outline" onclick="resetFotodoku()">Formular zur&uuml;cksetzen</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      MODULE: VERBESSERUNGSVORSCHLÄGE
      ═══════════════════════════════════════ -->
 <div class="module-panel" id="mod-ideen">
@@ -1697,6 +1765,7 @@ body {
     <button class="filter-tab" onclick="filterHistory('kabelliste',this)">Kabelliste</button>
     <button class="filter-tab" onclick="filterHistory('schalter',this)">Schalter</button>
     <button class="filter-tab" onclick="filterHistory('netzwerk',this)">Netzwerk</button>
+    <button class="filter-tab" onclick="filterHistory('fotodoku',this)">Fotodoku</button>
   </div>
   <div id="historyList"></div>
 </div>
@@ -1705,6 +1774,8 @@ body {
 <input type="file" id="camInput" accept="image/*" capture="environment" hidden>
 <input type="file" id="ideeInput" accept="image/*" hidden>
 <input type="file" id="csv-datei" accept=".csv,text/csv" hidden>
+<input type="file" id="fdCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="fdGalerie" accept="image/*" multiple hidden>
 
 <!-- ═══════════════════════════════════════
      MODULE: STAMMDATEN (Chef only)
@@ -1858,6 +1929,7 @@ body {
         <option value="kabelliste">Kabelliste</option>
         <option value="schalter">Schalter</option>
         <option value="netzwerk">Prüfprotokoll Netzwerk/SAT</option>
+        <option value="fotodoku">Fotodokumentation</option>
       </select>
     </div>
     <div class="field">
@@ -1885,6 +1957,7 @@ body {
         <option value="kabelliste">Kabelliste</option>
         <option value="schalter">Schalter</option>
         <option value="netzwerk">Prüfprotokoll Netzwerk/SAT</option>
+        <option value="fotodoku">Fotodokumentation</option>
       </select>
       <select id="dash-filter-site" onchange="dashLoadReports()">
         <option value="">Alle Baustellen</option>
@@ -1912,7 +1985,7 @@ body {
 /* ═══════════════════════════════════════
    FIREBASE – Initialization & Auth
    ═══════════════════════════════════════ */
-var APP_VERSION = 'v1.33.1';
+var APP_VERSION = 'v1.34.3';
 
 var db = null;
 var storage = null;
@@ -2184,6 +2257,7 @@ function doAdminLogin() {
 }
 
 function afterLogin() {
+  anmeldeLauf++;   // eine laufende Abmelde-Notbremse gilt damit nicht mehr
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-login').style.display = 'none';
   document.getElementById('app-main').style.display = '';
@@ -2215,9 +2289,68 @@ function afterLogin() {
   loadMasterData();
 }
 
+
+/* ═══════════════════════════════════════
+   RÜCKFRAGEN
+   Browser duerfen Dialoge abschalten: Chrome bietet nach mehreren
+   Rueckfragen "Diese Seite darf keine weiteren Dialoge erstellen" an. Ist
+   das gesetzt, liefert confirm() sofort "Nein" -- ohne etwas anzuzeigen.
+   Dann geht Abmelden, Zuruecksetzen und Loeschen wortlos ins Leere.
+   Deshalb: erkennen und auf einen eigenen Dialog ausweichen.
+   Eine Antwort in unter 30 ms kann kein Mensch gegeben haben.
+   ═══════════════════════════════════════ */
+var dialogeGehen = true;
+var frageBestaetigt = null;
+// Zaehlt Abmelde- und Anmeldevorgaenge, damit die Notbremse unten nicht
+// zuschlaegt, wenn sich in der Zwischenzeit schon wieder jemand angemeldet hat
+var anmeldeLauf = 0;
+
+function appFrage(text, nochmal) {
+  // Zweiter Durchlauf, nachdem im eigenen Dialog bestaetigt wurde
+  if (frageBestaetigt === text) return true;
+
+  if (dialogeGehen) {
+    var t0 = Date.now();
+    var antwort = false;
+    try { antwort = window.confirm(text); } catch(e) { dialogeGehen = false; }
+    if (antwort) return true;
+    if (Date.now() - t0 > 30) return false;   // der Nutzer hat wirklich abgelehnt
+    dialogeGehen = false;                      // der Browser hat den Dialog verschluckt
+  }
+
+  frageDialog(text, function() {
+    frageBestaetigt = text;
+    try { if (typeof nochmal === 'function') nochmal(); }
+    finally { frageBestaetigt = null; }
+  });
+  return false;
+}
+
+function frageDialog(text, beiJa) {
+  var alt = document.getElementById('frageOverlay');
+  if (alt) alt.parentNode.removeChild(alt);
+
+  var ov = document.createElement('div');
+  ov.className = 'frage-overlay';
+  ov.id = 'frageOverlay';
+  ov.innerHTML = '<div class="frage-box">'
+    + '<div class="frage-text">' + escHtml(text).replace(/\n/g, '<br>') + '</div>'
+    + '<div class="frage-knoepfe">'
+    +   '<button class="btn btn-secondary" id="frageNein">Abbrechen</button>'
+    +   '<button class="btn btn-primary" id="frageJa">Ja</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+
+  function zu() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+  document.getElementById('frageNein').onclick = zu;
+  document.getElementById('frageJa').onclick = function() { zu(); beiJa(); };
+  ov.onclick = function(e) { if (e.target === ov) zu(); };
+  setTimeout(function(){ try { document.getElementById('frageJa').focus(); } catch(e) {} }, 30);
+}
+
 function doLogout() {
   try {
-    if (!confirm('Abmelden?')) return;
+    if (!appFrage('Abmelden?', doLogout)) return;
     currentUser = null;
     isChef = false;
     berichteCacheLeeren();
@@ -2231,22 +2364,35 @@ function doLogout() {
     var fehlerFeld = document.getElementById('login-error');
     if (fehlerFeld) fehlerFeld.textContent = '';
 
-    // Der Anmeldebildschirm liest die Mitarbeiterliste. Firestore laesst das
-    // nur mit gueltiger Anmeldung zu -- beim Chef wird die E-Mail-Sitzung
-    // gerade gegen eine anonyme getauscht. Deshalb erst den Tausch abwarten.
+    // Sofort umschalten. Frueher hing das am Wechsel der Anmeldung -- wenn
+    // die Zusage nie kam, blieb der Nutzer angemeldet sitzen.
+    showLoginScreen();
+
+    // Die Mitarbeiterliste braucht eine gueltige Anmeldung. Beim Chef wird
+    // die E-Mail-Sitzung gegen eine anonyme getauscht; sobald das durch ist,
+    // wird die Liste nachgeladen.
     if (fbAuth) {
       fbAuth.signInAnonymously()
-        .then(function(){ showLoginScreen(); })
-        .catch(function(err) {
-          console.warn('Anon-Anmeldung:', err);
-          showLoginScreen();
-        });
-    } else {
-      showLoginScreen();
+        .then(function(){ loadLoginUsers(); })
+        .catch(function(err){ console.warn('Anon-Anmeldung:', err); });
     }
+
+    // Notbremse: Falls die Anzeige aus irgendeinem Grund haengt, die Seite
+    // neu laden -- die App startet immer am Anmeldebildschirm.
+    var meinLauf = ++anmeldeLauf;
+    setTimeout(function() {
+      if (meinLauf !== anmeldeLauf) return;   // inzwischen ist jemand angemeldet
+      var app = document.getElementById('app-main');
+      if (app && app.style.display !== 'none') {
+        console.warn('Abmelden haengt - lade neu');
+        location.replace(location.origin + location.pathname);
+      }
+    }, 2500);
   } catch (e) {
     console.error('Abmelden:', e);
     toast('Abmelden fehlgeschlagen: ' + (e && e.message ? e.message : e));
+    // Auch bei einer Ausnahme kommt der Nutzer raus
+    setTimeout(function(){ location.replace(location.origin + location.pathname); }, 800);
   }
 }
 
@@ -2366,7 +2512,7 @@ function loadMasterData() {
 }
 
 function populatePersonalDropdowns() {
-  var selIds = ['tr-fahrer','aa-monteur','rm-monteur','fm-monteur','kl-monteur','sc-monteur','pn-monteur'];
+  var selIds = ['tr-fahrer','aa-monteur','rm-monteur','fm-monteur','kl-monteur','sc-monteur','pn-monteur','fd-monteur'];
   selIds.forEach(function(sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
@@ -2383,7 +2529,7 @@ function populatePersonalDropdowns() {
 }
 
 function populateBaustellenDropdowns() {
-  var selectIds = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site','ak-bv'];
+  var selectIds = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','fd-bv','dash-filter-site','ak-bv'];
   selectIds.forEach(function(sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
@@ -2407,7 +2553,7 @@ function populateBaustellenDropdowns() {
    zuletzt verwendete zuerst, und das Anlegen erst, wenn die Suche nichts
    findet, samt Warnung vor aehnlichen Namen.
    ═══════════════════════════════════════ */
-var BV_FELDER = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','dash-filter-site','ak-bv'];
+var BV_FELDER = ['f-site','tr-baustelle','aa-bv','rm-bv','fm-bv','kl-bv','sc-bv','pn-bv','fd-bv','dash-filter-site','ak-bv'];
 var BV_ZULETZT_KEY = 'elmbau_bv_zuletzt';
 var BV_ZULETZT_MAX = 5;
 var bvOverlayEl = null;
@@ -2625,7 +2771,7 @@ function bvNeuAnlegen(sid, name) {
   } else {
     frage = 'Neue Baustelle „' + name + '" anlegen?';
   }
-  if (!confirm(frage)) return;
+  if (!appFrage(frage, function(){ bvNeuAnlegen(sid, name); })) return;
 
   if (!db) { toast('Keine Datenbankverbindung'); return; }
   db.collection('baustellen').add({ name: name, kostenstelle: '', projektNr: '', adresse: '', aktiv: true })
@@ -2658,6 +2804,9 @@ function autofillFromBaustelle(sel) {
     // Tagesrapport: fill Kostenstelle + Projekt-Nr.
     document.getElementById('tr-kostenstelle').value = found ? (found.kostenstelle || '') : '';
     document.getElementById('tr-projekt').value = found ? (found.projektNr || '') : '';
+  } else if (selId === 'fd-bv') {
+    var fdp = document.getElementById('fd-projekt');
+    if (fdp) fdp.value = found ? (found.projektNr || '') : '';
   } else if (selId === 'pn-bv') {
     var pnp = document.getElementById('pn-projekt');
     if (pnp) pnp.value = found ? (found.projektNr || '') : '';
@@ -2707,7 +2856,7 @@ function klHatEingaben() {
 function uebernehmeKabelVorgabe(bv) {
   var vorgabe = bv && bv.vorgabeKabel;
   if (!vorgabe) return;
-  if (klHatEingaben() && !confirm('Für diese Baustelle ist eine Kabelliste vorgegeben. Vorhandene Eintragungen ersetzen?')) return;
+  if (klHatEingaben() && !appFrage('Für diese Baustelle ist eine Kabelliste vorgegeben. Vorhandene Eintragungen ersetzen?', function(){ uebernehmeKabelVorgabe(bv); })) return;
   klRows = [];
   for (var i = 0; i < 30; i++) {
     var q = vorgabe[i] || {};
@@ -2726,7 +2875,7 @@ function scHatEingaben() {
 function uebernehmeSchalterVorgabe(bv) {
   var v = bv && bv.vorgabeSchalter;
   if (!v) return;
-  if (scHatEingaben() && !confirm('Für diese Baustelle ist eine Schalterliste vorgegeben. Vorhandene Stückzahlen ersetzen?')) return;
+  if (scHatEingaben() && !appFrage('Für diese Baustelle ist eine Schalterliste vorgegeben. Vorhandene Stückzahlen ersetzen?', function(){ uebernehmeSchalterVorgabe(bv); })) return;
   initScItems(v.zusatz);
   var mengen = v.mengen || {};
   scItems.forEach(function(it) {
@@ -2840,7 +2989,7 @@ function sdEditMitarbeiter(id) {
 
 function sdToggleMitarbeiter(id, activate) {
   var msg = activate ? 'Mitarbeiter wieder aktivieren?' : 'Mitarbeiter deaktivieren?';
-  if (!confirm(msg)) return;
+  if (!appFrage(msg, function(){ sdToggleMitarbeiter(id, activate); })) return;
   db.collection('mitarbeiter').doc(id).update({ aktiv: activate }).then(function() {
     toast(activate ? 'Aktiviert' : 'Deaktiviert');
     sdLoadMitarbeiter();
@@ -2937,7 +3086,7 @@ function sdEditFahrzeug(id) {
 }
 
 function sdDeleteFahrzeug(id) {
-  if (!confirm('Fahrzeug wirklich löschen?')) return;
+  if (!appFrage('Fahrzeug wirklich löschen?', function(){ sdDeleteFahrzeug(id); })) return;
   db.collection('fahrzeuge').doc(id).delete().then(function() {
     toast('Fahrzeug gelöscht');
     sdLoadFahrzeuge();
@@ -3216,7 +3365,7 @@ function sdVorgabeSchalter(bvId) {
 }
 
 function sdVorgabeLoeschen(bvId, feld, btn) {
-  if (!confirm('Vorgabe für diese Baustelle wirklich entfernen?')) return;
+  if (!appFrage('Vorgabe für diese Baustelle wirklich entfernen?', function(){ sdVorgabeLoeschen(bvId, feld, btn); })) return;
   var aend = {};
   aend[feld] = firebase.firestore.FieldValue.delete();
   db.collection('baustellen').doc(bvId).update(aend).then(function() {
@@ -3228,7 +3377,7 @@ function sdVorgabeLoeschen(bvId, feld, btn) {
 }
 
 function sdToggleBaustelle(id, activate) {
-  if (!confirm(activate ? 'Baustelle aktivieren?' : 'Baustelle deaktivieren?')) return;
+  if (!appFrage(activate ? 'Baustelle aktivieren?' : 'Baustelle deaktivieren?', function(){ sdToggleBaustelle(id, activate); })) return;
   db.collection('baustellen').doc(id).update({ aktiv: activate }).then(function() {
     toast(activate ? 'Aktiviert' : 'Deaktiviert');
     sdLoadBaustellen();
@@ -3294,7 +3443,7 @@ function sdEditKostenstelle(id) {
 }
 
 function sdDeleteKostenstelle(id) {
-  if (!confirm('Kostenstelle löschen?')) return;
+  if (!appFrage('Kostenstelle löschen?', function(){ sdDeleteKostenstelle(id); })) return;
   db.collection('kostenstellen').doc(id).delete().then(function() {
     toast('Gelöscht');
     sdLoadKostenstellen();
@@ -3334,7 +3483,7 @@ function sdChangeAdminPw() {
 }
 
 function sdResetConfig() {
-  if (!confirm('Firebase-Config wirklich zurücksetzen? Die App muss neu eingerichtet werden.')) return;
+  if (!appFrage('Firebase-Config wirklich zurücksetzen? Die App muss neu eingerichtet werden.', sdResetConfig)) return;
   localStorage.removeItem('eb_firebase_config');
   location.reload();
 }
@@ -3409,8 +3558,8 @@ function dashLoadReports() {
       return;
     }
 
-    var typeLabels = { kontrolle:'Kontrolle', rapport:'Tagesrapport', auftrag:'Arbeitsauftrag', rohmontage:'Rohmontage', fertigmontage:'Fertigmontage', kabelliste:'Kabelliste', schalter:'Schalter', netzwerk:'Prüfprot. Netzwerk/SAT' };
-    var typeColors = { kontrolle:'#009959', rapport:'#60A5FA', auftrag:'#38BDF8', rohmontage:'#F59E0B', fertigmontage:'#EC4899', kabelliste:'#A78BFA', schalter:'#F472B6', netzwerk:'#FBBF24' };
+    var typeLabels = { kontrolle:'Kontrolle', rapport:'Tagesrapport', auftrag:'Arbeitsauftrag', rohmontage:'Rohmontage', fertigmontage:'Fertigmontage', kabelliste:'Kabelliste', schalter:'Schalter', netzwerk:'Prüfprot. Netzwerk/SAT', fotodoku:'Fotodoku' };
+    var typeColors = { kontrolle:'#009959', rapport:'#60A5FA', auftrag:'#38BDF8', rohmontage:'#F59E0B', fertigmontage:'#EC4899', kabelliste:'#A78BFA', schalter:'#F472B6', netzwerk:'#FBBF24', fotodoku:'#C084FC' };
 
     listEl.innerHTML = reports.map(function(r) {
       var typeLabel = typeLabels[r.type] || r.type;
@@ -3586,7 +3735,7 @@ function dxExport() {
       dxStatus('Keine Berichte im gewählten Zeitraum gefunden');
       return;
     }
-    if (liste.length > 40 && !confirm(liste.length + ' Berichte werden zusammengefasst. Das kann einige Minuten dauern. Fortfahren?')) {
+    if (liste.length > 40 && !appFrage(liste.length + ' Berichte werden zusammengefasst. Das kann einige Minuten dauern. Fortfahren?', dxExport)) {
       dxFertig(btn);
       dxStatus('');
       return;
@@ -3663,6 +3812,7 @@ function berichtHtml(d) {
     if (d.type === 'kontrolle') return buildReportHtml(daten);
     if (d.type === 'auftrag') return buildAuftragHtml(daten);
     if (d.type === 'netzwerk') return buildNetzwerkHtml(daten);
+    if (d.type === 'fotodoku') return buildFotodokuHtml(daten);
     if (d.type === 'rohmontage') return buildRohmontageHtml(daten);
     if (d.type === 'fertigmontage') return buildFertigmontageHtml(daten);
     if (d.type === 'kabelliste') return buildKabellisteHtml(daten);
@@ -4177,6 +4327,7 @@ function switchModule(name, btn) {
   else if (name === 'kabelliste') sub.textContent = 'Kabelliste LWWP';
   else if (name === 'schalter') sub.textContent = 'Schalteraufmaß';
   else if (name === 'netzwerk') sub.textContent = 'Prüfprotokoll Netzwerk/SAT';
+  else if (name === 'fotodoku') sub.textContent = 'Fotodokumentation';
   else if (name === 'ideen') { sub.textContent = 'Verbesserungsvorschläge'; ideeLaden(); }
   else if (name === 'history') { sub.textContent = 'Berichte'; historyLimit = 20; kalMount('kalBerichte'); renderHistory(); }
   else if (name === 'stammdaten') { sub.textContent = 'Stammdaten verwalten'; sdSwitchTab('mitarbeiter', document.querySelector('.sd-tab')); }
@@ -6028,7 +6179,8 @@ var HISTORY_TYPE_LABELS = {
   fertigmontage: 'Fertigmontage',
   kabelliste: 'Kabelliste',
   schalter: 'Schalter',
-  netzwerk: 'Prüfprotokoll Netzwerk/SAT'
+  netzwerk: 'Prüfprotokoll Netzwerk/SAT',
+  fotodoku: 'Fotodokumentation'
 };
 
 function renderHistory() {
@@ -6146,6 +6298,8 @@ function renderLocalHistory(el) {
       meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.inspector || '—') + ' &middot; ' + (h.mangelCount || 0) + ' Mängel';
     } else if (hType === 'rapport') {
       meta = fmtDate(h.date) + ' &middot; ' + (h.workerCount || 0) + ' MA &middot; ' + (h.sumStd || 0) + ' Std.';
+    } else if (hType === 'fotodoku') {
+      meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.bildCount || 0) + ' Aufnahmen';
     } else if (hType === 'netzwerk') {
       meta = fmtDate(h.date) + ' &middot; ' + escHtml(h.monteur || '—') + ' &middot; ' + (h.geprueft || 0) + '/' + (h.dosen || 0) + ' Dosen geprüft';
     } else if (hType === 'auftrag') {
@@ -6183,7 +6337,8 @@ var HISTORY_FILE_PREFIXES = {
   fertigmontage: 'Fertigmontage_',
   kabelliste: 'Kabelliste_',
   schalter: 'Schalter_',
-  netzwerk: 'Pruefprotokoll_Netzwerk_'
+  netzwerk: 'Pruefprotokoll_Netzwerk_',
+  fotodoku: 'Fotodokumentation_'
 };
 
 function viewHistoryItem(id) {
@@ -6367,7 +6522,7 @@ function editFirestoreReport(docId) {
 
 function deleteFirestoreReport(docId) {
   if (!db) return;
-  if (!confirm('Bericht wirklich endgueltig loeschen?')) return;
+  if (!appFrage('Bericht wirklich endgültig löschen?', function(){ deleteFirestoreReport(docId); })) return;
   db.collection('berichte').doc(docId).delete().then(function() {
     toast('Bericht geloescht');
     berichteCacheLeeren();
@@ -6381,7 +6536,7 @@ function deleteFirestoreReport(docId) {
    RESET FORMS
    ═══════════════════════════════════════ */
 function resetForm() {
-  if (!confirm('Formular wirklich zurücksetzen?')) return;
+  if (!appFrage('Formular wirklich zurücksetzen?', resetForm)) return;
   document.getElementById('f-site').value = '';
   document.getElementById('f-date').valueAsDate = new Date();
   maengel = [];
@@ -6395,7 +6550,7 @@ function resetForm() {
 }
 
 function resetRapport() {
-  if (!confirm('Tagesrapport zurücksetzen?')) return;
+  if (!appFrage('Tagesrapport zurücksetzen?', resetRapport)) return;
   resetRapportFelder();
   loescheEntwurf();
   toast('Tagesrapport zurückgesetzt');
@@ -6437,7 +6592,7 @@ function resetRapportFelder() {
 }
 
 function resetRohmontage() {
-  if (!confirm('Rohmontage-Checkliste zurücksetzen?')) return;
+  if (!appFrage('Rohmontage-Checkliste zurücksetzen?', resetRohmontage)) return;
   document.getElementById('rm-bv').value = '';
   document.getElementById('rm-projekt').value = '';
   document.getElementById('rm-monteur').value = '';
@@ -6453,7 +6608,7 @@ function resetRohmontage() {
 }
 
 function resetFertigmontage() {
-  if (!confirm('Fertigmontage-Checkliste zurücksetzen?')) return;
+  if (!appFrage('Fertigmontage-Checkliste zurücksetzen?', resetFertigmontage)) return;
   document.getElementById('fm-bv').value = '';
   document.getElementById('fm-projekt').value = '';
   document.getElementById('fm-monteur').value = '';
@@ -6473,7 +6628,7 @@ function resetFertigmontage() {
 }
 
 function resetKabelliste() {
-  if (!confirm('Kabelliste zurücksetzen?')) return;
+  if (!appFrage('Kabelliste zurücksetzen?', resetKabelliste)) return;
   document.getElementById('kl-bv').value = '';
   document.getElementById('kl-elnr').value = '';
   document.getElementById('kl-monteur').value = '';
@@ -6489,7 +6644,7 @@ function resetKabelliste() {
 }
 
 function resetSchalter() {
-  if (!confirm('Schalteraufmaß zurücksetzen?')) return;
+  if (!appFrage('Schalteraufmaß zurücksetzen?', resetSchalter)) return;
   document.getElementById('sc-bv').value = '';
   document.getElementById('sc-elnr').value = '';
   document.getElementById('sc-monteur').value = '';
@@ -6903,7 +7058,7 @@ function createAuftrag() {
 }
 
 function resetAuftrag() {
-  if (!confirm('Arbeitsauftrag zurücksetzen?')) return;
+  if (!appFrage('Arbeitsauftrag zurücksetzen?', resetAuftrag)) return;
   aaArt = [];
   aaRueck = { durchgefuehrt: false, offen: false };
   aaAbnahme = { a1: false, a2: false };
@@ -7247,7 +7402,7 @@ function createNetzwerk() {
 }
 
 function resetNetzwerk() {
-  if (!confirm('Prüfprotokoll zurücksetzen?')) return;
+  if (!appFrage('Prüfprotokoll zurücksetzen?', resetNetzwerk)) return;
   ['pn-bv','pn-projekt','pn-monteur','pn-bemerkungen'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
@@ -7561,7 +7716,7 @@ function kalTagInfo(iso) {
    einmal geprueft, falls jemand von Hand tippt oder die Handyuhr verstellt.
    ═══════════════════════════════════════ */
 var DATUM_FELDER = ['f-date','tr-date','aa-datum','rm-datum','fm-datum',
-                    'kl-datum','sc-datum','pn-datum'];
+                    'kl-datum','sc-datum','pn-datum','fd-datum'];
 
 // Liefert true und meckert, wenn das Datum in der Zukunft liegt
 function datumSperrt(iso, feldId) {
@@ -7993,7 +8148,7 @@ function ideeAntwort(id) {
 
 function ideeLoeschen(id) {
   if (!isChef || !db) return;
-  if (!confirm('Diesen Hinweis löschen?')) return;
+  if (!appFrage('Diesen Hinweis löschen?', function(){ ideeLoeschen(id); })) return;
   db.collection('vorschlaege').doc(id).delete().then(function() {
     ideeDaten = ideeDaten.filter(function(x){ return x._id !== id; });
     ideeListeZeichnen();
@@ -8311,7 +8466,7 @@ function akteExport() {
   }).filter(function(d){ return d.html || d.daten; });
 
   if (!liste.length) { toast('Keine ausdruckbaren Berichte'); return; }
-  if (liste.length > 40 && !confirm(liste.length + ' Berichte werden zusammengefasst. Das kann einige Minuten dauern. Fortfahren?')) return;
+  if (liste.length > 40 && !appFrage(liste.length + ' Berichte werden zusammengefasst. Das kann einige Minuten dauern. Fortfahren?', akteExport)) return;
 
   var btn = document.getElementById('ak-btn');
   var status = document.getElementById('ak-status');
@@ -8403,8 +8558,9 @@ function vonGesternUebernehmen() {
     var e = letzter.daten;
 
     if (vgSchonGefuellt() &&
-        !confirm('Angaben aus dem Rapport vom ' + fmtDate(letzter.datum) + ' übernehmen?\n'
-                 + 'Baustelle, Arbeitszeit, Pausen, Fahrzeug und Tätigkeit werden überschrieben.')) {
+        !appFrage('Angaben aus dem Rapport vom ' + fmtDate(letzter.datum) + ' übernehmen?\n'
+                 + 'Baustelle, Arbeitszeit, Pausen, Fahrzeug und Tätigkeit werden überschrieben.',
+                 vonGesternUebernehmen)) {
       fertig();
       return;
     }
@@ -8635,7 +8791,7 @@ function csvImportLesen(art, text) {
     + neu.length + ' werden neu angelegt\n'
     + (fehlerhaft ? fehlerhaft + ' Zeilen ohne ' + def.pflicht + ' werden übersprungen\n' : '')
     + '\nEs wird nichts gelöscht. Fortfahren?';
-  if (!confirm(meldung)) { csvStatus(art, 'Abgebrochen'); return; }
+  if (!appFrage(meldung, function(){ csvSchreiben(art, aendern, neu); })) { csvStatus(art, ''); return; }
 
   csvSchreiben(art, aendern, neu);
 }
@@ -8695,6 +8851,285 @@ document.getElementById('csv-datei').addEventListener('change', function() {
   };
   leser.readAsText(datei, 'utf-8');
 });
+
+
+/* ═══════════════════════════════════════
+   FOTODOKUMENTATION
+   Bilder sind das Schwergewicht: Firestore nimmt hoechstens 1 MiB je
+   Dokument. Deshalb zwei Wege -- einreichen (wird gespeichert, begrenzt)
+   oder nur als PDF ausgeben, ohne die Datenbank zu belasten. Der zweite
+   Weg kennt keine Grenze und ist fuer die grossen Begehungen gedacht.
+   ═══════════════════════════════════════ */
+var FD_MAX_KANTE = 1400;        // fuer den Ausdruck etwas schaerfer als Maengelfotos
+var FD_QUALITAET = 0.62;
+var FD_SPEICHER_GRENZE = 850 * 1024;
+
+var fdEintraege = [];
+var fdSeq = 0;
+var fdSpeichertGerade = false;
+
+function fdNeu(bild) {
+  fdSeq++;
+  return { id: fdSeq, bild: bild, bereich: '', text: '' };
+}
+
+function fdBytes() {
+  var s = 0;
+  fdEintraege.forEach(function(e){ if (e.bild) s += e.bild.length; });
+  return s;
+}
+
+function fdFotoWaehlen() {
+  var inp = document.getElementById('fdCam');
+  inp.value = '';
+  inp.click();
+}
+function fdMehrereWaehlen() {
+  var inp = document.getElementById('fdGalerie');
+  inp.value = '';
+  inp.click();
+}
+
+function fdBilderAufnehmen(dateien) {
+  var liste = [];
+  for (var i = 0; i < dateien.length; i++) liste.push(dateien[i]);
+  if (!liste.length) return;
+
+  var offen = liste.length;
+  liste.forEach(function(datei) {
+    compressImg(datei, FD_MAX_KANTE, FD_QUALITAET, function(dataUrl) {
+      fdEintraege.push(fdNeu(dataUrl));
+      offen--;
+      if (offen <= 0) { renderFd(); }
+    });
+  });
+}
+
+function renderFd() {
+  var el = document.getElementById('fdListe');
+  if (!el) return;
+  if (!fdEintraege.length) {
+    el.innerHTML = '<div class="kal-info" style="padding:10px 20px">Noch keine Aufnahmen. Mit „+ Foto aufnehmen" beginnen.</div>';
+    fdHinweisAktualisieren();
+    return;
+  }
+  el.innerHTML = fdEintraege.map(function(e, i) {
+    return '<div class="fd-item">'
+      + '<div class="fd-kopf">'
+      +   '<span class="fd-nr">Bild ' + (i + 1) + '</span>'
+      +   '<div class="fd-nav">'
+      +     (i > 0 ? '<button class="cl-btn" style="width:32px" onclick="fdVerschieben(' + e.id + ',-1)" title="Nach oben">&#8593;</button>' : '')
+      +     (i < fdEintraege.length - 1 ? '<button class="cl-btn" style="width:32px" onclick="fdVerschieben(' + e.id + ',1)" title="Nach unten">&#8595;</button>' : '')
+      +     '<button class="cl-btn" style="width:32px;color:var(--danger)" onclick="fdEntfernen(' + e.id + ')" title="Entfernen">&times;</button>'
+      +   '</div>'
+      + '</div>'
+      + '<img class="fd-bild" src="' + e.bild + '" onclick="openLB(this.src)" alt="Aufnahme ' + (i + 1) + '">'
+      + '<input class="cl-bem" style="width:100%;margin-top:8px" placeholder="Bereich / Raum" value="' + escHtml(e.bereich) + '" oninput="fdSetz(' + e.id + ',\'bereich\',this.value)">'
+      + '<textarea class="fd-text" placeholder="Was ist zu sehen?" oninput="fdSetz(' + e.id + ',\'text\',this.value)">' + escHtml(e.text) + '</textarea>'
+      + '</div>';
+  }).join('');
+  fdHinweisAktualisieren();
+}
+
+function fdHinweisAktualisieren() {
+  var el = document.getElementById('fdHinweis');
+  if (!el) return;
+  var n = fdEintraege.length;
+  if (!n) { el.textContent = ''; return; }
+  var kb = Math.round(fdBytes() / 1024);
+  var text = n + (n === 1 ? ' Aufnahme' : ' Aufnahmen') + ' · ' + kb + ' KB';
+  if (fdBytes() > FD_SPEICHER_GRENZE) {
+    text += ' — zu viel zum Einreichen, bitte „Nur als PDF" nutzen';
+    el.style.color = 'var(--danger)';
+  } else {
+    el.style.color = 'var(--text-muted)';
+  }
+  el.textContent = text;
+}
+
+function fdFinde(id) {
+  for (var i = 0; i < fdEintraege.length; i++) if (fdEintraege[i].id === id) return fdEintraege[i];
+  return null;
+}
+function fdSetz(id, feld, wert) { var e = fdFinde(id); if (e) e[feld] = wert; }
+function fdEntfernen(id) {
+  fdEintraege = fdEintraege.filter(function(e){ return e.id !== id; });
+  renderFd();
+}
+function fdVerschieben(id, richtung) {
+  var i = -1;
+  for (var k = 0; k < fdEintraege.length; k++) if (fdEintraege[k].id === id) i = k;
+  var j = i + richtung;
+  if (i < 0 || j < 0 || j >= fdEintraege.length) return;
+  var t = fdEintraege[i]; fdEintraege[i] = fdEintraege[j]; fdEintraege[j] = t;
+  renderFd();
+}
+
+/* ═══════════════════════════════════════
+   REPORT GENERATION – Fotodokumentation
+   ═══════════════════════════════════════ */
+function getFotodokuData() {
+  return {
+    bv: document.getElementById('fd-bv').value.trim(),
+    projekt: document.getElementById('fd-projekt').value.trim(),
+    datum: document.getElementById('fd-datum').value,
+    monteur: document.getElementById('fd-monteur').value,
+    abschnitt: document.getElementById('fd-abschnitt').value.trim(),
+    bemerkungen: document.getElementById('fd-bemerkungen').value.trim(),
+    bilder: fdEintraege.map(function(e) {
+      return { bild: e.bild, bereich: e.bereich, text: e.text };
+    })
+  };
+}
+
+function buildFotodokuHtml(data) {
+  var dateFmt = fmtDate(data.datum);
+  var bilder = data.bilder || [];
+
+  // Zwei Aufnahmen je Reihe, drei Reihen auf die Seite -- so bleibt das Bild
+  // gross genug, um etwas zu erkennen, und die Bildunterschrift lesbar.
+  var zellen = bilder.map(function(b, i) {
+    return '<td class="fd-z">'
+      + '<div class="fd-rahmen"><img src="' + b.bild + '"></div>'
+      + '<div class="fd-bu"><b>Bild ' + (i + 1) + '</b>'
+      +   (b.bereich ? ' &middot; ' + escHtml(b.bereich) : '')
+      +   (b.text ? '<div class="fd-bt">' + escHtml(b.text) + '</div>' : '')
+      + '</div></td>';
+  });
+  var reihen = '';
+  for (var i = 0; i < zellen.length; i += 2) {
+    reihen += '<tr>' + zellen[i] + (zellen[i + 1] || '<td class="fd-z"></td>') + '</tr>';
+  }
+  if (!zellen.length) reihen = '<tr><td class="fd-z" colspan="2" style="text-align:center;padding:20mm 0">Keine Aufnahmen</td></tr>';
+
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+    + '<title>Fotodokumentation – ' + escHtml(data.bv || dateFmt) + '</title>'
+    + '<style>' + checklisteStil()
+    +   'td, th { border:1px solid #999; }'
+    +   '.fd-lbl { background:#f2f2f2; font-weight:bold; }'
+    +   'table.fd-gitter { border-collapse:separate; border-spacing:0; }'
+    +   '.fd-z { width:50%; border:none; padding:0 4mm 6mm 0; vertical-align:top; }'
+    +   '.fd-rahmen { border:1px solid #999; background:#fff; height:52mm;'
+    +     'display:flex; align-items:center; justify-content:center; overflow:hidden; }'
+    +   '.fd-rahmen img { max-width:100%; max-height:52mm; display:block; }'
+    +   '.fd-bu { font-size:9.5px; padding:2px 0 0; line-height:1.35; }'
+    +   '.fd-bt { color:#333; }'
+    +   '.aa-box { border:1px solid #999; margin-top:4px; }'
+    +   '.aa-box .t { background:#f2f2f2; border-bottom:1px solid #999; padding:3px 6px; font-weight:bold; font-size:10px; }'
+    +   '.aa-box .b { padding:5px 7px; white-space:pre-wrap; line-height:1.35; }'
+    + '</style></head><body>'
+    + elmbauKopf('FOTODOKUMENTATION')
+    + '<table style="margin-bottom:6px">'
+    + '<colgroup><col style="width:17%"><col style="width:43%"><col style="width:14%"><col style="width:26%"></colgroup>'
+    + '<tr><td class="fd-lbl">Bauvorhaben</td><td><b>' + escHtml(data.bv || '') + '</b></td>'
+    +     '<td class="fd-lbl">Projekt-Nr.</td><td>' + escHtml(data.projekt || '') + '</td></tr>'
+    + '<tr><td class="fd-lbl">Abschnitt</td><td>' + escHtml(data.abschnitt || '') + '</td>'
+    +     '<td class="fd-lbl">Datum</td><td>' + escHtml(dateFmt) + '</td></tr>'
+    + '<tr><td class="fd-lbl">Aufgenommen von</td><td>' + escHtml(data.monteur || '') + '</td>'
+    +     '<td class="fd-lbl">Aufnahmen</td><td>' + bilder.length + '</td></tr>'
+    + '</table>'
+    + '<table class="fd-gitter"><colgroup><col style="width:50%"><col style="width:50%"></colgroup>'
+    + reihen
+    + '</table>'
+    + (data.bemerkungen
+        ? '<div class="aa-box"><div class="t">Bemerkungen</div><div class="b">' + escHtml(data.bemerkungen) + '</div></div>'
+        : '')
+    + '</body></html>';
+}
+
+function pruefeFotodoku(d) {
+  if (!d.bv) return { id: 'fd-bv-btn', text: 'Bitte Bauvorhaben wählen' };
+  if (!d.datum) return { id: 'fd-datum', text: 'Bitte Datum eingeben' };
+  if (!d.monteur) return { id: 'fd-monteur', text: 'Bitte angeben, wer aufgenommen hat' };
+  if (!d.bilder.length) return { id: 'fdListe', text: 'Bitte mindestens eine Aufnahme hinzufügen' };
+  return null;
+}
+
+// Nur ausgeben, nichts speichern -- fuer umfangreiche Begehungen
+function fdNurExport() {
+  var data = getFotodokuData();
+  var luecke = pruefeFotodoku(data);
+  if (luecke) { toast(luecke.text); return; }
+  showPreview(buildFotodokuHtml(data),
+    'Fotodokumentation_' + (data.bv || 'Baustelle').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_')
+    + '_' + (data.datum || 'undatiert') + '.pdf');
+}
+
+function createFotodoku() {
+  if (fdSpeichertGerade) return;
+  var data = getFotodokuData();
+
+  var luecke = pruefeFotodoku(data);
+  if (luecke) {
+    toast(luecke.text);
+    var ziel = document.getElementById(luecke.id);
+    if (ziel) {
+      ziel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var alt = ziel.style.boxShadow;
+      ziel.style.transition = 'box-shadow .2s';
+      ziel.style.boxShadow = '0 0 0 3px var(--danger)';
+      setTimeout(function(){ ziel.style.boxShadow = alt || ''; }, 1600);
+    }
+    return;
+  }
+  if (datumSperrt(data.datum, 'fd-datum')) return;
+
+  if (fdBytes() > FD_SPEICHER_GRENZE) {
+    toast('Zu viele Bilder zum Speichern (' + Math.round(fdBytes()/1024) + ' KB) – bitte „Nur als PDF" nutzen oder aufteilen');
+    return;
+  }
+
+  var label = data.bv || fmtDate(data.datum);
+  fdSpeichertGerade = true;
+  var btn = document.getElementById('fd-submit');
+  var btnText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Wird eingereicht…'; }
+
+  saveToHistory({ type: 'fotodoku', site: label, date: data.datum, monteur: data.monteur,
+                  bildCount: data.bilder.length, daten: data });
+
+  var meta = { baustelle: label, datum: data.datum, monteur: data.monteur,
+               abschnitt: data.abschnitt, bildCount: data.bilder.length };
+  mitZeitlimit(saveReportToFirestore('fotodoku', meta, data), 5000).then(function(ergebnis) {
+    fdSpeichertGerade = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = btnText; }
+    if (ergebnis === 'fehler') { toast('Konnte nicht eingereicht werden – bitte erneut versuchen'); return; }
+
+    document.getElementById('statusBadge').textContent = 'Erstellt';
+    document.getElementById('statusBadge').className = 'status-badge saved';
+    toast(ergebnis === 'gespeichert' ? 'Fotodokumentation eingereicht' : 'Eingereicht – wird bei Netz übertragen');
+
+    var ziel = isChef ? 'dashboard' : 'history';
+    var navBtn = document.getElementById(isChef ? 'nav-dashboard' : 'nav-history');
+    switchModule(ziel, navBtn);
+  });
+}
+
+function resetFotodoku() {
+  if (!appFrage('Fotodokumentation zurücksetzen?', resetFotodoku)) return;
+  ['fd-bv','fd-projekt','fd-monteur','fd-abschnitt','fd-bemerkungen'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('fd-datum').valueAsDate = new Date();
+  fdEintraege = []; fdSeq = 0;
+  renderFd();
+  document.getElementById('statusBadge').textContent = '';
+  document.getElementById('statusBadge').className = 'status-badge';
+  bvButtonsAktualisieren();
+  toast('Fotodokumentation zurückgesetzt');
+}
+
+document.getElementById('fdCam').addEventListener('change', function() {
+  fdBilderAufnehmen(this.files || []);
+  this.value = '';
+});
+document.getElementById('fdGalerie').addEventListener('change', function() {
+  fdBilderAufnehmen(this.files || []);
+  this.value = '';
+});
+renderFd();
+document.getElementById('fd-datum').valueAsDate = new Date();
 
 /* ═══════════════════════════════════════
    INIT – deferred sig init for modules
